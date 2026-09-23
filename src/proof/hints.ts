@@ -4,7 +4,7 @@ import type { CloseMethod, DerivationDraft, DraftLine } from './types';
 import { accessProblem, analyze, type Analysis } from './checker';
 import { Prover, prune } from './prover';
 import { ruleLabel } from './rules';
-import { contradictory, entails, equals as eq, fmt, lineList } from './util';
+import { consistent, contradictory, entails, equals as eq, fmt, lineList } from './util';
 
 /** A concrete suggested line (level 3), or a close instruction. */
 export interface HintLine {
@@ -239,9 +239,8 @@ function nextStep(draft: DerivationDraft, level: 1 | 2 | 3): Hint | null {
   if (!cont) {
     // Explain why, if the Show line simply doesn't follow.
     const avail = accessibleFor(an, t).map((a) => a.f);
-    const target: Formula =
-      asm === 'CD' && G.kind === 'implies' ? G.right : asm === 'ID' ? { kind: 'and', left: { kind: 'atom', name: 'Z9' }, right: Not({ kind: 'atom', name: 'Z9' }) } : G;
-    const ok = entails(avail, target);
+    const target: Formula = asm === 'CD' && G.kind === 'implies' ? G.right : G;
+    const ok = asm === 'ID' ? (consistent(avail) === null ? null : !consistent(avail)) : entails(avail, target);
     if (ok === false)
       return {
         message:
