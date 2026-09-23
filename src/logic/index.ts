@@ -22,14 +22,17 @@ export * from './ast';
 export type { Span, ParseError, ParseResult, ParseErrorCode } from './parser';
 export { parse, parseOrThrow, normalizeInput } from './parser';
 
-export { format, formatWithSpans } from './format';
+export { format, formatWithSpans, ASCII_SYMBOL } from './format';
 export type { FormatOptions } from './format';
 
-export { atomsOf, evaluate, subformulas, complexity, mainConnective } from './evaluate';
+export { atomsOf, evaluate, subformulas, complexity, mainConnective, compareAtoms, compileFormula } from './evaluate';
 export type { Valuation } from './evaluate';
 
-export { buildTruthTable, classify } from './truthTable';
+export { buildTruthTable, classify, allValuations, MAX_TRUTH_TABLE_ATOMS, MAX_BRUTE_FORCE_ATOMS } from './truthTable';
 export type { TruthTable, TruthTableColumn, Classification } from './truthTable';
 
 export { checkValidity, checkEquivalence, checkConsistency } from './validity';
 export type { ValidityResult, EquivalenceResult, ConsistencyResult } from './validity';
+
+export { randomFormula, seededRandom } from './random';
+export type { RandomFormulaOptions } from './random';

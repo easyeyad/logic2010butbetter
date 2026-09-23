@@ -1,5 +1,11 @@
 import type { Formula } from './ast';
 import type { Valuation } from './evaluate';
+import { atomsOf, compileFormula } from './evaluate';
+import { forEachRow, toValuation } from './truthTable';
+
+// All checks brute-force the truth table in standard row order (all-T first),
+// so "the first counterexample/model" matches the first such row a student sees.
+// Up to MAX_BRUTE_FORCE_ATOMS (16) sentence letters; throws beyond that.
 
 export interface ValidityResult {
   valid: boolean;
@@ -13,16 +19,55 @@ export interface ValidityResult {
   premisesInconsistent: boolean;
 }
 
-export function checkValidity(_premises: Formula[], _conclusion: Formula): ValidityResult {
-  throw new Error('not implemented');
+export function checkValidity(premises: Formula[], conclusion: Formula): ValidityResult {
+  const atoms = atomsOf(...premises, conclusion);
+  const ps = premises.map((p) => compileFormula(p, atoms));
+  const c = compileFormula(conclusion, atoms);
+  const counterexamples: Valuation[] = [];
+  let premisesSatisfiable = false;
+  const rowsChecked = forEachRow(atoms, (vs) => {
+    for (const p of ps) if (!p(vs)) return;
+    premisesSatisfiable = true;
+    if (!c(vs)) counterexamples.push(toValuation(atoms, vs));
+  });
+  return {
+    valid: counterexamples.length === 0,
+    counterexample: counterexamples[0],
+    counterexamples,
+    rowsChecked,
+    premisesInconsistent: !premisesSatisfiable,
+  };
 }
 
 export interface EquivalenceResult { equivalent: boolean; differingValuation?: Valuation }
-export function checkEquivalence(_a: Formula, _b: Formula): EquivalenceResult {
-  throw new Error('not implemented');
+
+/** Stops at the first row where the two formulas differ. */
+export function checkEquivalence(a: Formula, b: Formula): EquivalenceResult {
+  const atoms = atomsOf(a, b);
+  const ea = compileFormula(a, atoms);
+  const eb = compileFormula(b, atoms);
+  let differingValuation: Valuation | undefined;
+  forEachRow(atoms, (vs) => {
+    if (ea(vs) !== eb(vs)) {
+      differingValuation = toValuation(atoms, vs);
+      return false;
+    }
+  });
+  return differingValuation ? { equivalent: false, differingValuation } : { equivalent: true };
 }
 
 export interface ConsistencyResult { consistent: boolean; model?: Valuation }
-export function checkConsistency(_fs: Formula[]): ConsistencyResult {
-  throw new Error('not implemented');
+
+/** Stops at the first row making every formula true. The empty set is consistent. */
+export function checkConsistency(fs: Formula[]): ConsistencyResult {
+  const atoms = atomsOf(...fs);
+  const evs = fs.map((f) => compileFormula(f, atoms));
+  let model: Valuation | undefined;
+  forEachRow(atoms, (vs) => {
+    if (evs.every((e) => e(vs))) {
+      model = toValuation(atoms, vs);
+      return false;
+    }
+  });
+  return model ? { consistent: true, model } : { consistent: false };
 }
