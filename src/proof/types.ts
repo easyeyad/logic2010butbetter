@@ -58,6 +58,11 @@ export interface DerivationDraft {
   lines: DraftLine[];
   /** Allow derived rules (DM, NC, NB, CDJ, SC). Default false. */
   allowDerivedRules?: boolean;
+  /**
+   * Optional: the exercise's given premises (text). When present, every PR
+   * line must be one of them ('premise-not-given' otherwise).
+   */
+  premises?: string[];
 }
 
 export type Severity = 'error' | 'warning' | 'info';
@@ -78,6 +83,8 @@ export interface LineIssue {
   badRefs?: number[];
   /** What would make it valid — must not give away the whole proof. */
   suggestion?: string;
+  /** For 'parse-error': the offending character range of the line's text. */
+  span?: { start: number; end: number };
 }
 
 export interface LineCheck {
