@@ -515,6 +515,15 @@ Show P ↔ Q | DD 3
     expect(issuesOf(c, 3)[0].suggestion).toContain('CB');
   });
 
+  it('BC on a conditional to get its converse', () => {
+    const c = checkDerivation(draft(`
+P → Q      | PR
+Show Q → P | DD 3
+  Q → P    | BC 1
+`));
+    expect(issuesOf(c, 3)[0].suggestion).toContain('does not give you its converse');
+  });
+
   it('CB with non-converses', () => {
     const c = checkDerivation(draft(`
 P → Q      | PR

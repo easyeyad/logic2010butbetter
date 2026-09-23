@@ -560,7 +560,9 @@ function diagBC(n: number, [a]: RefF[], c: Formula): Diagnosis {
       suggestion:
         c.kind === 'iff'
           ? 'To BUILD a biconditional, use CB with both conditionals φ → ψ and ψ → φ.'
-          : 'BC only applies to a line whose main connective is ↔.',
+          : a.f.kind === 'implies' && eq(c, Implies(a.f.right, a.f.left))
+            ? `A conditional does not give you its converse: ${F(a.f)} does not mean ${F(c)}.`
+            : 'BC only applies to a line whose main connective is ↔.',
       badRefs: [a.n],
       target: 'refs',
     };
