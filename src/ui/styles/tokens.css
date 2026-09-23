@@ -1,0 +1,178 @@
+/* Design tokens. Light theme is the default; dark theme applies either via
+   system preference (no explicit data-theme) or data-theme="dark". */
+:root {
+  color-scheme: light;
+  /* Neutrals */
+  --c-bg: #f7f7f5;
+  --c-surface: #ffffff;
+  --c-surface-2: #f1f1ee;
+  --c-surface-3: #e8e8e4;
+  --c-border: #dcdcd6;
+  --c-border-strong: #b9b9b1;
+  --c-text: #1b1b19;
+  --c-text-2: #4a4a45;
+  --c-text-3: #66665f;
+  /* Accent (indigo) */
+  --c-accent: #4338ca;
+  --c-accent-hover: #3730a3;
+  --c-accent-soft: #eceafd;
+  --c-accent-text: #3730a3;
+  --c-on-accent: #ffffff;
+  /* Status (always paired with an icon + word in the UI) */
+  --c-ok: #166534;
+  --c-ok-soft: #e7f5ec;
+  --c-ok-border: #9fd3b1;
+  --c-err: #b42318;
+  --c-err-soft: #fdeceb;
+  --c-err-border: #f1aca6;
+  --c-warn: #8a5300;
+  --c-warn-soft: #fff4de;
+  --c-warn-border: #f0cd85;
+  --c-info: #1e5aa8;
+  --c-info-soft: #e8f0fb;
+  /* Truth values */
+  --c-true: #14532d;
+  --c-true-soft: #eaf6ee;
+  --c-false: #7f1d1d;
+  --c-false-soft: #faeeee;
+  /* Proof box rails */
+  --c-rail: #a5a1e8;
+  --c-rail-closed: #b9b9b1;
+
+  --focus-ring: 0 0 0 2px var(--c-surface), 0 0 0 4px var(--c-accent);
+
+  /* Type */
+  --font-sans: "Inter", ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --font-math: "STIX Two Math", "STIX Two Text", "Cambria Math", "Noto Sans Math", "Latin Modern Math", "Segoe UI Symbol", "DejaVu Sans", ui-serif, serif;
+  --font-mono: ui-monospace, "SF Mono", "JetBrains Mono", Menlo, Consolas, monospace;
+  --fs-xs: 0.75rem;
+  --fs-sm: 0.875rem;
+  --fs-md: 1rem;
+  --fs-lg: 1.125rem;
+  --fs-xl: 1.375rem;
+  --fs-2xl: 1.75rem;
+  --fs-3xl: 2.25rem;
+  --lh-tight: 1.25;
+  --lh: 1.55;
+
+  /* Spacing (4px grid) */
+  --sp-1: 0.25rem;
+  --sp-2: 0.5rem;
+  --sp-3: 0.75rem;
+  --sp-4: 1rem;
+  --sp-5: 1.25rem;
+  --sp-6: 1.5rem;
+  --sp-8: 2rem;
+  --sp-10: 2.5rem;
+  --sp-12: 3rem;
+
+  --radius-sm: 6px;
+  --radius: 10px;
+  --radius-lg: 14px;
+  --radius-full: 999px;
+
+  --shadow-sm: 0 1px 2px rgb(20 20 15 / 0.06);
+  --shadow: 0 1px 3px rgb(20 20 15 / 0.08), 0 4px 12px rgb(20 20 15 / 0.06);
+  --shadow-lg: 0 10px 30px rgb(20 20 15 / 0.16), 0 2px 6px rgb(20 20 15 / 0.08);
+
+  --touch: 44px;
+  --control-h: 40px;
+  --sidebar-w: 240px;
+  --rail-w: 72px;
+  --tabbar-h: 60px;
+  --indent: 22px;
+
+  --dur: 160ms;
+  --ease: cubic-bezier(0.2, 0.7, 0.2, 1);
+}
+
+@media (pointer: coarse) {
+  :root { --control-h: 44px; }
+}
+
+@media (max-width: 767px) {
+  :root { --indent: 12px; }
+}
+
+/* Dark theme values, applied in two places below. */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+    --c-bg: #111113;
+    --c-surface: #19191c;
+    --c-surface-2: #212125;
+    --c-surface-3: #2b2b30;
+    --c-border: #33333a;
+    --c-border-strong: #4d4d56;
+    --c-text: #ededf0;
+    --c-text-2: #c2c2c9;
+    --c-text-3: #9d9da6;
+    --c-accent: #8b85ff;
+    --c-accent-hover: #a29dff;
+    --c-accent-soft: #25234a;
+    --c-accent-text: #b7b3ff;
+    --c-on-accent: #0f0e24;
+    --c-ok: #6fd694;
+    --c-ok-soft: #13291c;
+    --c-ok-border: #2d6a44;
+    --c-err: #ff8a80;
+    --c-err-soft: #34181a;
+    --c-err-border: #7a3530;
+    --c-warn: #f3c465;
+    --c-warn-soft: #2f2410;
+    --c-warn-border: #6d5320;
+    --c-info: #8ab8ff;
+    --c-info-soft: #16233a;
+    --c-true: #8ee0aa;
+    --c-true-soft: #14261b;
+    --c-false: #ffaaa3;
+    --c-false-soft: #2c1718;
+    --c-rail: #5f59c9;
+    --c-rail-closed: #4d4d56;
+    --shadow-sm: 0 1px 2px rgb(0 0 0 / 0.4);
+    --shadow: 0 1px 3px rgb(0 0 0 / 0.4), 0 4px 12px rgb(0 0 0 / 0.3);
+    --shadow-lg: 0 10px 30px rgb(0 0 0 / 0.55);
+  }
+}
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --c-bg: #111113;
+  --c-surface: #19191c;
+  --c-surface-2: #212125;
+  --c-surface-3: #2b2b30;
+  --c-border: #33333a;
+  --c-border-strong: #4d4d56;
+  --c-text: #ededf0;
+  --c-text-2: #c2c2c9;
+  --c-text-3: #9d9da6;
+  --c-accent: #8b85ff;
+  --c-accent-hover: #a29dff;
+  --c-accent-soft: #25234a;
+  --c-accent-text: #b7b3ff;
+  --c-on-accent: #0f0e24;
+  --c-ok: #6fd694;
+  --c-ok-soft: #13291c;
+  --c-ok-border: #2d6a44;
+  --c-err: #ff8a80;
+  --c-err-soft: #34181a;
+  --c-err-border: #7a3530;
+  --c-warn: #f3c465;
+  --c-warn-soft: #2f2410;
+  --c-warn-border: #6d5320;
+  --c-info: #8ab8ff;
+  --c-info-soft: #16233a;
+  --c-true: #8ee0aa;
+  --c-true-soft: #14261b;
+  --c-false: #ffaaa3;
+  --c-false-soft: #2c1718;
+  --c-rail: #5f59c9;
+  --c-rail-closed: #4d4d56;
+  --shadow-sm: 0 1px 2px rgb(0 0 0 / 0.4);
+  --shadow: 0 1px 3px rgb(0 0 0 / 0.4), 0 4px 12px rgb(0 0 0 / 0.3);
+  --shadow-lg: 0 10px 30px rgb(0 0 0 / 0.55);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root:not([data-motion="full"]) { --dur: 0ms; }
+}
+:root[data-motion="reduce"] { --dur: 0ms; }

@@ -1,12 +1,10 @@
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
-
-function Placeholder() {
-  return <h1>Logic Studio</h1>;
-}
+import './ui/styles/index.css';
+import { App } from './ui/app/App';
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
-    <Placeholder />
+    <App />
   </StrictMode>,
 );
