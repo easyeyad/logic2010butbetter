@@ -6,9 +6,9 @@
  * OWNER: Learning System.
  */
 import type { Classification, Formula, Valuation } from '../logic';
-import { atomsOf, buildTruthTable, checkValidity, classify, evaluate, format, randomFormula } from '../logic';
+import { atomsOf, buildTruthTable, checkValidity, classify, evaluate, format } from '../logic';
 import type { CountermodelExercise, Difficulty, Feedback, Solution, TruthTableExercise, ValidityExercise } from './types';
-import { explainValue, f, formatValuation, hash, joinList, makeRng, missingAtoms, pick, sample, substitute, tf, type Rng } from './util';
+import { explainValue, f, formatValuation, hash, joinList, makeRng, missingAtoms, niceRandomFormula, pick, sample, substitute, tf, type Rng } from './util';
 
 // ---------------------------------------------------------------------------
 // Substitution material
@@ -29,7 +29,7 @@ function filler(rng: Rng, difficulty: Difficulty, letters: string[]): Formula {
   }
   if (r < 0.35) return atom();
   if (r < 0.5) return { kind: 'not', operand: atom() };
-  return randomFormula({ atoms: letters, maxDepth: 2, random: rng });
+  return niceRandomFormula({ atoms: letters, maxDepth: 2, random: rng });
 }
 
 /** Substitute distinct fillers for the schematic letters W X Y Z. */
@@ -68,7 +68,7 @@ function truthTableFormula(rng: Rng, difficulty: Difficulty, target: Classificat
   const maxDepth = difficulty <= 1 ? 2 : difficulty <= 3 ? 3 : 4;
   if (target === 'contingent' || rng() < 0.3) {
     for (let i = 0; i < 200; i++) {
-      const g = randomFormula({ atoms, maxDepth, random: rng });
+      const g = niceRandomFormula({ atoms, maxDepth, random: rng });
       if (g.kind === 'atom') continue;
       if (classify(g) === target) return g;
     }
@@ -282,8 +282,8 @@ function randomArgument(rng: Rng, difficulty: Difficulty, wantValid: boolean): A
   const atoms = LETTERS.slice(0, difficulty >= 5 ? 4 : 3);
   for (let i = 0; i < 300; i++) {
     const n = 1 + Math.floor(rng() * (difficulty >= 5 ? 3 : 2));
-    const premises = Array.from({ length: n }, () => randomFormula({ atoms, maxDepth: difficulty >= 5 ? 3 : 2, random: rng }));
-    const conclusion = randomFormula({ atoms, maxDepth: 2, random: rng });
+    const premises = Array.from({ length: n }, () => niceRandomFormula({ atoms, maxDepth: difficulty >= 5 ? 3 : 2, random: rng }));
+    const conclusion = niceRandomFormula({ atoms, maxDepth: 2, random: rng });
     if (conclusion.kind === 'atom' && rng() < 0.5) continue;
     const r = checkValidity(premises, conclusion);
     if (r.premisesInconsistent) continue;

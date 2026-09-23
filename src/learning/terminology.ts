@@ -7,9 +7,9 @@
  * OWNER: Learning System.
  */
 import type { Formula } from '../logic';
-import { CONNECTIVE_NAME, SYMBOL, equals, format, formatWithSpans, parse, randomFormula } from '../logic';
+import { CONNECTIVE_NAME, SYMBOL, equals, format, formatWithSpans, parse } from '../logic';
 import type { Difficulty, Feedback, FormulaPart, Solution, TerminologyExercise, TerminologyFormat } from './types';
-import { editDistance, f, hash, makeRng, pick, shuffle } from './util';
+import { editDistance, f, hash, makeRng, niceRandomFormula, pick, shuffle } from './util';
 
 // ---------------------------------------------------------------------------
 // Formula anatomy helpers
@@ -187,7 +187,7 @@ export function generateTerminology(difficulty: Difficulty, seed: number): Termi
   const minSize = [1, 2, 3, 4, 5][difficulty - 1];
   let g: Formula = f('P → Q');
   for (let i = 0; i < 100; i++) {
-    const c = randomFormula({ atoms, maxDepth, random: rng });
+    const c = niceRandomFormula({ atoms, maxDepth, random: rng });
     const n = (format(c).match(/[¬∧∨→↔]/g) ?? []).length;
     if (c.kind !== 'atom' && n >= minSize && n <= minSize + 3) {
       g = c;

@@ -6,9 +6,9 @@
  *
  * OWNER: Learning System.
  */
-import { CONNECTIVE_NAME, format, mainConnective, parse, randomFormula } from '../logic';
+import { CONNECTIVE_NAME, format, mainConnective, parse } from '../logic';
 import type { Difficulty, Feedback, Solution, WffDefect, WffExercise } from './types';
-import { hash, makeRng, pick, type Rng } from './util';
+import { hash, makeRng, niceRandomFormula, pick, type Rng } from './util';
 
 const ATOMS_BY_DIFFICULTY: Record<Difficulty, string[]> = {
   1: ['P', 'Q'],
@@ -132,7 +132,7 @@ export function generateWff(difficulty: Difficulty, seed: number): WffExercise {
   let defect: WffDefect | undefined;
   for (let attempt = 0; attempt < 50; attempt++) {
     const maxDepth = difficulty <= 1 ? 2 : difficulty <= 3 ? 3 : 4;
-    const g = randomFormula({ atoms, maxDepth, random: rng });
+    const g = niceRandomFormula({ atoms, maxDepth, random: rng });
     const s = format(g);
     const conns = (s.match(/[¬∧∨→↔]/g) ?? []).length;
     const minConns = [1, 1, 2, 3, 4][difficulty - 1];

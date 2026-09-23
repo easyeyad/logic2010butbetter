@@ -10,9 +10,9 @@
 import type { Formula } from '../logic';
 import { checkValidity, equals, format, parse } from '../logic';
 import type { RuleId } from '../proof';
-import { getRule } from '../proof';
+import { getRule, ruleLabel } from '../proof';
 import type { Difficulty, Feedback, InferenceRuleExercise, Solution } from './types';
-import { f, hash, makeRng, pick, shuffle, type Rng } from './util';
+import { f, hash, makeRng, pick, sample, shuffle, type Rng } from './util';
 
 export const PRIMITIVE_RULES: RuleId[] = ['MP', 'MT', 'DN', 'R', 'S', 'ADJ', 'ADD', 'MTP', 'BC', 'CB'];
 export const DERIVED_RULES: RuleId[] = ['DM', 'NC', 'NB', 'CDJ', 'SC'];
@@ -20,10 +20,6 @@ export const ALL_RULES: RuleId[] = [...PRIMITIVE_RULES, ...DERIVED_RULES];
 
 const ARITY: Record<RuleId, number> = { MP: 2, MT: 2, DN: 1, R: 1, S: 1, ADJ: 2, ADD: 1, MTP: 2, BC: 1, CB: 2, DM: 1, NC: 1, NB: 1, CDJ: 1, SC: 3 };
 
-export function ruleLabel(id: string): string {
-  const r = getRule(id);
-  return r ? `${r.abbreviation} (${r.name})` : id;
-}
 
 const eq = equals;
 const isNeg = (g: Formula): g is Extract<Formula, { kind: 'not' }> => g.kind === 'not';
@@ -57,7 +53,7 @@ function oneWay(rule: RuleId, a: Formula, b: Formula): boolean {
 
 /** Does `rule` justify `to` from exactly the lines `cited` (any order, all used)? */
 export function ruleJustifies(rule: RuleId, cited: Formula[], to: Formula): boolean {
-  if (cited.length !== ARITY[rule]) return false;
+  if (cited.length !== ARITY[rule] && !(rule === 'SC' && cited.length === 2)) return false;
   return permutations(cited).some((ls) => {
     const [a, b, c] = ls;
     switch (rule) {
@@ -87,6 +83,7 @@ export function ruleJustifies(rule: RuleId, cited: Formula[], to: Formula): bool
       case 'CDJ':
         return oneWay(rule, a, to) || oneWay(rule, to, a);
       case 'SC':
+        if (ls.length === 2) return a.kind === 'implies' && b.kind === 'implies' && eq(b.left, N(a.left)) && eq(a.right, to) && eq(b.right, to);
         return (
           a.kind === 'or' && b.kind === 'implies' && c.kind === 'implies' && eq(b.left, a.left) && eq(c.left, a.right) && eq(b.right, to) && eq(c.right, to)
         );
@@ -112,7 +109,8 @@ function part(rng: Rng, difficulty: Difficulty): Formula {
   if (difficulty === 2) return r < 0.7 ? atom() : N(atom());
   if (r < 0.4) return atom();
   if (r < 0.6) return N(atom());
-  return Bn(pick(rng, ['and', 'or', 'implies', 'iff'] as const), atom(), difficulty >= 5 && rng() < 0.4 ? N(atom()) : atom());
+  const [a, b] = sample(rng, LETTERS, 2).map((name): Formula => ({ kind: 'atom', name }));
+  return Bn(pick(rng, ['and', 'or', 'implies', 'iff'] as const), a, difficulty >= 5 && rng() < 0.4 ? N(b) : b);
 }
 
 type Instance = { cited: Formula[]; to: Formula };

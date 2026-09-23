@@ -202,6 +202,7 @@ function localMutations(g: Formula): { code: MutationCode; to: Formula }[] {
       if (g.kind === 'and' && l.kind === 'not' && r.kind === 'not') out.push({ code: 'neither-as-not-both', to: N(B('and', l.operand, r.operand)) });
       if (g.kind === 'or' && l.kind === 'not' && r.kind === 'not') out.push({ code: 'not-both-as-neither', to: N(B('or', l.operand, r.operand)) });
       if (l.kind === 'not') out.push({ code: 'negation-scope-wide', to: N(B(g.kind, l.operand, r)) });
+      if (r.kind === 'not') out.push({ code: 'negation-scope-wide', to: N(B(g.kind, l, r.operand)) });
       if (g.kind === 'implies') {
         out.push({ code: 'converse', to: B('implies', r, l) });
         out.push({ code: 'conditional-as-biconditional', to: B('iff', l, r) });

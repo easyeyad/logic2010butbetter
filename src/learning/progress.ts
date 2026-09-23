@@ -178,6 +178,8 @@ function shiftDay(key: string, delta: number): string {
   return dayKey(new Date(y, m - 1, d + delta, 12).getTime());
 }
 
+/** Newest first; among equal timestamps, the later-recorded one first. */
+const newestFirst = (as: readonly AttemptRecord[]) => [...as].reverse().sort((a, b) => b.timestamp - a.timestamp);
 const score = (a: AttemptRecord) => (a.correct ? 1 : a.partial ? 0.5 : 0);
 const isTopic = (t: unknown): t is Topic => typeof t === 'string' && (TOPICS as readonly string[]).includes(t);
 const isNum = (n: unknown): n is number => typeof n === 'number' && Number.isFinite(n);
@@ -247,30 +249,30 @@ export const DEMOTE_AFTER = 2;
 export function adaptiveLevel(attempts: readonly AttemptRecord[], start: Difficulty = 1): Difficulty {
   let level: number = start;
   let run = 0;
-  let window: boolean[] = [];
+  let recent: boolean[] = [];
   for (const a of attempts) {
     const clean = a.correct && a.hintsUsed <= 1 && !a.solutionViewed;
     const failed = !a.correct && !a.partial;
     if (clean && a.difficulty >= level) {
       run++;
-      window.push(true);
+      recent.push(true);
       if (run >= PROMOTE_AFTER && level < 5) {
         level++;
         run = 0;
-        window = [];
+        recent = [];
         continue;
       }
     } else if (failed || a.solutionViewed) {
       run = 0;
-      window.push(false);
+      recent.push(false);
     } else if (!a.correct) {
       run = 0; // partial: resets the run but is not a failure
     }
-    window = window.slice(-3);
-    if (window.filter((w) => !w).length >= DEMOTE_AFTER && level > 1) {
+    recent = recent.slice(-3);
+    if (recent.filter((w) => !w).length >= DEMOTE_AFTER && level > 1) {
       level--;
       run = 0;
-      window = [];
+      recent = [];
     }
   }
   return clampDifficulty(level);
@@ -411,7 +413,7 @@ export class ProgressStore {
 
   /** Most recent attempts first. */
   recentActivity(limit = 10): AttemptRecord[] {
-    return [...this.data.attempts].sort((a, b) => b.timestamp - a.timestamp).slice(0, limit);
+    return newestFirst(this.data.attempts).slice(0, limit);
   }
 
   /** Attempts per local day for the last `days` days (oldest first, including today). */
@@ -442,7 +444,7 @@ export class ProgressStore {
   private weightedAccuracy(attempts: AttemptRecord[]): number | null {
     if (!attempts.length) return null;
     const now = this.now();
-    const sorted = [...attempts].sort((a, b) => b.timestamp - a.timestamp);
+    const sorted = newestFirst(attempts);
     let wsum = 0;
     let ssum = 0;
     sorted.forEach((a, rank) => {

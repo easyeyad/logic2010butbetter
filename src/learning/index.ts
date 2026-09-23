@@ -99,7 +99,6 @@ export {
   checkInferenceRule,
   ruleJustifies,
   rulesJustifying,
-  ruleLabel,
   PRIMITIVE_RULES,
   DERIVED_RULES,
   ALL_RULES,

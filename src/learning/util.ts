@@ -4,8 +4,8 @@
  *
  * OWNER: Learning System.
  */
-import type { Formula, Valuation } from '../logic';
-import { atomsOf, evaluate, format, parse, seededRandom } from '../logic';
+import type { Formula, RandomFormulaOptions, Valuation } from '../logic';
+import { atomsOf, equals as equalsF, evaluate, format, parse, randomFormula, seededRandom } from '../logic';
 
 export type Rng = () => number;
 
@@ -163,4 +163,23 @@ export function depth(g: Formula): number {
     default:
       return 1 + Math.max(depth(g.left), depth(g.right));
   }
+}
+
+/** True if some binary node has identical sides (P ∧ P, Q ↔ Q) — legal but silly in exercises. */
+export function hasTrivialNode(g: Formula): boolean {
+  switch (g.kind) {
+    case 'atom':
+      return false;
+    case 'not':
+      return hasTrivialNode(g.operand);
+    default:
+      return equalsF(g.left, g.right) || hasTrivialNode(g.left) || hasTrivialNode(g.right);
+  }
+}
+
+/** randomFormula without degenerate nodes like P ∨ P (falls back after 60 tries). */
+export function niceRandomFormula(opts: RandomFormulaOptions & { random: Rng }): Formula {
+  let g = randomFormula(opts);
+  for (let i = 0; i < 60 && hasTrivialNode(g); i++) g = randomFormula(opts);
+  return g;
 }
