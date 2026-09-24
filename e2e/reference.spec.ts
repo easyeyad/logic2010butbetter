@@ -35,8 +35,8 @@ test.describe('reference', () => {
     await fresh(page);
     await go(page, '/reference');
     const group = page.getByRole('group', { name: 'Filter by category' });
-    await group.getByRole('button', { name: 'Primitive' }).click();
-    await expect(group.getByRole('button', { name: 'Primitive' })).toHaveAttribute('aria-pressed', 'true');
+    await group.getByRole('button', { name: 'Sentential' }).click();
+    await expect(group.getByRole('button', { name: 'Sentential' })).toHaveAttribute('aria-pressed', 'true');
     await expect(group.getByRole('button', { name: 'All' })).toHaveAttribute('aria-pressed', 'false');
     await expect(page.locator('main').getByRole('heading', { name: 'Derived rules' })).toHaveCount(0);
   });

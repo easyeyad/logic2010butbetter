@@ -86,7 +86,7 @@ export function CloseBoxDialog({
         )}
         <fieldset className="methods">
           <legend className="field__label">Method</legend>
-          {METHODS.map(({ m, name, fallback }) => (
+          {METHODS.filter(({ m }) => m !== 'UD' || /^\s*[∀@]/.test(line.text) || method === 'UD').map(({ m, name, fallback }) => (
             <label key={m} className={`method ${method === m ? 'is-selected' : ''}`}>
               <input type="radio" name="close-method" value={m} checked={method === m} onChange={() => setMethod(m)} data-autofocus={method === m ? '' : undefined} />
               <span>

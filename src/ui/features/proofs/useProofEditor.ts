@@ -23,7 +23,7 @@ import {
   isBlank,
   updateLine,
 } from './draftOps';
-import { DERIVATION_EXERCISES } from '../../../learning';
+import { ALL_DERIVATIONS as DERIVATION_EXERCISES } from './exercises';
 
 export interface ProofProblem {
   /** Sample id, or 'custom'. */

@@ -1,5 +1,5 @@
 import { useEffect, useRef } from 'react';
-import { DERIVATION_EXERCISES } from '../../../learning';
+import { ALL_DERIVATIONS as DERIVATION_EXERCISES } from './exercises';
 import { useDebounced } from '../../hooks/useDebounced';
 import { progressStore } from '../../learning/progress';
 import { useFlushOnLeave } from '../../hooks/useFlushOnLeave';
@@ -54,7 +54,7 @@ export function useProofTracking(ed: ProofEditorState) {
     try {
       progressStore().recordAttempt({
         exerciseId: ex ? ex.id : proofId,
-        topic: 'derivation',
+        topic: ex ? ex.topic : 'derivation',
         difficulty: ex ? ex.difficulty : 3,
         correct: true,
         hintsUsed: s.hints,

@@ -30,7 +30,7 @@ export function toInterpretation(s: BuilderState, predicates: { name: string; ar
 }
 
 const same = (a: number[], b: number[]) => a.length === b.length && a.every((v, i) => v === b[i]);
-const obj = (i: number) => String(i + 1);
+const obj = (i: number) => `#${i + 1}`;
 
 /**
  * Build a finite model by hand: domain size 1–4, which object each name

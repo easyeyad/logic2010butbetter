@@ -1,7 +1,7 @@
 import type { Interpretation } from '../../../logic';
 import { Icon } from '../../components/Icon';
 
-const obj = (i: number) => String(i + 1);
+const obj = (i: number) => `#${i + 1}`;
 
 function Mark({ yes, label }: { yes: boolean; label: string }) {
   return (

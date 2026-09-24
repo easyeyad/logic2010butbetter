@@ -16,7 +16,7 @@ export interface SetupChoice {
 const LENGTHS = [5, 10, 20];
 
 export function topicTitle(t: PracticeTopic) {
-  return t === 'mixed' ? 'Mixed review' : TOPIC_INFO[t].title;
+  return t === 'mixed' ? 'Mixed review' : t === 'mixed-predicate' ? 'Mixed predicate review' : TOPIC_INFO[t].title;
 }
 
 /** Topic + difficulty (Adaptive by default) + length, and the recommended next practice. */
@@ -26,7 +26,7 @@ export function PracticeSetup({ onStart }: { onStart: (c: SetupChoice) => void }
   const [difficulty, setDifficulty] = useState<Difficulty | null>(null);
   const [count, setCount] = useState(10);
   const rec = attempt(() => store.recommendNext());
-  const adaptiveLevel = topic === 'mixed' ? null : attempt(() => store.recommendedDifficulty(topic));
+  const adaptiveLevel = topic === 'mixed' || topic === 'mixed-predicate' ? null : attempt(() => store.recommendedDifficulty(topic));
 
   return (
     <div className="stack stack--lg">
@@ -52,7 +52,6 @@ export function PracticeSetup({ onStart }: { onStart: (c: SetupChoice) => void }
           {[
             { title: 'Sentential logic', list: SENTENTIAL_PICKER },
             { title: 'Predicate logic', list: PREDICATE_PICKER },
-            { title: 'Mix it up', list: ['mixed'] as PracticeTopic[] },
           ].map((g) => (
             <div key={g.title} className="topic-group">
               <h3 className="topic-group__h">{g.title}</h3>
@@ -63,7 +62,7 @@ export function PracticeSetup({ onStart }: { onStart: (c: SetupChoice) => void }
                     <span className="topic-card__icon"><Icon name={TOPIC_ICON[t]} size={20} /></span>
                     <span className="topic-card__text">
                       <span className="topic-card__title">{topicTitle(t)}</span>
-                      <span className="topic-card__desc">{t === 'mixed' ? 'A bit of everything, each at your level.' : TOPIC_INFO[t].description}</span>
+                      <span className="topic-card__desc">{t === 'mixed' ? 'A bit of every sentential topic, each at your level.' : t === 'mixed-predicate' ? 'Symbolization, models, countermodels and derivations with quantifiers.' : TOPIC_INFO[t].description}</span>
                     </span>
                   </label>
                 ))}

@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import type { Difficulty, ExerciseResult, PracticeSession, Topic } from '../../../learning';
-import { createPracticeSession, mergeResult, TOPICS } from '../../../learning';
+import { createPracticeSession, mergeResult, PREDICATE_TOPICS, SENTENTIAL_TOPICS, TOPICS } from '../../../learning';
 import { PageHeader } from '../../app/PageHeader';
 import { Button } from '../../components/Button';
 import { EngineError } from '../../components/Notice';
@@ -24,10 +24,11 @@ interface Run {
 function buildSession(c: SetupChoice): PracticeSession {
   const store = progressStore();
   const seed = Math.floor(Math.random() * 0x7fffffff);
-  if (c.topic === 'mixed') {
+  if (c.topic === 'mixed' || c.topic === 'mixed-predicate') {
+    const topics = c.topic === 'mixed' ? [...SENTENTIAL_TOPICS] : [...PREDICATE_TOPICS];
     const byTopic: Partial<Record<Topic, Difficulty>> = {};
-    if (c.difficulty === null) TOPICS.forEach((t) => (byTopic[t] = store.recommendedDifficulty(t)));
-    return createPracticeSession({ topic: 'mixed', difficulty: c.difficulty ?? 2, count: c.count, seed, difficultyByTopic: c.difficulty === null ? byTopic : undefined });
+    if (c.difficulty === null) topics.forEach((t) => (byTopic[t] = store.recommendedDifficulty(t)));
+    return createPracticeSession({ topic: 'mixed', topics, difficulty: c.difficulty ?? 2, count: c.count, seed, difficultyByTopic: c.difficulty === null ? byTopic : undefined });
   }
   const difficulty = c.difficulty ?? store.recommendedDifficulty(c.topic);
   return createPracticeSession({ topic: c.topic, difficulty, count: c.count, seed });
@@ -63,7 +64,7 @@ export default function PracticePage() {
         });
       }
       setParams({}, { replace: true });
-    } else if (topic && (topic === 'mixed' || (TOPICS as readonly string[]).includes(topic))) {
+    } else if (topic && (topic === 'mixed' || topic === 'mixed-predicate' || (TOPICS as readonly string[]).includes(topic))) {
       const d = Number(params.get('difficulty'));
       start({ topic, difficulty: d >= 1 && d <= 5 ? (d as Difficulty) : null, count: Number(params.get('count')) || 5 });
       setParams({}, { replace: true });

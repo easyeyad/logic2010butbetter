@@ -107,7 +107,7 @@ code { font-family: var(--font-mono); font-size: 0.9em; background: var(--c-surf
 .model__desc { padding-left: var(--sp-5); font-size: var(--fs-sm); }
 .domain, .mono-row { list-style: none; display: flex; flex-wrap: wrap; gap: var(--sp-2); }
 .obj { display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px 4px 4px; border-radius: var(--radius-full); background: var(--c-surface); border: 1px solid var(--c-border-strong); }
-.obj__n { display: inline-grid; place-items: center; min-width: 26px; height: 26px; border-radius: 50%; background: var(--c-accent); color: var(--c-on-accent); font-weight: 700; font-size: var(--fs-sm); }
+.obj__n { display: inline-grid; place-items: center; min-width: 30px; height: 26px; padding: 0 5px; border-radius: 13px; background: var(--c-accent); color: var(--c-on-accent); font-weight: 700; font-size: var(--fs-sm); }
 .obj__names { font-weight: 600; }
 .mono-cell { display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px 4px 4px; border-radius: var(--radius); border: 1px dashed var(--c-border-strong); background: var(--c-surface); font-size: var(--fs-sm); }
 .mono-cell.is-yes { border-style: solid; border-color: var(--c-ok-border); background: var(--c-ok-soft); }
