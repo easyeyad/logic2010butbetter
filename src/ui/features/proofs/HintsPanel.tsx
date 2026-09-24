@@ -26,12 +26,15 @@ export function HintsPanel({
   goal,
   onApply,
   onSolution,
+  onHint,
 }: {
   draft: DerivationDraft;
   premises: string[];
   goal: string;
   onApply: (line: HintLine) => void;
   onSolution: (lines: DraftLine[]) => void;
+  /** Called whenever a hint is revealed (for progress tracking). */
+  onHint?: () => void;
 }) {
   const [hints, setHints] = useState<HintEntry[]>([]);
   const [sig, setSig] = useState('');
@@ -58,6 +61,7 @@ export function HintsPanel({
     }
     const entry: HintEntry = { level: nextLevel, message: r.value.message, line: r.value.line };
     setHints((h) => (stale ? [entry] : [...h, entry]));
+    onHint?.();
     setSig(currentSig);
   };
 

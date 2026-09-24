@@ -2,7 +2,9 @@ import { useState } from 'react';
 import { Button } from '../../components/Button';
 import { FormulaInput } from '../../components/FormulaInput';
 import { FormulaText } from '../../components/FormulaText';
-import { SAMPLE_PROBLEMS } from './samples';
+import { DERIVATION_EXERCISES, type DerivationExercise } from '../../../learning';
+import { Icon } from '../../components/Icon';
+import { useProgress } from '../../learning/progress';
 import type { ProofProblem } from './useProofEditor';
 
 function Sequent({ premises, goal }: { premises: string[]; goal: string }) {
@@ -76,27 +78,13 @@ export function ProblemPanel({
     <div className="stack">
       <section aria-labelledby="samples-h">
         <h3 id="samples-h" className="panel-h">Exercises</h3>
-        <ul className="problem-list">
-          {SAMPLE_PROBLEMS.map((s) => (
-            <li key={s.id}>
-              <button
-                type="button"
-                className={`problem-item ${problem.id === s.id ? 'is-active' : ''}`}
-                aria-current={problem.id === s.id ? 'true' : undefined}
-                onClick={() => {
-                  onLoad({ id: s.id, title: s.title, premises: s.premises, goal: s.goal });
-                  if (collapsible) setOpen(false);
-                }}
-              >
-                <span className="problem-item__top">
-                  <span className="problem-item__title">{s.title}</span>
-                  <span className="badge">{s.strategy}</span>
-                </span>
-                <Sequent premises={s.premises} goal={s.goal} />
-              </button>
-            </li>
-          ))}
-        </ul>
+        <ExerciseGroups
+          currentId={problem.id}
+          onPick={(s) => {
+            onLoad({ id: s.id, title: s.title, premises: s.premises, goal: s.goal });
+            if (collapsible) setOpen(false);
+          }}
+        />
       </section>
       <section aria-labelledby="custom-h">
         <button type="button" className="disclosure" aria-expanded={custom} onClick={() => setCustom((c) => !c)}>
@@ -130,6 +118,62 @@ export function ProblemPanel({
         )}
       </div>
       {open && chooser}
+    </div>
+  );
+}
+
+const LEVELS = [1, 2, 3, 4, 5] as const;
+
+/** DERIVATION_EXERCISES grouped by difficulty, with completion checkmarks. */
+function ExerciseGroups({ currentId, onPick }: { currentId: string; onPick: (e: DerivationExercise) => void }) {
+  const [store] = useProgress();
+  const current = DERIVATION_EXERCISES.find((e) => e.id === currentId);
+  return (
+    <div className="levels">
+      {LEVELS.map((lvl) => {
+        const items = DERIVATION_EXERCISES.filter((e) => e.difficulty === lvl);
+        if (!items.length) return null;
+        const done = items.filter((e) => store.isSolved(e.id)).length;
+        return (
+          <details key={lvl} className="level" open={current ? current.difficulty === lvl : lvl === 1}>
+            <summary className="level__summary">
+              <span className="level__name">Level {lvl}</span>
+              <span className="level__count">
+                {done} of {items.length} done
+              </span>
+            </summary>
+            <ul className="problem-list">
+              {items.map((s) => {
+                const solved = store.isSolved(s.id);
+                return (
+                  <li key={s.id}>
+                    <button
+                      type="button"
+                      className={`problem-item ${currentId === s.id ? 'is-active' : ''}`}
+                      aria-current={currentId === s.id ? 'true' : undefined}
+                      onClick={() => onPick(s)}
+                    >
+                      <span className="problem-item__top">
+                        <span className="problem-item__title">{s.title}</span>
+                        <span className="row" style={{ gap: 4, flexWrap: 'nowrap' }}>
+                          {solved && (
+                            <span className="badge badge--ok" title="Completed">
+                              <Icon name="check" />
+                              <span className="visually-hidden">Completed</span>
+                            </span>
+                          )}
+                          <span className="badge">{s.strategy}</span>
+                        </span>
+                      </span>
+                      <Sequent premises={s.premises} goal={s.goal} />
+                    </button>
+                  </li>
+                );
+              })}
+            </ul>
+          </details>
+        );
+      })}
     </div>
   );
 }

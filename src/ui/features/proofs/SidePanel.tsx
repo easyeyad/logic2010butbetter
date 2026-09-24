@@ -13,12 +13,16 @@ export function SidePanel({
   onTab,
   onGoTo,
   errorCount,
+  onHint,
+  onSolutionViewed,
 }: {
   ed: ProofEditorState;
   tab: SideTab;
   onTab: (t: SideTab) => void;
   onGoTo: (id: string) => void;
   errorCount: number;
+  onHint?: () => void;
+  onSolutionViewed?: () => void;
 }) {
   return (
     <Tabs<SideTab>
@@ -42,7 +46,11 @@ export function SidePanel({
           premises={ed.doc.problem.premises}
           goal={ed.doc.problem.goal}
           onApply={ed.ops.applyHint}
-          onSolution={(lines) => ed.replaceLines(lines)}
+          onSolution={(lines) => {
+            onSolutionViewed?.();
+            ed.replaceLines(lines);
+          }}
+          onHint={onHint}
         />
       )}
       {tab === 'rules' && <RulesPanel compact />}
