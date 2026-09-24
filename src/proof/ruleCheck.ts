@@ -126,7 +126,9 @@ export function checkRuleApplication(
       message,
       suggestion:
         suggestion ??
-        `${ruleLabel(rule)} cites ${RULE_ARITY[rule].join(' or ')} ${RULE_ARITY[rule].length === 1 && RULE_ARITY[rule][0] === 1 ? 'line' : 'lines'}; check which lines the step really uses.`,
+        (cited.length < Math.min(...RULE_ARITY[rule])
+          ? 'Add the missing line to the citations, or pick the rule that matches the lines you cited.'
+          : 'Remove the lines this step does not use.'),
       target: 'refs',
       alternativeRules: alts,
     };

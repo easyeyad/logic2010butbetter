@@ -37,7 +37,8 @@ export function FormulaList({
       setFocusRow(i + parts.length - 1);
       return;
     }
-    onChange(values.map((v, j) => (j === i ? text : v)));
+    // Leading whitespace carries no meaning (typically the space after a comma).
+    onChange(values.map((v, j) => (j === i ? text.replace(/^\s+/, '') : v)));
   };
 
   return (

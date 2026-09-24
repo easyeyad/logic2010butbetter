@@ -71,7 +71,11 @@ function ProofsWorkspace() {
       onGoTo={goTo}
       errorCount={errorCount}
       onHint={tracking.hint}
-      onSolutionViewed={tracking.solutionViewed}
+      onSolutionViewed={() => {
+        tracking.solutionViewed();
+        // Let the student see the loaded solution rather than the sheet covering it.
+        setOverlayOpen(false);
+      }}
     />
   );
 
