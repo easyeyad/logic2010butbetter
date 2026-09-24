@@ -14,7 +14,7 @@
  *
  * OWNER: Learning System.
  */
-import { equals, parse } from '../logic';
+import { equals, format, parse } from '../logic';
 import type { CloseMethod, DerivationCheck, DerivationDraft, DraftLine, RuleId } from '../proof';
 import { checkDerivation, solve } from '../proof';
 import type { DerivationExercise, Difficulty, Feedback, Solution } from './types';
@@ -360,7 +360,9 @@ function toExercise(p: Problem, topic: DerivationExercise['topic'] = 'derivation
 export const DERIVATION_EXERCISES: DerivationExercise[] = PROBLEMS.map((p) => toExercise(p));
 
 /** Curated quantifier problems (topic 'quantifier-derivation'), easiest first. */
-export const QUANTIFIER_DERIVATION_EXERCISES: DerivationExercise[] = QUANTIFIER_PROBLEMS.map((p) => toExercise(p, 'quantifier-derivation'));
+export const QUANTIFIER_DERIVATION_EXERCISES: DerivationExercise[] = QUANTIFIER_PROBLEMS.map((p) =>
+  toExercise({ ...p, premises: p.premises.map((x) => format(f(x))), goal: format(f(p.goal)) }, 'quantifier-derivation'),
+);
 
 const solvedCache = new Map<string, DraftLine[] | null>();
 /** Proof-engine solution for problems without a scripted one (cached). */

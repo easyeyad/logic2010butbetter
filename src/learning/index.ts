@@ -10,7 +10,11 @@
  *   type Exercise = WffExercise | SymbolizationExercise | TruthTableExercise
  *                 | ValidityExercise | CountermodelExercise | DerivationExercise
  *                 | InferenceRuleExercise | TerminologyExercise
- *   Discriminated on `kind` (== `topic`). All fields are JSON-serializable.
+ *   Discriminated on `kind`. `topic` == `kind`, except predicate-logic derivations
+ *   (kind 'derivation', topic 'quantifier-derivation') and predicate concepts
+ *   (kind 'terminology', topic 'predicate-terminology'). All fields are JSON-serializable.
+ *   Predicate logic adds kinds 'predicate-symbolization', 'model', 'predicate-countermodel'.
+ *   Topic groups: SENTENTIAL_TOPICS, PREDICATE_TOPICS (TOPICS = both, in curriculum order).
  *   Common fields: id, kind, topic, difficulty (1–5), title, prompt, tags, source.
  *
  *   generateExercise(topic, difficulty, seed, opts?)  → Exercise   (deterministic)
@@ -31,6 +35,9 @@
  *       countermodel:   { valuation }
  *       derivation:     { draft }                  DerivationDraft from the proof editor
  *       inference-rule: { rule? , formula? }       'identify' mode → rule; 'apply' mode → formula
+ *       predicate-symbolization: { formula }     raw text; checked by alphaEquals, else bounded model search
+ *       model:          { value: boolean }          is exercise.formula true in exercise.model?
+ *       predicate-countermodel: { model: Interpretation }  domainSize, names{a:0}, predicates{F:{arity:1,extension:[[0]]}}
  *       terminology:    { position? , text?, value?, choice? }
  *                       click-connective → position; type-part/type-formula/fill-in → text;
  *                       true-false → value + choice (justification index); multiple-choice → choice

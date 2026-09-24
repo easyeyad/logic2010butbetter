@@ -163,7 +163,9 @@ function toExercise(it: Item, topic: TerminologyExercise['topic'] = 'terminology
     ex.options = shuffle(makeRng(parseInt(hash(ex.id), 36)), ex.options);
     ex.correctOption = ex.options.indexOf(right);
   }
-  if (ex.format === 'click-connective' && ex.formula)ex.connectiveIndex = mainConnectiveIndex(f(ex.formula));
+  // Display the canonical rendering, so character positions match format().
+  if (ex.formula) ex.formula = format(f(ex.formula));
+  if (ex.format === 'click-connective' && ex.formula) ex.connectiveIndex = mainConnectiveIndex(f(ex.formula));
   if (ex.format === 'type-part' && ex.formula && ex.part) {
     const p = formulaPart(f(ex.formula), ex.part);
     ex.accepted = p ? [format(p)] : [];

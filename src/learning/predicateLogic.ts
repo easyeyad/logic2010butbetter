@@ -152,8 +152,9 @@ export const PREDICATE_SYMBOLIZATION_EXERCISES: PredicateSymbolizationExercise[]
   source: 'bank',
   sentence: it.sentence,
   key: it.key,
-  answer: it.answer,
-  alternatives: it.alternatives ?? [],
+  // Canonical renderings, so what the solution shows matches the app's formatter.
+  answer: format(f(it.answer)),
+  alternatives: (it.alternatives ?? []).map((x) => format(f(x))),
   explanation: it.explanation,
 }));
 
@@ -492,13 +493,13 @@ export function checkPredicateSymbolization(ex: PredicateSymbolizationExercise, 
   }
   for (const used of predicatesOf(ans)) {
     const k = preds.find((q) => q.symbol === used.name);
-    if (!k) {
+    if (!k || (used.arity === 0 && k.arity > 0)) {
       return {
         correct: false,
         severity: 'error',
         code: used.arity === 0 ? 'sentence-letter' : 'unknown-predicate',
         headline: used.arity === 0 ? `${used.name} has no arguments — predicates need terms.` : `${used.name} is not in the symbol key.`,
-        explanation: used.arity === 0 ? `A predicate letter must be followed by its arguments, e.g. ${preds[0] ? `${preds[0].symbol}${'xyz'.slice(0, preds[0].arity)}` : 'Fx'}. Key: ${ex.key.map(keyLabel).join('; ')}.` : `Use only the key's predicates: ${ex.key.map(keyLabel).join('; ')}.`,
+        explanation: used.arity === 0 ? `A predicate letter must be followed by its arguments, e.g. ${k ? `${k.symbol}${'xyz'.slice(0, k.arity)}` : preds[0] ? `${preds[0].symbol}${'xyz'.slice(0, preds[0].arity)}` : 'Fx'}. Key: ${ex.key.map(keyLabel).join('; ')}.` : `Use only the key's predicates: ${ex.key.map(keyLabel).join('; ')}.`,
         highlight: occurrences(text, new RegExp(`${used.name}(?=[a-z])|${used.name}\\b`)).map((s) => ({ target: 'answer' as const, ...s, tone: 'error' as const })),
       };
     }
