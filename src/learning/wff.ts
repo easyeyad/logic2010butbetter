@@ -219,10 +219,10 @@ export function diagnoseWff(text: string): WffDiagnosis | null {
     };
   }
   const frag = text.slice(e.span.start, e.span.end);
-  const context = text.slice(Math.max(0, e.span.start - 2), Math.min(text.length, e.span.end + 2)).trim();
+  const context = text.slice(Math.max(0, e.span.start - 2), Math.min(text.length, e.span.end + 2)).trim().replace(/^[()[\]{}]+|[()[\]{}]+$/g, '').trim();
   const whole = e.span.start === 0 && e.span.end >= text.trim().length;
   let message = e.message;
-  if (e.code === 'misplaced-negation') {
+  if (e.code === 'misplaced-connective' && frag.trim() === '¬') {
     message = `In ${quote(context)}, ¬ sits between two formulas. ¬ only negates the formula right after it; to join two formulas you need ∧, ∨, → or ↔.`;
   } else if (!whole && frag.trim()) {
     message = `${e.message} Look at ${quote(frag.length < 3 ? context : frag)}.`;

@@ -5,6 +5,7 @@ import {
   TOPICS,
   checkAnswer,
   connectivePositions,
+  diagnoseWff,
   generateCountermodel,
   generateExercise,
   generateInferenceRule,
@@ -59,7 +60,7 @@ describe('WFF generator', () => {
         if (r.ok) good++;
         else {
           bad++;
-          expect(ex.errorSpan).toEqual(r.error.span);
+          expect(ex.errorSpan).toEqual(diagnoseWff(ex.formula)!.span);
           expect(ex.errorCode).toBe(r.error.code);
         }
       }
@@ -349,5 +350,38 @@ describe('hints never reveal the solution answer verbatim (generated kinds)', ()
       const ans = getSolution(ex).answer;
       if (ans.length > 2) for (const h of getHints(ex)) expect(h.includes(ans)).toBe(false);
     }
+  });
+});
+
+describe('WFF diagnosis wording (review round 1)', () => {
+  it('blames the dangling connective, quoting it, with no character indices', () => {
+    const d = diagnoseWff('R ↔ ¬(Q ∨ R) →')!;
+    expect(d.code).toBe('dangling-connective');
+    expect(d.message).toContain('The "→" at the end has nothing after it');
+    expect(d.span).toEqual({ start: 13, end: 14 });
+    expect(diagnoseWff('∧ P')!.message).toContain('at the start has nothing before it');
+    const ex = { id: 'w', kind: 'wff', topic: 'wff', difficulty: 2, title: '', prompt: '', tags: [], source: 'generated', formula: 'R ↔ ¬(Q ∨ R) →', wellFormed: false, askLocation: true } as const;
+    const sol = getSolution({ ...ex, tags: [] });
+    const text = [sol.summary, ...(sol.steps ?? [])].join(' ');
+    expect(text).toContain('nothing after it');
+    expect(text).not.toMatch(/character|\d+\s*[–-]\s*\d+/);
+    expect(checkAnswer({ ...ex, tags: [] }, { kind: 'wff', wellFormed: false, errorAt: 13 }).correct).toBe(true);
+    expect(checkAnswer({ ...ex, tags: [] }, { kind: 'wff', wellFormed: false, errorAt: 0 }).code).toBe('wrong-location');
+  });
+
+  it('explains a misplaced ¬ by quoting the fragment', () => {
+    const d = diagnoseWff('¬(Q ¬Q)')!;
+    expect(d.message).toContain('"Q ¬Q"');
+    expect(d.message).toMatch(/only negates the formula right after it/);
+  });
+
+  it('no generated WFF solution or feedback mentions character positions', () => {
+    for (const d of DS)
+      for (const s of SEEDS) {
+        const ex = generateWff(d, s);
+        const sol = getSolution(ex);
+        const fb = checkAnswer(ex, { kind: 'wff', wellFormed: !ex.wellFormed });
+        for (const t of [sol.summary, ...(sol.steps ?? []), fb.explanation, ...(fb.details ?? [])]) expect(t).not.toMatch(/character/i);
+      }
   });
 });

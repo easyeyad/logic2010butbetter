@@ -102,7 +102,8 @@ describe('symbolization checking', () => {
     for (const ans of ['¬A ∨ ¬B', '¬(A ∧ B)']) {
       const fb = check('sym-036', ans);
       expect(fb.code).toBe('neither-as-not-both');
-      expect(fb.explanation).toContain('¬P ∧ ¬Q');
+      expect(fb.explanation).toContain('"Neither A nor B" means ¬A ∧ ¬B');
+      expect(fb.explanation).not.toMatch(/\bP\b|\bQ\b/); // no stray schematic letters
       expect(fb.explanation).toMatch(/not both/);
     }
   });
@@ -128,7 +129,7 @@ describe('symbolization checking', () => {
   it('diagnoses "unless" read as a conditional or exclusively', () => {
     const fb = check('sym-029', 'S → W');
     expect(fb.code).toBe('disjunction-as-conditional');
-    expect(fb.explanation).toMatch(/unless/i);
+    expect(fb.headline).toBe('"W unless S" means W ∨ S (equivalently ¬S → W).');
     expect(check('sym-042', '¬(V ↔ R)').code).toBe('exclusive-or');
   });
 

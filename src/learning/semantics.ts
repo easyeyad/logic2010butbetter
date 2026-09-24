@@ -462,7 +462,10 @@ export function argumentHints(ex: ValidityExercise | CountermodelExercise): stri
     'Keep those values fixed and try to make each premise true, one at a time. If you get stuck in every possible way, the argument is valid.',
   ];
   const form = formOf(ex.form);
-  if (form) hints.push(`This argument has a well-known shape: ${form.premises.join(', ')} ∴ ${form.conclusion} (with X, Y, Z standing for parts of the formulas).`);
+  if (form) {
+    const schematic = (t: string) => t.replace(/[WXYZ]/g, (c) => ({ X: 'φ', Y: 'ψ', Z: 'χ', W: 'θ' })[c]!);
+    hints.push(`This argument has a well-known shape: ${form.premises.map(schematic).join(', ')} ∴ ${schematic(form.conclusion)} (φ, ψ, χ, θ stand for parts of the formulas).`);
+  }
   return hints;
 }
 

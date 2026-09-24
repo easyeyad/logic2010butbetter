@@ -100,19 +100,19 @@ export const PATTERN_NOTES: Record<string, string> = {
   negation: '"not", "n\'t", "does not" and "it is not the case that" all become ¬ in front of what they deny.',
   conjunction: '"and", "but", "although", "however" and "both … and" all become ∧: both parts are asserted.',
   disjunction: '"or" and "either … or" become ∨, read inclusively (true when both parts are true).',
-  conditional: '"If P, then Q" is P → Q: the "if" clause is the antecedent (left of the arrow).',
-  'if-after': '"Q if P" is still P → Q: "if" introduces the antecedent wherever it appears.',
-  whenever: '"Whenever P, Q" means "if P, then Q": P → Q.',
-  'provided-that': '"Q provided that P" means "Q if P": P → Q.',
-  'only-if': '"P only if Q" is P → Q: "only if" introduces the consequent (the necessary condition).',
-  unless: '"P unless Q" is P ∨ Q (equivalently ¬Q → P): if Q does not happen, P does.',
-  sufficient: '"P is sufficient for Q" is P → Q: a sufficient condition is an antecedent.',
-  necessary: '"Q is necessary for P" is P → Q: a necessary condition is a consequent.',
+  conditional: '"If φ, then ψ" is φ → ψ: the "if" clause is the antecedent (left of the arrow).',
+  'if-after': '"ψ if φ" is still φ → ψ: "if" introduces the antecedent wherever it appears.',
+  whenever: '"Whenever φ, ψ" means "if φ, then ψ": φ → ψ.',
+  'provided-that': '"ψ provided that φ" means "ψ if φ": φ → ψ.',
+  'only-if': '"φ only if ψ" is φ → ψ: "only if" introduces the consequent (the necessary condition).',
+  unless: '"φ unless ψ" is φ ∨ ψ (equivalently ¬ψ → φ): if ψ does not happen, φ does.',
+  sufficient: '"φ is sufficient for ψ" is φ → ψ: a sufficient condition is an antecedent.',
+  necessary: '"ψ is necessary for φ" is φ → ψ: a necessary condition is a consequent.',
   biconditional: '"if and only if", "just in case", "exactly when" and "necessary and sufficient" become ↔.',
-  'neither-nor': '"Neither P nor Q" is ¬P ∧ ¬Q (equivalently ¬(P ∨ Q)): both are false.',
-  'not-both': '"Not both P and Q" is ¬(P ∧ Q) (equivalently ¬P ∨ ¬Q): at least one is false.',
-  exclusive: '"… but not both" adds a conjunct ¬(P ∧ Q) to the disjunction.',
-  'negation-scope': 'Decide exactly what "it is not the case that" covers: ¬(P → Q) negates the whole conditional, ¬P → Q only P.',
+  'neither-nor': '"Neither φ nor ψ" is ¬φ ∧ ¬ψ (equivalently ¬(φ ∨ ψ)): both are false.',
+  'not-both': '"Not both φ and ψ" is ¬(φ ∧ ψ) (equivalently ¬φ ∨ ¬ψ): at least one is false.',
+  exclusive: '"… but not both" adds a conjunct ¬(φ ∧ ψ) to the disjunction.',
+  'negation-scope': 'Decide exactly what "it is not the case that" covers: ¬(φ → ψ) negates the whole conditional, ¬φ → ψ only φ.',
   nested: 'Find the main connective first, symbolize each part on its own, then combine them with parentheses.',
 };
 
@@ -268,30 +268,45 @@ function findMutation(key: Formula, answer: Formula): Mutation | null {
   return null;
 }
 
+/** A subformula as it would appear inside a larger formula (compound parts get parentheses). */
+const inner = (g: Formula) => format(g, { dropOuter: false });
+const neg = (g: Formula) => `¬${inner(g)}`;
+
+/** The two sides of a binary formula, or of the formula a negation applies to. */
+function sides(g: Formula): [Formula, Formula] | null {
+  if (g.kind === 'not') return sides(g.operand);
+  if (g.kind === 'atom') return null;
+  if (g.kind === 'and' && g.left.kind === 'not' && g.right.kind === 'not') return [g.left.operand, g.right.operand];
+  if (g.kind === 'or' && g.left.kind === 'not' && g.right.kind === 'not') return [g.left.operand, g.right.operand];
+  return [g.left, g.right];
+}
+
 function mutationMessage(m: Mutation, ex: SymbolizationExercise): { headline: string; explanation: string; details: string[] } {
   const o = format(m.original);
   const r = format(m.replaced);
   const has = (t: string) => ex.tags.includes(t);
   const same = `Your formula works like ${r} where the sentence needs ${o}.`;
+  const [lf, rf] = sides(m.original) ?? [m.original, m.original];
+  const [X, Y] = [inner(lf), inner(rf)];
   switch (m.code) {
     case 'converse': {
-      let why = 'A conditional only goes one way: the antecedent (the condition) goes on the left of the arrow, the consequent on the right. P → Q and Q → P say different things.';
-      if (has('only-if')) why = '"Only if" introduces the consequent: "P only if Q" is P → Q, not Q → P. The clause after "only if" is a necessary condition, so it goes on the RIGHT of the arrow.';
-      else if (has('necessary')) why = 'A necessary condition is the consequent: "Q is necessary for P" means P → Q (if P holds, Q must hold).';
-      else if (has('sufficient')) why = 'A sufficient condition is the antecedent: "P is sufficient for Q" means P → Q.';
-      else if (has('if-after') || has('provided-that') || has('whenever')) why = '"If" (like "provided that" and "whenever") introduces the antecedent wherever it appears in the sentence: "Q if P" is P → Q.';
+      let why = `A conditional only goes one way: the antecedent (the condition) goes on the left of the arrow, the consequent on the right. ${X} → ${Y} and ${Y} → ${X} say different things.`;
+      if (has('only-if')) why = `"Only if" introduces the consequent: "${X} only if ${Y}" is ${X} → ${Y}, not ${Y} → ${X}. The part after "only if" is a necessary condition, so it goes on the RIGHT of the arrow.`;
+      else if (has('necessary')) why = `A necessary condition is the consequent: "${Y} is necessary for ${X}" means ${X} → ${Y} (if ${X} holds, ${Y} must hold).`;
+      else if (has('sufficient')) why = `A sufficient condition is the antecedent: "${X} is sufficient for ${Y}" means ${X} → ${Y}.`;
+      else if (has('if-after') || has('provided-that') || has('whenever')) why = `"If" (like "provided that" and "whenever") introduces the antecedent wherever it appears in the sentence: "${Y} if ${X}" is ${X} → ${Y}.`;
       return { headline: 'You reversed the conditional (you wrote its converse).', explanation: why, details: [same] };
     }
     case 'neither-as-not-both':
       return {
         headline: '"Neither … nor" means both are false, not just one.',
-        explanation: '"Neither P nor Q" means ¬P ∧ ¬Q, i.e. ¬(P ∨ Q). Your formula amounts to ¬P ∨ ¬Q (= ¬(P ∧ Q)), which means "not both" — it allows one of them to be true.',
+        explanation: `"Neither ${X} nor ${Y}" means ${neg(lf)} ∧ ${neg(rf)}, i.e. ¬(${X} ∨ ${Y}). Your formula amounts to ${neg(lf)} ∨ ${neg(rf)} (= ¬(${X} ∧ ${Y})), which means "not both" — it allows one of them to be true.`,
         details: [same],
       };
     case 'not-both-as-neither':
       return {
         headline: '"Not both" only rules out both being true together.',
-        explanation: '"Not both P and Q" is ¬(P ∧ Q), equivalently ¬P ∨ ¬Q. Your formula amounts to ¬P ∧ ¬Q (= ¬(P ∨ Q)), which means "neither" — it also rules out exactly one being true.',
+        explanation: `"Not both ${X} and ${Y}" is ¬(${X} ∧ ${Y}), equivalently ${neg(lf)} ∨ ${neg(rf)}. Your formula amounts to ${neg(lf)} ∧ ${neg(rf)} (= ¬(${X} ∨ ${Y})), which means "neither" — it also rules out exactly one of them being true.`,
         details: [same],
       };
     case 'negation-scope-narrow':
@@ -303,63 +318,65 @@ function mutationMessage(m: Mutation, ex: SymbolizationExercise): { headline: st
     case 'negation-scope-wide':
       return {
         headline: 'Your negation covers too much.',
-        explanation: `In the sentence only one part is denied. ¬( … ) around the whole ${CONNECTIVE_NAME[m.original.kind]} negates all of it, which says something different.`,
+        explanation: `In the sentence only one part is denied: ${o}. Putting ¬( … ) around the whole ${CONNECTIVE_NAME[m.original.kind]} negates all of it, which says something different.`,
         details: [same],
       };
     case 'conditional-as-biconditional':
       return {
         headline: 'The sentence only goes one way; ↔ claims both directions.',
-        explanation: '"if", "only if", "provided that", "whenever", "sufficient" and "necessary" each express a one-way conditional (→). Only "if and only if", "just in case", "exactly when" and "necessary and sufficient" give ↔.',
+        explanation: `The sentence says ${X} → ${Y}; ${X} ↔ ${Y} would also claim ${Y} → ${X}. "if", "only if", "provided that", "whenever", "sufficient" and "necessary" each express a one-way conditional. Only "if and only if", "just in case", "exactly when" and "necessary and sufficient" give ↔.`,
         details: [same],
       };
     case 'biconditional-one-direction':
       return {
         headline: 'The sentence claims both directions, but your conditional has only one.',
-        explanation: '"if and only if" (like "just in case", "exactly when", "necessary and sufficient") means each side implies the other: use ↔, or (P → Q) ∧ (Q → P).',
+        explanation: `"if and only if" (like "just in case", "exactly when", "necessary and sufficient") means each side implies the other: ${X} ↔ ${Y}, or equivalently (${X} → ${Y}) ∧ (${Y} → ${X}).`,
         details: [same],
       };
     case 'disjunction-as-conditional':
       return has('unless')
         ? {
-            headline: '"Unless" is symbolized with ∨ (or as ¬Q → P).',
-            explanation: '"P unless Q" means that if Q does not happen, P does: ¬Q → P, which is equivalent to P ∨ Q. Your conditional does not say that — check which side should be negated.',
+            headline: `"${X} unless ${Y}" means ${X} ∨ ${Y} (equivalently ¬${Y} → ${X}).`,
+            explanation: `If ${Y} does not happen, ${X} does. Either ${X} ∨ ${Y} or ${neg(rf)} → ${X} is accepted, but your conditional says something else — check which side should be negated and which way the arrow points.`,
             details: [same],
           }
-        : { headline: 'The sentence is a disjunction, not a conditional.', explanation: '"or" offers alternatives (∨); it does not make one part a condition of the other.', details: [same] };
+        : { headline: 'The sentence is a disjunction, not a conditional.', explanation: `"or" offers alternatives: ${X} ∨ ${Y}. It does not make one part a condition of the other.`, details: [same] };
     case 'exclusive-or':
       return {
         headline: 'Your formula reads "or"/"unless" exclusively.',
-        explanation: 'In logic "or" and "unless" are inclusive: P ∨ Q is also true when both P and Q are true. Your formula is false in that case. Only an explicit "but not both" makes it exclusive.',
+        explanation: `In logic "or" and "unless" are inclusive: ${X} ∨ ${Y} is also true when both ${X} and ${Y} are true. Your formula is false in that case. Only an explicit "but not both" makes it exclusive.`,
         details: [same],
       };
     case 'and-as-or':
       return {
         headline: 'You used ∨ where the sentence needs ∧.',
-        explanation: '"and", "but", "although", "however" and "both … and" assert BOTH parts, so they are conjunctions (∧). ∨ would need only one part to be true.',
+        explanation: `"and", "but", "although", "however" and "both … and" assert BOTH parts: ${X} ∧ ${Y}. ∨ would need only one part to be true.`,
         details: [same],
       };
     case 'or-as-and':
       return {
         headline: 'You used ∧ where the sentence needs ∨.',
-        explanation: `${has('unless') ? '"unless" is symbolized with ∨' : '"or" and "either … or" are disjunctions'}: only one part has to be true. ∧ would require both.`,
+        explanation: has('unless')
+          ? `"${X} unless ${Y}" means ${X} ∨ ${Y} (equivalently ¬${Y} → ${X}): only one part has to be true. ∧ would require both.`
+          : `"or" and "either … or" are disjunctions: ${X} ∨ ${Y} needs only one part to be true. ∧ would require both.`,
         details: [same],
       };
     case 'conditional-as-conjunction':
       return {
         headline: 'The sentence states a condition; it does not assert both parts.',
-        explanation: 'An "if" sentence can be true even when its antecedent is false, so it is not a conjunction. Use → with the condition on the left.',
+        explanation: `An "if" sentence can be true even when its antecedent is false, so it is not a conjunction. Use ${X} → ${Y}, with the condition on the left.`,
         details: [same],
       };
     case 'conjunction-as-conditional':
       return {
         headline: 'The sentence asserts both parts outright — use ∧, not →.',
-        explanation: '"and", "but", "although" claim that both parts are true. A conditional would only say one holds IF the other does.',
+        explanation: `"and", "but", "although" claim that both parts are true: ${X} ∧ ${Y}. A conditional would only say one holds IF the other does.`,
         details: [same],
       };
     case 'grouping':
       return {
         headline: 'Right connectives, wrong grouping.',
-        explanation: `Parentheses decide which connective is the main one. In the sentence the main connective is the ${CONNECTIVE_NAME[mainConnective(f(ex.answer))]} (${MAIN_CUE[mainConnective(f(ex.answer))]}). Symbolize each part separately, then combine.`,
+        explanation: `Parentheses decide which connective is the main one. ${mainDescription(ex)} Symbolize each part separately, then combine.`,
         details: [same],
       };
     case 'missing-negation':
@@ -383,6 +400,26 @@ function mutationMessage(m: Mutation, ex: SymbolizationExercise): { headline: st
       };
     }
   }
+}
+
+/** Main connectives of all accepted standard forms (answer first). */
+function acceptedMains(ex: SymbolizationExercise): Formula['kind'][] {
+  const out: Formula['kind'][] = [];
+  for (const s of [ex.answer, ...ex.alternatives]) {
+    const k = mainConnective(f(s));
+    if (!out.includes(k)) out.push(k);
+  }
+  return out;
+}
+
+const symOf = (k: Formula['kind']) => (k === 'atom' ? '' : ` (${SYMBOL[k as keyof typeof SYMBOL]})`);
+
+/** "The sentence as a whole is a disjunction (∨) — or, equivalently, a conditional (→)." */
+function mainDescription(ex: SymbolizationExercise): string {
+  const [k, ...rest] = acceptedMains(ex);
+  const first = `As a whole the sentence is a ${CONNECTIVE_NAME[k]}${symOf(k)} — ${MAIN_CUE[k]}`;
+  if (!rest.length) return `${first}.`;
+  return `${first}; it can equally be written as a ${rest.map((x) => `${CONNECTIVE_NAME[x]}${symOf(x)}`).join(' or ')} (both forms are accepted).`;
 }
 
 // ---------------------------------------------------------------------------
@@ -468,14 +505,14 @@ export function checkSymbolization(ex: SymbolizationExercise, text: string): Fee
   if (m) {
     const msg = mutationMessage(m, ex);
     fb = { correct: false, severity: 'error', code: m.code, headline: msg.headline, explanation: msg.explanation, details: [...msg.details, row] };
-  } else if (mainConnective(ans) !== mainConnective(key)) {
+  } else if (!acceptedMains(ex).includes(mainConnective(ans))) {
     const k = mainConnective(key);
     fb = {
       correct: false,
       severity: 'error',
       code: 'wrong-main-connective',
-      headline: `Wrong main connective: the sentence as a whole is a ${CONNECTIVE_NAME[k]}.`,
-      explanation: `The main connective of the sentence is ${k === 'atom' ? 'absent' : SYMBOL[k as keyof typeof SYMBOL]} — ${MAIN_CUE[k]}. Your formula's main connective is the ${CONNECTIVE_NAME[mainConnective(ans)]}. ${notesFor(ex.tags, 1).join(' ')}`.trim(),
+      headline: acceptedMains(ex).length > 1 ? `Wrong main connective for this sentence.` : `Wrong main connective: the sentence as a whole is a ${CONNECTIVE_NAME[k]}.`,
+      explanation: `${mainDescription(ex)} Your formula's main connective is the ${CONNECTIVE_NAME[mainConnective(ans)]}. ${notesFor(ex.tags, 1).join(' ')}`.trim(),
       details: [row],
     };
   } else {
@@ -483,7 +520,7 @@ export function checkSymbolization(ex: SymbolizationExercise, text: string): Fee
       correct: false,
       severity: 'error',
       code: 'not-equivalent',
-      headline: 'Right main connective, but a part is symbolized incorrectly.',
+      headline: 'Your main connective can work here, but a part is symbolized incorrectly.',
       explanation: `Compare each part of your formula with the matching clause of the sentence. ${notesFor(ex.tags, 1).join(' ')}`.trim(),
       details: [row],
     };
@@ -514,7 +551,7 @@ export function symbolizationHints(ex: SymbolizationExercise): string[] {
   );
   const notes = notesFor(ex.tags);
   if (notes.length) hints.push(notes.join(' '));
-  if (k !== 'atom') hints.push(`The main connective is the ${CONNECTIVE_NAME[k]} (${SYMBOL[k as keyof typeof SYMBOL]}).`);
+  if (k !== 'atom') hints.push(mainDescription(ex));
   if (atomsOf(key).length > 1 || key.kind !== 'atom') hints.push(`Your formula should have this shape (fill in letters from the key): ${skeleton(key)}`);
   return hints;
 }
@@ -635,7 +672,8 @@ export function generateSymbolization(difficulty: Difficulty, seed: number): Sym
     sentence,
     key,
     answer,
-    alternatives: [],
+    // "φ unless ψ" = φ ∨ ψ, equally ¬ψ → φ
+    alternatives: t.tags.includes('unless') && out.f.kind === 'or' ? [format(I(N(out.f.right), out.f.left))] : [],
     explanation: notesFor(tags).join(' ') || 'Symbolize each clause with its letter and combine them with the connective the sentence uses.',
   };
 }
