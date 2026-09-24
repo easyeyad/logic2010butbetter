@@ -171,7 +171,7 @@ export function analyze(draft: DerivationDraft): Analysis {
       issues[i].push(
         err('parse-error', `Line ${i + 1}: ${res.error.message}`, {
           target: 'formula',
-          suggestion: res.error.hint,
+          suggestion: res.error.hint ?? 'Check the highlighted part of the formula — every connective needs its formulas, and nested binary parts need parentheses.',
           span: { start: res.error.span.start + offset, end: res.error.span.end + offset },
         }),
       );
@@ -667,7 +667,12 @@ export function analyze(draft: DerivationDraft): Analysis {
   if (typeof draft.goal === 'string' && draft.goal.trim() !== '') {
     const g = safeParse(draft.goal);
     if (g.ok) goal = g.formula;
-    else globalIssues.push(err('goal-parse-error', `The goal can't be read: ${g.error.message}`));
+    else
+      globalIssues.push(
+        err('goal-parse-error', `The goal can't be read: ${g.error.message}`, {
+          suggestion: g.error.hint ?? 'Check how the goal formula is written.',
+        }),
+      );
   }
 
   // ---- assemble

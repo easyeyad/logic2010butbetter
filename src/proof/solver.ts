@@ -7,6 +7,11 @@ import { entails, fmt } from './util';
 export interface SolveOptions {
   /** Max lines the search may emit (including rolled-back attempts). Default 6000. */
   maxLines?: number;
+  /**
+   * Reject solutions longer than this many lines (premises included), so a
+   * "Show solution" is never an unreadable wall. Default 150.
+   */
+  maxProofLines?: number;
 }
 
 /**
@@ -25,6 +30,7 @@ export function solve(premises: Formula[], goal: Formula, opts: SolveOptions = {
     const { lines } = prune(p.out, [show - 1], premises.length);
     const ids = lines.map((l, i) => ({ ...l, id: `sol-${i + 1}` }));
     const check = checkDerivation({ goal: fmt(goal), lines: ids });
+    if (ids.length > (opts.maxProofLines ?? 150)) return null;
     return check.complete ? ids : null;
   } catch (e) {
     if (Prover.isBudget(e)) return null;

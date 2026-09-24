@@ -106,14 +106,32 @@ const RULE_NUDGE: Record<string, string> = {
 };
 
 /** Continue the student's derivation with the prover; return the new lines (pruned) or null. */
+/**
+ * Prefer the shorter of the strict and lenient continuations — unless the
+ * lenient one starts by re-opening an enclosing open Show (which would make a
+ * hint-follower regress forever).
+ */
 function continueProof(an: Analysis, t: number): { lines: DraftLine[]; origN: number } | null {
-  return continueWith(an, t, true) ?? continueWith(an, t, false);
+  return continueBudget(an, t, 2500) ?? continueBudget(an, t, 12000);
 }
 
-function continueWith(an: Analysis, t: number, strict: boolean): { lines: DraftLine[]; origN: number } | null {
+function continueBudget(an: Analysis, t: number, budget: number): { lines: DraftLine[]; origN: number } | null {
+  const strict = continueWith(an, t, true, budget);
+  const lenient = continueWith(an, t, false, budget);
+  if (!lenient) return strict;
+  const first = lenient.lines[lenient.origN];
+  const open = new Set<string>();
+  for (let s = t; s !== -1; s = an.parent[s]) if (an.formulas[s] && !an.closed[s]) open.add(fmt(an.formulas[s]!));
+  const regress = first && first.kind === 'show' && open.has(first.text);
+  if (regress) return strict ?? lenient;
+  if (!strict) return lenient;
+  return lenient.lines.length < strict.lines.length ? lenient : strict;
+}
+
+function continueWith(an: Analysis, t: number, strict: boolean, budget: number): { lines: DraftLine[]; origN: number } | null {
   const G = an.formulas[t]!;
   const n = an.lines.length;
-  const p = new Prover({ maxLines: 2500, strictNesting: strict });
+  const p = new Prover({ maxLines: budget, strictNesting: strict });
   p.out = an.lines.map((l) => ({ ...l, refs: l.refs ? [...l.refs] : undefined, close: l.close ? { ...l.close, refs: [...l.close.refs] } : undefined }));
   for (const a of accessibleFor(an, t)) p.addAvail(a.f, a.n);
   p.depth = an.lines[t].depth + 1;

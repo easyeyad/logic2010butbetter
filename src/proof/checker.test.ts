@@ -298,7 +298,7 @@ P ∧ Q  | PR
 Show R | DD 3
   R    | S 1
 `));
-    expect(issuesOf(c, 3)[0].message).toBe('Line 3: S from line 1 (P ∧ Q) can give P or Q, but you wrote R.');
+    expect(issuesOf(c, 3)[0].message).toBe('Line 3: S (Simplification) from line 1 (P ∧ Q) can give P or Q, but you wrote R.');
   });
 
   it('S used on a disjunction', () => {
@@ -330,7 +330,7 @@ Show R  | DD 5
   R     | MP 2,1
 `));
     const iss = issuesOf(c, 5)[0];
-    expect(iss.message).toBe('Line 5: MP needs a conditional and its antecedent. Line 2 is Q → R, so the other line must be Q — line 1 is P.');
+    expect(iss.message).toBe('Line 5: MP (Modus Ponens) needs a conditional and its antecedent. Line 2 is Q → R, so the other line must be Q — line 1 is P.');
     expect(iss.badRefs).toEqual([1]);
     expect(iss.suggestion).toMatch(/cite the line that contains Q/i);
   });
@@ -343,7 +343,7 @@ Show P | DD 4
   P    | MP 1,2
 `));
     const iss = issuesOf(c, 4)[0];
-    expect(iss.message).toContain('MP runs forwards from the antecedent; from P → Q and Q you cannot conclude P');
+    expect(iss.message).toContain('MP (Modus Ponens) runs forwards from the antecedent; from P → Q and Q you cannot conclude P');
     expect(iss.message).toContain('affirming the consequent');
   });
 
@@ -378,7 +378,7 @@ P      | PR
 Show R | DD 4
   R    | MP 1,2
 `));
-    expect(issuesOf(c, 4)[0].message).toBe('Line 4: MP from line 1 (P → Q) and line 2 (P) gives Q, but you wrote R.');
+    expect(issuesOf(c, 4)[0].message).toBe('Line 4: MP (Modus Ponens) from line 1 (P → Q) and line 2 (P) gives Q, but you wrote R.');
   });
 
   it('MT with the wrong negation', () => {
@@ -926,6 +926,35 @@ Show P | DD 3
   P    | S 1
 `));
     expect(c.summary).toBe('2 lines need attention: lines 3 and 4.');
+  });
+});
+
+describe('message audit', () => {
+  it('every error names its line and comes with a suggestion', () => {
+    const drafts = [
+      `P → Q | PR\nShow P |\n  P | S 1\n  P | MP 1,1\n  Q | MT 1\n  P | FOO 1`,
+      `Show P | DD 1`,
+      `P | PR\nShow P |\n  P | R 4\n  P | R 3\n  P | R 9\n  P | R 2`,
+      `Show P → Q |\n  Q | ASS CD\nShow P | ID 3\n  P | ASS ID\nP | PR`,
+      `P | PR\n    P | R 1\nShow Q | CD 4\n  Q | ID 1`,
+      `P ∧ | PR\nShow P |\n  P | S 1`,
+      `P → Q | PR\nShow P → Q | CD 3,1\n  P | ASS CD`,
+      `P | PR\nShow P | ID 3,4\n  ¬P | ASS ID\n  ¬¬P | DN 3`,
+      `P | PR\nShow P | DD 4\n  Show P |\n    P | R 1`,
+      `P | PR\nShow ¬¬P | DD 3\n  ¬¬P | DM 1`,
+    ];
+    let count = 0;
+    for (const src of drafts) {
+      const c = checkDerivation(draft(src, { goal: 'P' }));
+      for (const l of c.lines)
+        for (const i of l.issues.filter((x) => x.severity === 'error')) {
+          count++;
+          expect(i.message, i.code).toMatch(/^Line \d+/);
+          expect(i.suggestion, `${i.code}: ${i.message}`).toBeTruthy();
+          if (i.code === 'rule-mismatch' || i.code === 'ref-count') expect(i.message).toMatch(/[A-Z]+ \([A-Z][a-z]/);
+        }
+    }
+    expect(count).toBeGreaterThan(15);
   });
 });
 
