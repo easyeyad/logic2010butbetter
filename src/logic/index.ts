@@ -36,3 +36,10 @@ export type { ValidityResult, EquivalenceResult, ConsistencyResult } from './val
 
 export { randomFormula, seededRandom } from './random';
 export type { RandomFormulaOptions } from './random';
+
+export {
+  freeVariables, namesOf, variablesOf, predicatesOf, arityConflicts, isSentence,
+  substitute, matchInstance, isGeneralizationOf, alphaEquals, freshVariable,
+  evaluateIn, findModel, checkPredicateValidity, describeInterpretation,
+} from './predicate';
+export type { Interpretation, ModelSearchResult, PredicateValidityResult } from './predicate';
