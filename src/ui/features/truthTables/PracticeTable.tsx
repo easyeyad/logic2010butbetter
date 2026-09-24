@@ -1,4 +1,9 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
+import type { Classification } from '../../../logic';
+import { clampDifficulty } from '../../../learning';
+import { attempt, safeClassify } from '../../engine/safe';
+import { progressStore } from '../../learning/progress';
+import { ChoiceGroup } from '../practice/answers/ChoiceGroup';
 import type { TruthTable } from '../../../logic';
 import { CONNECTIVE_NAME } from '../../../logic';
 import { Button } from '../../components/Button';
@@ -18,6 +23,20 @@ const k = (r: number, c: number) => `${r}:${c}`;
  */
 export function PracticeTable({ table, caption, onSolved }: { table: TruthTable; caption: string; onSolved?: () => void }) {
   const [answers, setAnswers] = useState<Answers>({});
+  const [classes, setClasses] = useState<Record<number, Classification | undefined>>({});
+  const hintsUsed = useRef(0);
+  const started = useRef(Date.now());
+  const mains = useMemo(() => table.columns.map((c, i) => ({ c, i })).filter((x) => x.c.isMain), [table]);
+  const truthClass = useMemo(() => {
+    const m: Record<number, Classification | undefined> = {};
+    mains.forEach(({ c, i }) => {
+      const r = safeClassify(c.formula);
+      m[i] = r.ok ? r.value : undefined;
+    });
+    return m;
+  }, [mains]);
+  const classRight = mains.every(({ i }) => classes[i] !== undefined && classes[i] === truthClass[i]);
+  const classAnswered = mains.every(({ i }) => classes[i] !== undefined);
   const [checked, setChecked] = useState(false);
   const [hintCol, setHintCol] = useState<number | null>(null);
   const [confirm, setConfirm] = useState(false);
@@ -46,6 +65,7 @@ export function PracticeTable({ table, caption, onSolved }: { table: TruthTable;
     // First column (in evaluation order) with a blank or wrong cell.
     const col = table.columns.findIndex((_, c) => editable[c] && table.rows.some((row, r) => answers[k(r, c)] !== row[c]));
     setHintCol(col >= 0 ? col : null);
+    hintsUsed.current += 1;
   };
 
   const hl = useMemo(() => {
@@ -90,10 +110,45 @@ export function PracticeTable({ table, caption, onSolved }: { table: TruthTable;
         marks={marks}
       />
 
+      <div className="stack stack--sm tt-classify">
+        <p className="field__label">Finally: classify {mains.length > 1 ? 'each formula' : 'the formula'}</p>
+        {mains.map(({ c, i }) => (
+          <ChoiceGroup<Classification>
+            key={i}
+            label={c.label}
+            columns={3}
+            value={classes[i]}
+            onChange={(v) => {
+              setClasses((cl) => ({ ...cl, [i]: v }));
+              setChecked(false);
+            }}
+            options={[
+              { value: 'tautology', label: 'Tautology', description: 'True in every row' },
+              { value: 'contradiction', label: 'Contradiction', description: 'False in every row' },
+              { value: 'contingent', label: 'Contingent', description: 'Some rows T, some F' },
+            ]}
+          />
+        ))}
+      </div>
+
       <div className="row">
         <Button variant="primary" icon="check" onClick={() => {
           setChecked(true);
-          if (results.correct === total) onSolved?.();
+          const correct = results.correct === total && classRight;
+          const id = `tt-page:${mains.map((m) => m.c.label).join('|')}`;
+          attempt(() =>
+            progressStore().recordAttempt({
+              exerciseId: id,
+              topic: 'truth-table',
+              difficulty: clampDifficulty(table.atoms.length + (table.columns.length > 6 ? 1 : 0)),
+              correct,
+              partial: !correct && results.correct === total,
+              hintsUsed: hintsUsed.current,
+              timeMs: Date.now() - started.current,
+              solutionViewed: revealed,
+            }),
+          );
+          if (correct) onSolved?.();
         }}>
           Check
         </Button>
@@ -119,9 +174,14 @@ export function PracticeTable({ table, caption, onSolved }: { table: TruthTable;
         </Notice>
       )}
       {checked && (
-        allRight ? (
+        allRight && classAnswered && !classRight ? (
+          <Notice tone="warn" role="status" title="The table is right — check the classification">
+            Every cell is correct, but look at the main column again: is it true in every row, false in every row, or mixed?
+          </Notice>
+        ) : allRight ? (
           <Notice tone="ok" role="status" title="All correct!">
             Every one of the {total} cells is right{revealed ? ' (solution shown)' : ''}.
+            {classRight ? ' Your classification is right too.' : ' Last step: classify the formula below the table.'}
           </Notice>
         ) : (
           <Notice tone="err" role="status" title={`${results.correct} of ${total} cells correct`}>
@@ -144,6 +204,8 @@ export function PracticeTable({ table, caption, onSolved }: { table: TruthTable;
           setAnswers(a);
           setChecked(true);
           setRevealed(true);
+          setHintCol(null);
+          setClasses({ ...truthClass });
           setConfirm(false);
         }}
       />

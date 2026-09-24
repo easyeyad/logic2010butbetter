@@ -205,3 +205,4 @@
 .muted-icon { color: var(--c-text-3); flex: none; }
 .inline-icon { display: inline-block; vertical-align: -2px; color: var(--c-warn); }
 .dash-grid { display: grid; gap: var(--sp-4); grid-template-columns: repeat(auto-fit, minmax(min(100%, 320px), 1fr)); }
+.review-list__text { display: flex; flex-direction: column; gap: 2px; min-width: 0; } .review-list__label { color: var(--c-text-2); overflow-wrap: anywhere; }

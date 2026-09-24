@@ -31,7 +31,7 @@ export const SETTINGS_ITEM: NavItem = {
 export const ALL_NAV = [...NAV, SETTINGS_ITEM];
 
 /** Mobile bottom tab bar: five primary destinations; the rest live under "More". */
-export const MOBILE_TABS = ['/', '/proofs', '/truth-tables', '/countermodels', '/reference'];
+export const MOBILE_TABS = ['/', '/practice', '/proofs', '/truth-tables', '/reference'];
 
 export function findNav(pathname: string): NavItem | undefined {
   if (pathname === '/') return NAV[0];

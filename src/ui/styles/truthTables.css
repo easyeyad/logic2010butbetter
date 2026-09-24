@@ -46,3 +46,26 @@ thead .tt__main { color: var(--c-accent-text); font-weight: 750; }
 .verdict { padding: var(--sp-3) var(--sp-4); border: 1px solid var(--c-border); border-radius: var(--radius); background: var(--c-surface); }
 .verdict__head { display: flex; flex-wrap: wrap; gap: var(--sp-2); align-items: center; justify-content: space-between; margin-bottom: 2px; }
 .verdict__f { font-size: 1.1rem; overflow-wrap: anywhere; min-width: 0; }
+
+/* Truth values: bold letter in a tinted pill (distinct from sentence letters). */
+.tv {
+  display: inline-grid; place-items: center;
+  min-width: 1.55em; height: 1.45em; padding: 0 3px;
+  border-radius: 5px; border: 1px solid transparent;
+  font-family: var(--font-sans); font-size: 0.9em; line-height: 1;
+}
+.tv--t { background: var(--c-true-soft); border-color: color-mix(in srgb, var(--c-true) 25%, transparent); }
+.tv--f { background: var(--c-false-soft); border-color: color-mix(in srgb, var(--c-false) 25%, transparent); }
+
+/* Scroll affordance for wide tables */
+.scrollwrap { position: relative; min-width: 0; }
+.scrollwrap__hint { display: flex; align-items: center; gap: 4px; font-size: var(--fs-xs); font-weight: 600; color: var(--c-text-2); margin-bottom: var(--sp-1); }
+.scrollwrap.has-left:not(.has-right) .scrollwrap__hint svg { transform: scaleX(-1); }
+.scrollwrap::after, .scrollwrap::before {
+  content: ""; position: absolute; bottom: 1px; top: 26px; width: 22px; pointer-events: none; z-index: 5;
+  opacity: 0; transition: opacity var(--dur);
+}
+.scrollwrap::after { right: 1px; border-radius: 0 var(--radius) var(--radius) 0; background: linear-gradient(to left, color-mix(in srgb, var(--c-text) 22%, transparent), transparent); }
+.scrollwrap::before { left: 1px; border-radius: var(--radius) 0 0 var(--radius); background: linear-gradient(to right, color-mix(in srgb, var(--c-text) 14%, transparent), transparent); }
+.scrollwrap.has-right::after { opacity: 1; }
+.scrollwrap.has-left::before { opacity: 0; }

@@ -28,10 +28,6 @@ test.describe('axe (WCAG 2 A/AA)', () => {
     for (const r of ROUTES) {
       test(`${scheme}: ${r.path}${r.inFlux ? ' (page in flux)' : ''}`, async ({ page }, info) => {
         test.skip(!AXE_PROJECTS.includes(info.project.name), 'axe runs at 1440 and 390 only');
-        // BUG (ui, major a11y): TruthValue renders <span class="tv" aria-label="true"><span aria-hidden>T</span></span>.
-        // aria-label is prohibited on a role-less span (axe aria-prohibited-attr, serious), so most screen
-        // readers announce the atom cells (and practice answers) as EMPTY. Use visually-hidden text instead.
-        test.fail(r.path === '/truth-tables', 'BUG: truth-value cells use aria-label on a generic span');
         await page.emulateMedia({ colorScheme: scheme, reducedMotion: 'reduce' });
         await fresh(page, r.path === '/proofs' ? { 'proof-session': HS_START } : {});
         await go(page, r.path);
@@ -47,7 +43,6 @@ test.describe('axe (WCAG 2 A/AA)', () => {
 
   test('truth-table practice grid and dialogs', async ({ page }, info) => {
     test.skip(!AXE_PROJECTS.includes(info.project.name), 'axe runs at 1440 and 390 only');
-    test.fail(true, 'BUG: truth-value cells use aria-label on a generic span (see above)');
     await fresh(page);
     await go(page, '/truth-tables');
     await page.getByLabel('Formula 1', { exact: true }).fill('P ∧ ¬P');

@@ -62,6 +62,8 @@ export function ExerciseRunner({ exercise, initialAnswer, initialHints = 0, sess
 
   const report = (fb: Feedback | null, solutionViewed: boolean) =>
     onResult?.({
+      // A check counts as an attempt; revealing the solution does not.
+      attempts: solutionViewed ? 0 : 1,
       exerciseId: exercise.id,
       feedback: fb ? { correct: fb.correct, partial: fb.partial } : undefined,
       correct: fb?.correct ?? false,

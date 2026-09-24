@@ -1,6 +1,7 @@
 import { useMemo, useRef, useState, type CSSProperties, type KeyboardEvent } from 'react';
 import type { TruthTable } from '../../../logic';
 import { Icon } from '../../components/Icon';
+import { ScrollRegion } from '../../components/ScrollRegion';
 import { cellClass, TableHead } from './TableHead';
 import { TruthValue } from './TruthValue';
 
@@ -91,7 +92,7 @@ export function EditableTruthGrid({
   };
 
   return (
-    <div className="tt-scroll" role="region" aria-label={`${caption} (scrolls horizontally)`}>
+    <ScrollRegion label={caption} revealSelector="td.tt__cell">
       <table ref={gridRef} className="tt tt--practice" role="grid" aria-label={caption}>
         <TableHead table={table} highlight={highlight} />
         <tbody>
@@ -101,9 +102,15 @@ export function EditableTruthGrid({
                 const style = table.columns[c].isAtom ? ({ '--i': c } as CSSProperties) : undefined;
                 if (!editable[c])
                   return (
-                    <th key={c} scope="row" className={cellClass(table, c)} style={style}>
-                      <TruthValue value={v} />
-                    </th>
+                    c === 0 ? (
+                      <th key={c} scope="row" className={cellClass(table, c)} style={style}>
+                        <TruthValue value={v} />
+                      </th>
+                    ) : (
+                      <td key={c} className={cellClass(table, c)} style={style}>
+                        <TruthValue value={v} />
+                      </td>
+                    )
                   );
                 const a = answers[cellKey(r, c)];
                 const mark = marks?.[cellKey(r, c)];
@@ -136,6 +143,6 @@ export function EditableTruthGrid({
           ))}
         </tbody>
       </table>
-    </div>
+    </ScrollRegion>
   );
 }

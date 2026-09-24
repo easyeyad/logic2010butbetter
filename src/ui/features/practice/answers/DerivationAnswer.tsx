@@ -1,6 +1,9 @@
 import { useEffect, useRef } from 'react';
 import { createDerivationDraft } from '../../../../learning';
-import { FormulaTargetProvider } from '../../../components/FormulaTarget';
+import { FormulaTargetProvider, useFormulaTarget } from '../../../components/FormulaTarget';
+import { SymbolBar } from '../../../components/SymbolBar';
+import { BP, useMediaQuery } from '../../../hooks/useMediaQuery';
+import { useFormulaFocus, useKeepFocusAboveBars } from '../../proofs/useFormulaFocus';
 import { attempt } from '../../../engine/safe';
 import { blankLine, makeId } from '../../proofs/draftOps';
 import { ProofEditor } from '../../proofs/ProofEditor';
@@ -33,7 +36,21 @@ function DerivationEditor({ exercise, initial, onChange, solution }: AnswerProps
     }
   }, [solution, replaceLines]);
 
-  return <ProofEditor ed={ed} />;
+  const docked = !useMediaQuery(BP.desktop);
+  const focused = useFormulaFocus('.practice-proof');
+  const target = useFormulaTarget();
+  useKeepFocusAboveBars('.practice-proof', docked);
+
+  return (
+    <div className="practice-proof">
+      <ProofEditor ed={ed} inlineSymbolBar={!docked} />
+      {docked && focused && (
+        <div className="actionbar" role="region" aria-label="Proof tools">
+          <SymbolBar compact label="Insert symbol into the focused line" onInsert={(d) => target?.insert(d)} />
+        </div>
+      )}
+    </div>
+  );
 }
 
 /** The full proof editor, seeded with the exercise's premises and Show line. */

@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import type { Difficulty, ExerciseResult, PracticeSession, Topic } from '../../../learning';
-import { createPracticeSession, TOPICS } from '../../../learning';
+import { createPracticeSession, mergeResult, TOPICS } from '../../../learning';
 import { PageHeader } from '../../app/PageHeader';
 import { Button } from '../../components/Button';
 import { EngineError } from '../../components/Notice';
@@ -80,7 +80,7 @@ export default function PracticePage() {
   }, [run?.session.id]);
 
   const onResult = (r: ExerciseResult) =>
-    setRun((cur) => (cur ? { ...cur, results: [...cur.results.filter((x) => x.exerciseId !== r.exerciseId), r] } : cur));
+    setRun((cur) => (cur ? { ...cur, results: mergeResult(cur.results, r) } : cur));
   const next = () =>
     setRun((cur) => {
       if (!cur) return cur;
@@ -112,7 +112,7 @@ export default function PracticePage() {
             <div className="session-progress">
               <div className="session-progress__text">
                 Exercise {run.index + 1} of {total}
-                <span className="subtle"> · {run.results.filter((r) => r.correct).length} correct so far</span>
+                <span className="subtle"> · {run.results.filter((r) => r.firstTryCorrect).length} correct on the first try so far</span>
               </div>
               <div
                 className="progressbar"

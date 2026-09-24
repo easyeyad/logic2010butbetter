@@ -213,9 +213,9 @@ function ExerciseGroups({ currentId, onPick }: { currentId: string; onPick: (e: 
                         <span className="problem-item__title">{s.title}</span>
                         <span className="row" style={{ gap: 4, flexWrap: 'nowrap' }}>
                           {solved && (
-                            <span className="badge badge--ok" title="Completed">
+                            <span className="badge badge--ok">
                               <Icon name="check" />
-                              <span className="visually-hidden">Completed</span>
+                              Done
                             </span>
                           )}
                           <span className="badge">{s.strategy}</span>

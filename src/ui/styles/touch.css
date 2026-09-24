@@ -44,3 +44,9 @@
 @media (max-width: 767px) {
   .rail--start::after { width: 5px; }
 }
+
+/* Keep the 7 symbol buttons on one row on phones (44px tall, ≥40px wide). */
+@media (max-width: 480px) {
+  .symbar { flex-wrap: nowrap; gap: 3px; }
+  .symbar__btn, .symbar--compact .symbar__btn { flex: 1 1 0; min-width: 40px; padding: 0; }
+}

@@ -4,6 +4,7 @@ import { useLocalStorage } from '../hooks/useLocalStorage';
 import { BP, useMediaQuery } from '../hooks/useMediaQuery';
 import { BottomTabs } from './BottomTabs';
 import { Sidebar } from './Sidebar';
+import { requestHeadingFocus } from './headingFocus';
 
 export function AppShell({ children }: { children: ReactNode }) {
   const isMobile = useMediaQuery(BP.mobile);
@@ -11,17 +12,15 @@ export function AppShell({ children }: { children: ReactNode }) {
   const [desktopCollapsed, setDesktopCollapsed] = useLocalStorage('nav-collapsed', false);
   const [tabletExpanded, setTabletExpanded] = useLocalStorage('nav-tablet-expanded', false);
   const { pathname } = useLocation();
-  const first = useRef(true);
+  const prevPath = useRef(pathname);
 
   // Move focus to the new page's heading on navigation (not on first load).
   useEffect(() => {
-    if (first.current) {
-      first.current = false;
-      return;
-    }
+    // Only on a real navigation (not the first load, and not StrictMode's effect re-run).
+    if (prevPath.current === pathname) return;
+    prevPath.current = pathname;
     window.scrollTo(0, 0);
-    const h = document.getElementById('page-title');
-    h?.focus({ preventScroll: true });
+    requestHeadingFocus();
   }, [pathname]);
 
   const collapsed = isDesktop ? desktopCollapsed : !tabletExpanded;

@@ -1,7 +1,7 @@
 import { expect, test } from '@playwright/test';
 import { fresh, go, isPhone, ROUTES, trackErrors } from './helpers';
 
-const MOBILE_TABS = ['/', '/proofs', '/truth-tables', '/countermodels', '/reference'];
+const MOBILE_TABS = ['/', '/practice', '/proofs', '/truth-tables', '/reference'];
 
 test.describe('navigation', () => {
   test('every page is reachable from the main navigation; active link has aria-current', async ({ page }) => {
@@ -51,11 +51,7 @@ test.describe('navigation', () => {
     await expect(page.locator('h1')).toBeFocused();
   });
 
-  // BUG (ui, minor/a11y): AppShell focuses #page-title in an effect on pathname
-  // change, but lazy pages are still suspended then (no h1 yet), so on the FIRST
-  // visit to Proofs/Truth Tables/Countermodels/Reference/Settings focus stays on
-  // the nav link and screen-reader users aren't told the page changed.
-  test.fail('BUG: focus moves to the page heading on first visit to a lazy-loaded page', async ({ page }) => {
+  test('focus moves to the page heading on first visit to a lazy-loaded page', async ({ page }) => {
     await fresh(page);
     await go(page, '/');
     const nav = page.getByRole('navigation', { name: 'Main' });

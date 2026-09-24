@@ -42,9 +42,6 @@ test.describe('reference', () => {
   });
 
   test('rules are available from the proof page (panel / drawer / sheet)', async ({ page }) => {
-    // BUG (ui, major, phones): see proofs.spec — the mobile "Rules" action-bar
-    // button is unmounted on focus and never opens the sheet.
-    test.fail(!isDesktop(page), 'BUG: phone/tablet action-bar buttons never open the sheet');
     await fresh(page, { 'proof-session': HS_START });
     await go(page, '/proofs');
     let scope;
