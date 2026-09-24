@@ -16,7 +16,15 @@ export type ParseErrorCode =
   | 'mismatched-bracket'     // '(P ∧ Q]'
   | 'empty-parens'           // '()'
   | 'ambiguous'              // 'P ∧ Q ∨ R' — needs parentheses
-  | 'misplaced-connective';  // 'P ¬ Q', '∧ P'
+  | 'misplaced-connective'   // 'P ¬ Q'
+  | 'too-deep';              // more than MAX_NESTING_DEPTH nested brackets/negations
+
+/**
+ * Maximum nesting of brackets and negations `parse` accepts. Deeper input gets a
+ * 'too-deep' error, so every formula parse returns is safe for the recursive
+ * engines (format, evaluate, proofs...).
+ */
+export const MAX_NESTING_DEPTH = 500;
 
 export interface ParseError {
   code: ParseErrorCode;
@@ -452,6 +460,9 @@ class Parser {
       if (o.t !== 'bin') break;
       this.next();
       end = o.end;
+      // A dangling connective (nothing usable after it) is the more useful
+      // diagnosis: report its own error (e.g. missing-operand) instead.
+      if (this.attempt(() => this.parseUnary(o)) === null) this.parseUnary(o);
       const nextOperand = this.attempt(() => {
         const n = this.parseUnary(o);
         this.checkAfterOperand(n);
@@ -485,6 +496,38 @@ class Parser {
   }
 }
 
+const tooDeepMessage = `This formula is nested too deeply: at most ${MAX_NESTING_DEPTH} levels of brackets and ¬ are allowed.`;
+
+/**
+ * Reject input nested deeper than MAX_NESTING_DEPTH before the recursive parser
+ * runs. Depth counts open brackets plus the ¬s stacked in front of each one and
+ * the current run of ¬s (each is a level of the resulting formula).
+ */
+function checkDepth(toks: Token[]): void {
+  const stack: number[] = [];
+  let open = 0;
+  let notRun = 0;
+  for (const t of toks) {
+    if (t.t === 'not') notRun++;
+    else if (t.t === 'open') {
+      stack.push(1 + notRun);
+      open += 1 + notRun;
+      notRun = 0;
+    } else {
+      if (t.t === 'close' && stack.length) open -= stack.pop()!;
+      notRun = 0;
+    }
+    if (open + notRun > MAX_NESTING_DEPTH) {
+      throw new ParseFailure({
+        code: 'too-deep',
+        message: tooDeepMessage,
+        span: { start: t.start, end: t.end },
+        hint: 'Simplify the formula, e.g. ¬¬P is equivalent to P.',
+      });
+    }
+  }
+}
+
 /** Parse a formula. Never throws. Spans refer to the input as given. */
 export function parse(input: string): ParseResult {
   const normalized = normalizeInput(input).text;
@@ -496,11 +539,22 @@ export function parse(input: string): ParseResult {
     };
   }
   try {
-    const formula = new Parser(lex(input)).parseTop();
+    const toks = lex(input);
+    checkDepth(toks);
+    const formula = new Parser(toks).parseTop();
     return { ok: true, formula, normalized };
   } catch (e) {
     if (e instanceof ParseFailure) return { ok: false, error: e.error, normalized };
-    throw e;
+    // Last resort: parse must never throw.
+    return {
+      ok: false,
+      normalized,
+      error: {
+        code: e instanceof RangeError ? 'too-deep' : 'unexpected-char',
+        message: e instanceof RangeError ? tooDeepMessage : 'This formula could not be read.',
+        span: { start: 0, end: input.length },
+      },
+    };
   }
 }
 

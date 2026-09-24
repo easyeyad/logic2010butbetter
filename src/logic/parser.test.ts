@@ -2,6 +2,8 @@ import { describe, expect, it } from 'vitest';
 import { And, Atom, Iff, Implies, Not, Or, equals } from './ast';
 import type { Formula } from './ast';
 import { normalizeInput, parse, parseOrThrow } from './parser';
+import { format } from './format';
+import { evaluate, subformulas } from './evaluate';
 import type { ParseErrorCode } from './parser';
 
 const P = Atom('P'), Q = Atom('Q'), R = Atom('R');
@@ -192,6 +194,31 @@ describe('parse: errors', () => {
     const e4 = err('¬(P ∧ Q ∨ ¬R) → S', 'ambiguous', 'P ∧ Q ∨ ¬R');
     expect(e4.hint).toMatch(/\(P ∧ Q\) ∨ ¬R/);
     err('(P → Q) ∧ R ∨ S', 'ambiguous', '(P → Q) ∧ R ∨ S');
+  });
+
+  it('a dangling connective after a chain is missing-operand, not ambiguous', () => {
+    expect(err('R ↔ ¬(Q ∨ R) →', 'missing-operand', '→').message).toMatch(/nothing follows it/);
+    err('P ∧ Q ∨', 'missing-operand', '∨');
+    err('(P ∧ Q ∨)', 'missing-operand', '∨');
+    err('P ∧ Q ∨ R →', 'missing-operand', '→');
+  });
+
+  it('rejects absurdly deep nesting without throwing', () => {
+    for (const s of ['('.repeat(20000), '('.repeat(20000) + 'P' + ')'.repeat(20000), '¬'.repeat(20000) + 'P', '¬('.repeat(10000) + 'P' + ')'.repeat(10000), '['.repeat(600)]) {
+      const t0 = performance.now();
+      const r = parse(s);
+      expect(r.ok).toBe(false);
+      if (!r.ok) expect(r.error.code).toBe('too-deep');
+      expect(performance.now() - t0).toBeLessThan(1000);
+    }
+    const deepest = '¬('.repeat(250) + 'P' + ')'.repeat(250);
+    const f = parseOrThrow(deepest);
+    expect(format(f)).toBe('¬'.repeat(250) + 'P');
+    expect(evaluate(f, { P: true })).toBe(true);
+    expect(subformulas(f).length).toBe(250);
+    expect(parse('¬'.repeat(500) + 'P').ok).toBe(true);
+    expect(parse('¬'.repeat(501) + 'P').ok).toBe(false);
+    expect(parse('('.repeat(500) + 'P' + ')'.repeat(500)).ok).toBe(true);
   });
 
   it('reports the first error only (no cascading)', () => {

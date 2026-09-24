@@ -395,17 +395,18 @@ describe('edge cases', () => {
     expect(rs.ok).toBe(true);
   });
 
-  // BUG (logic, minor): parse() is documented "Never throws", but ~10,000 nested
-  // brackets or negations overflow the recursive-descent stack (RangeError).
-  // 8,000 is fine. A pasted/garbage string of 20k "(" crashes the caller unless
-  // wrapped (the UI wraps it in safeParse, so the page shows "engine error").
-  test.fails('BUG: 20,000 unmatched "(" returns a parse error instead of throwing RangeError', () => {
+  // parse() never throws: pathological nesting beyond MAX_NESTING_DEPTH is a
+  // 'too-deep' parse error rather than a stack overflow.
+  test('20,000 unmatched "(" or ¬ return a parse error quickly instead of throwing', () => {
     const junk = '('.repeat(20000);
     const t1 = performance.now();
     const rj = parse(junk);
     expect(rj.ok).toBe(false);
     expect(performance.now() - t1).toBeLessThan(1000);
-    expect(parse('¬'.repeat(20000) + 'P').ok).toBe(true);
+    const deepNeg = parse('¬'.repeat(20000) + 'P');
+    expect(deepNeg.ok).toBe(false);
+    if (!deepNeg.ok) expect(deepNeg.error.code).toBe('too-deep');
+    expect(parse('¬'.repeat(400) + 'P').ok).toBe(true);
   });
 
   test('unicode oddities: alternate symbols accepted, lookalikes rejected with a span inside the input', () => {

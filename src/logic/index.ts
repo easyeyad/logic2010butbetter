@@ -20,7 +20,7 @@
 export * from './ast';
 
 export type { Span, ParseError, ParseResult, ParseErrorCode } from './parser';
-export { parse, parseOrThrow, normalizeInput } from './parser';
+export { parse, parseOrThrow, normalizeInput, MAX_NESTING_DEPTH } from './parser';
 
 export { format, formatWithSpans, ASCII_SYMBOL } from './format';
 export type { FormatOptions } from './format';
