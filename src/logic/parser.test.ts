@@ -138,7 +138,7 @@ describe('parse: errors', () => {
 
   it('lowercase atoms', () => {
     const e = err('p ∧ q', 'invalid-atom', 'p');
-    expect(e.message).toBe('Sentence letters must be capital letters: did you mean P?');
+    expect(e.message).toMatch(/^Sentence letters must be capital letters: did you mean P\?/);
     expect(err('P ∧ q1', 'invalid-atom', 'q1').message).toMatch(/did you mean Q1\?/);
     expect(err('PvQ', 'invalid-atom', 'v').message).toMatch(/∨/);
     err('foo', 'invalid-atom', 'foo');

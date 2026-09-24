@@ -1,7 +1,7 @@
 import type { Formula } from './ast';
-import { Atom, equals } from './ast';
+import { Atom, equals, isPredicateFormula } from './ast';
 import type { Valuation } from './evaluate';
-import { atomsOf, compileFormula, subformulas } from './evaluate';
+import { NotSententialError, atomsOf, compileFormula, subformulas } from './evaluate';
 import { format } from './format';
 
 export type Classification = 'tautology' | 'contradiction' | 'contingent';
@@ -61,9 +61,11 @@ export function allValuations(atoms: string[]): Valuation[] {
  * Build a table for one or more formulas (sharing atoms). Columns: atoms first,
  * then each non-atomic subformula (inner first, deduped across formulas),
  * with the input formulas' own columns flagged isMain.
- * Throws if more than 10 atoms.
+ * Throws if more than 10 atoms, and a NotSententialError if any formula uses
+ * predicates or quantifiers.
  */
 export function buildTruthTable(formulas: Formula[]): TruthTable {
+  assertSentential(formulas);
   const atoms = atomsOf(...formulas);
   const n = atoms.length;
   if (n > MAX_TRUTH_TABLE_ATOMS) {
@@ -84,7 +86,7 @@ export function buildTruthTable(formulas: Formula[]): TruthTable {
   for (const f of formulas) {
     for (const s of subformulas(f)) {
       if (find(s) >= 0) continue;
-      const dependsOn = s.kind === 'not' ? [find(s.operand)] : s.kind === 'atom' ? [] : [find(s.left), find(s.right)];
+      const dependsOn = s.kind === 'not' ? [find(s.operand)] : 'left' in s ? [find(s.left), find(s.right)] : [];
       columns.push({ formula: s, label: format(s), isAtom: false, isMain: false, dependsOn });
     }
   }
@@ -135,6 +137,11 @@ export function buildTruthTable(formulas: Formula[]): TruthTable {
   return { atoms, columns, rows, valuations, mainColumns };
 }
 
+/** Throws NotSententialError if any formula uses predicates or quantifiers. */
+export function assertSentential(fs: Formula[]): void {
+  if (fs.some(isPredicateFormula)) throw new NotSententialError();
+}
+
 /** Shared brute-force driver: calls `visit` for each row (standard order) until it returns false. */
 export function forEachRow(atoms: string[], visit: (values: boolean[], row: number) => boolean | void): number {
   const n = atoms.length;
@@ -156,7 +163,9 @@ export function toValuation(atoms: string[], values: boolean[]): Valuation {
   return v;
 }
 
+/** Throws NotSententialError for predicate/quantified formulas. */
 export function classify(f: Formula): Classification {
+  assertSentential([f]);
   const atoms = atomsOf(f);
   const ev = compileFormula(f, atoms);
   let sawT = false;

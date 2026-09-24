@@ -1,4 +1,4 @@
-import type { Formula } from './ast';
+import type { Formula, Term } from './ast';
 import { SYMBOL } from './ast';
 import type { Span } from './parser';
 
@@ -16,17 +16,36 @@ export const ASCII_SYMBOL = {
   or: 'v',
   implies: '->',
   iff: '<->',
+  forall: '@',
+  exists: '$',
 } as const;
 
-/** Canonical string for a formula, e.g. "(P ∧ Q) → R". parse(format(f)) equals f. */
+const termsText = (args: Term[]) => args.map((t) => t.name).join('');
+
+/**
+ * Quantifier prefix: "∀x" followed by a space only when the body starts with a
+ * letter ("∀x Fx", "∃y P"); no space before "(", "¬" or another quantifier
+ * ("∀x(Fx → Gx)", "∀x¬Fx", "∀x∃y Rxy").
+ */
+function quantPrefix(sym: string, variable: string, body: Formula): string {
+  const letterNext = body.kind === 'atom' || body.kind === 'pred';
+  return sym + variable + (letterNext ? ' ' : '');
+}
+
+/** Canonical string for a formula, e.g. "(P ∧ Q) → R", "∀x(Fx → Gx)", "∃x Rxa". parse(format(f)) equals f. */
 export function format(f: Formula, opts?: FormatOptions): string {
   const sym = opts?.ascii ? ASCII_SYMBOL : SYMBOL;
   const go = (g: Formula, top: boolean): string => {
     switch (g.kind) {
       case 'atom':
         return g.name;
+      case 'pred':
+        return g.name + termsText(g.args);
       case 'not':
         return sym.not + go(g.operand, false);
+      case 'forall':
+      case 'exists':
+        return quantPrefix(sym[g.kind], g.variable, g.body) + go(g.body, false);
       default: {
         const inner = `${go(g.left, false)} ${sym[g.kind]} ${go(g.right, false)}`;
         return top ? inner : `(${inner})`;
@@ -55,9 +74,17 @@ export function formatWithSpans(f: Formula, opts?: FormatOptions): { text: strin
       case 'atom':
         text += g.name;
         break;
+      case 'pred':
+        text += g.name + termsText(g.args);
+        break;
       case 'not':
         text += sym.not;
         go(g.operand, false);
+        break;
+      case 'forall':
+      case 'exists':
+        text += quantPrefix(sym[g.kind], g.variable, g.body);
+        go(g.body, false);
         break;
       default:
         if (!top) text += '(';

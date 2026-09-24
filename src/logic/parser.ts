@@ -1,5 +1,5 @@
-import type { BinaryKind, Formula } from './ast';
-import { SYMBOL } from './ast';
+import type { BinaryKind, Formula, Term } from './ast';
+import { SYMBOL, VARIABLE_LETTERS } from './ast';
 import { format } from './format';
 
 /** Half-open character range [start, end) into the ORIGINAL input string. */
@@ -17,7 +17,8 @@ export type ParseErrorCode =
   | 'empty-parens'           // '()'
   | 'ambiguous'              // 'P ∧ Q ∨ R' — needs parentheses
   | 'misplaced-connective'   // 'P ¬ Q'
-  | 'too-deep';              // more than MAX_NESTING_DEPTH nested brackets/negations
+  | 'too-deep'               // more than MAX_NESTING_DEPTH nested brackets/negations
+  | 'bad-quantifier';        // '∀Fx' (no variable), '∀a' (quantifying a name)
 
 /**
  * Maximum nesting of brackets and negations `parse` accepts. Deeper input gets a
@@ -62,6 +63,9 @@ const BINARY_CHARS: Record<string, BinaryKind> = {
   '↔': 'iff', '=': 'iff', '≡': 'iff', '⇔': 'iff',
 };
 
+/** Quantifier symbols and their ASCII aliases (@ = ∀, $ = ∃). */
+const QUANT_CHARS: Record<string, 'forall' | 'exists'> = { '∀': 'forall', '@': 'forall', '∃': 'exists', '$': 'exists' };
+
 const OPEN_TO_CLOSE: Record<string, string> = { '(': ')', '[': ']', '{': '}' };
 const CLOSE_TO_OPEN: Record<string, string> = { ')': '(', ']': '[', '}': '{' };
 
@@ -87,7 +91,7 @@ function isStandaloneV(s: string, i: number): boolean {
  *
  * Rules:
  *  - Complete multi-char aliases convert: <-> <=> <> (↔), -> => (→).
- *  - ~ ! ∼ − → ¬;  & ^ * · → ∧;  | → ∨;  > ⊃ ⇒ → →;  ≡ ⇔ → ↔.
+ *  - ~ ! ∼ − → ¬;  & ^ * · → ∧;  | → ∨;  > ⊃ ⇒ → →;  ≡ ⇔ → ↔;  @ → ∀;  $ → ∃.
  *  - A lowercase `v` converts to ∨ only when standalone (neither neighbour is a
  *    letter or digit, e.g. "P v Q", "(P)v(Q)").
  *  - "Held" characters: a `-` or `=` that sits at the end of the text or
@@ -123,6 +127,7 @@ export function normalizeInput(input: string, caret?: number): { text: string; c
       else if (c === '-') rep = held(i + 1) ? null : SYMBOL.not;
       else if (c === '=') rep = held(i + 1) ? null : SYMBOL.iff;
       else if (c in BINARY_CHARS) rep = SYMBOL[BINARY_CHARS[c]];
+      else if (c in QUANT_CHARS) rep = SYMBOL[QUANT_CHARS[c]];
       else if (isStandaloneV(input, i)) rep = SYMBOL.or;
     }
     const piece = rep ?? input.slice(i, i + n);
@@ -141,13 +146,20 @@ export function normalizeInput(input: string, caret?: number): { text: string; c
 // ---------------------------------------------------------------------------
 
 type Token =
-  | { t: 'atom'; name: string; start: number; end: number }
+  /** Sentence letter (args empty) or predication (Fa, Rxy). */
+  | { t: 'atom'; name: string; args: Term[]; start: number; end: number }
+  /** A lowercase term not attached to a predicate letter (only valid right after a quantifier). */
+  | { t: 'term'; term: Term; start: number; end: number }
+  /** Quantifier; `variable` is filled in by the parser once the variable is read. */
+  | { t: 'quant'; kind: 'forall' | 'exists'; variable?: string; start: number; end: number }
   | { t: 'not'; start: number; end: number }
   | { t: 'bin'; kind: BinaryKind; start: number; end: number }
   | { t: 'open'; ch: string; start: number; end: number }
   | { t: 'close'; ch: string; start: number; end: number }
   | { t: 'error'; error: ParseError; start: number; end: number }
   | { t: 'end'; start: number; end: number };
+
+const makeTerm = (name: string): Term => ({ kind: VARIABLE_LETTERS.includes(name[0]) ? 'var' : 'name', name });
 
 const WORD_CONNECTIVES: Record<string, string> = {
   and: '∧', but: '∧', or: '∨', not: '¬', implies: '→', then: '→', if: '→', only: '→', iff: '↔',
@@ -165,9 +177,18 @@ function lex(s: string): Token[] {
       continue;
     }
     if (isUpper(c)) {
+      // Capital letter, optional digits, then any directly attached terms (Rab, Fx1y).
       let j = i + 1;
       while (isDigit(s[j])) j++;
-      toks.push({ t: 'atom', name: s.slice(i, j), start: i, end: j });
+      const name = s.slice(i, j);
+      const args: Term[] = [];
+      while (isLower(s[j]) && s[j] !== 'v') {
+        let k = j + 1;
+        while (isDigit(s[k])) k++;
+        args.push(makeTerm(s.slice(j, k)));
+        j = k;
+      }
+      toks.push({ t: 'atom', name, args, start: i, end: j });
       i = j;
       continue;
     }
@@ -185,14 +206,19 @@ function lex(s: string): Token[] {
       const digits = s.slice(j, k);
       if (Object.hasOwn(WORD_CONNECTIVES, word) && !digits) {
         err('unexpected-char', `Write connectives as symbols, not words: use ${WORD_CONNECTIVES[word]} instead of “${word}”.`, i, j);
+      } else if (word === 'v') {
+        err(
+          'invalid-atom',
+          `“v” can't be a sentence letter, name or variable — it is reserved for “or”. For “or”, use ∨, or put spaces around the v. (Did you mean the sentence letter V?)`,
+          i,
+          k,
+        );
       } else if (word.length === 1) {
-        const guess = word.toUpperCase() + digits;
-        const extra = word === 'v' ? ' (For “or”, use ∨, or put spaces around the v.)' : '';
-        err('invalid-atom', `Sentence letters must be capital letters: did you mean ${guess}?${extra}`, i, k, `Write ${guess}`);
+        toks.push({ t: 'term', term: makeTerm(word + digits), start: i, end: k });
       } else {
         err(
           'invalid-atom',
-          `“${s.slice(i, k)}” is not a sentence letter. Sentence letters are single capital letters, optionally followed by digits (like P or Q1).`,
+          `“${s.slice(i, k)}” is not a sentence letter. Sentence letters are single capital letters, optionally followed by digits (like P or Q1); lowercase names and variables go right after a predicate letter (Fa, Rxy).`,
           i,
           k,
         );
@@ -211,6 +237,11 @@ function lex(s: string): Token[] {
     if (multi) {
       toks.push({ t: 'bin', kind: multi[1], start: i, end: i + multi[0].length });
       i += multi[0].length;
+      continue;
+    }
+    if (c in QUANT_CHARS) {
+      toks.push({ t: 'quant', kind: QUANT_CHARS[c], start: i, end: i + 1 });
+      i++;
       continue;
     }
     if (NOT_CHARS.has(c) || c === '-') {
@@ -259,7 +290,18 @@ interface Node { f: Formula; start: number; end: number }
 function symOf(tok: Token): string {
   if (tok.t === 'bin') return SYMBOL[tok.kind];
   if (tok.t === 'not') return SYMBOL.not;
+  if (tok.t === 'quant') return SYMBOL[tok.kind] + (tok.variable ?? '');
   return '';
+}
+
+const termList = (ts: Term[]) => ts.map((t) => t.name).join('');
+
+/** Student-facing complaint about a lowercase term that isn't attached to a predicate letter. */
+function strayTermMessage(term: Term): string {
+  const upper = term.name.toUpperCase();
+  return term.kind === 'var'
+    ? `A variable like ${term.name} must follow a predicate letter, e.g. F${term.name} (or a quantifier, as in ∀${term.name}). Sentence letters are capitals: did you mean ${upper}?`
+    : `Sentence letters must be capital letters: did you mean ${upper}? (Lowercase names like ${term.name} go right after a predicate letter, as in F${term.name}.)`;
 }
 
 /** Display form of an operand as it appears inside a larger formula. */
@@ -267,7 +309,7 @@ const show = (f: Formula) => format(f, { dropOuter: false });
 
 class Parser {
   private pos = 0;
-  constructor(private toks: Token[]) {}
+  constructor(private toks: Token[], private src: string) {}
 
   private peek(): Token {
     return this.toks[this.pos];
@@ -319,7 +361,34 @@ class Parser {
     switch (t.t) {
       case 'atom':
         this.next();
-        return { f: { kind: 'atom', name: t.name }, start: t.start, end: t.end };
+        return {
+          f: t.args.length ? { kind: 'pred', name: t.name, args: t.args } : { kind: 'atom', name: t.name },
+          start: t.start,
+          end: t.end,
+        };
+      case 'term':
+        this.fail('invalid-atom', strayTermMessage(t.term), { start: t.start, end: t.end });
+      case 'quant': {
+        this.next();
+        const sym = SYMBOL[t.kind];
+        const v = this.peek();
+        if (v.t === 'error') throw new ParseFailure(v.error);
+        if (v.t !== 'term') {
+          this.fail('bad-quantifier', `${sym} must be followed by a variable such as x.`, { start: t.start, end: t.end }, `For example: ${sym}x Fx`);
+        }
+        if (v.term.kind === 'name') {
+          this.fail(
+            'bad-quantifier',
+            `${v.term.name} is a name; quantify a variable: x, y, z, w or u.`,
+            { start: t.start, end: v.end },
+            `For example: ${sym}x`,
+          );
+        }
+        this.next();
+        const q: Token = { t: 'quant', kind: t.kind, variable: v.term.name, start: t.start, end: v.end };
+        const body = this.parseUnary(q);
+        return { f: { kind: t.kind, variable: v.term.name, body: body.f }, start: t.start, end: body.end };
+      }
       case 'not': {
         this.next();
         const operand = this.parseUnary(t);
@@ -371,6 +440,11 @@ class Parser {
       this.fail('empty-parens', `There is nothing inside these brackets.`, { start: prev.start, end: t.end }, 'Put a formula inside, or remove the brackets.');
     }
     const span = { start: prev.start, end: prev.end };
+    if (prev.t === 'quant') {
+      const q = symOf(prev);
+      const after = t.t === 'end' ? '' : `, but “${t.ch}” comes right after it`;
+      this.fail('missing-operand', `${q} must be followed by a formula${after}.`, span, `For example: ${q} F${prev.variable}`);
+    }
     if (prev.t === 'not') {
       const after = t.t === 'end' ? '' : `, but “${t.ch}” comes right after it`;
       this.fail('missing-operand', `¬ must be followed by a formula${after}.`, span, 'For example: ¬P');
@@ -383,6 +457,14 @@ class Parser {
   /** Expected an operand but found a binary connective. */
   private binaryWithoutLeft(t: Token & { t: 'bin' }, prev: Token | null): never {
     const sym = SYMBOL[t.kind];
+    if (prev?.t === 'quant') {
+      this.fail(
+        'missing-operand',
+        `${symOf(prev)} must be followed by a formula, but ${sym} comes right after it.`,
+        { start: prev.start, end: t.end },
+        `A quantifier applies to the formula immediately after it, e.g. ${symOf(prev)}(F${prev.variable} ${sym} G${prev.variable}).`,
+      );
+    }
     if (prev?.t === 'not') {
       this.fail(
         'missing-operand',
@@ -423,20 +505,41 @@ class Parser {
             : 'Use ∧, ∨, → or ↔ to join two formulas.',
         );
       }
-      case 'atom':
-      case 'open': {
-        if (t.t === 'atom' && prevTok.t === 'atom' && prevTok.end === t.start) {
-          const both = prevTok.name + t.name;
+      case 'term': {
+        if (prevTok.t === 'atom' && prev.end === prevTok.end) {
+          // "F a" or "Fa b": terms separated from their predicate letter by spaces.
+          let j = this.pos;
+          const extra: Term[] = [];
+          while (this.toks[j].t === 'term') extra.push((this.toks[j] as Token & { t: 'term' }).term), j++;
+          const fixed = prevTok.name + termList(prevTok.args) + termList(extra);
           this.fail(
             'invalid-atom',
-            `Sentence letters are single capital letters, so “${both}” is two sentence letters (${prevTok.name} and ${t.name}) with no connective between them.`,
+            `Write the terms right after the predicate letter, with no spaces: ${fixed}.`,
+            { start: prevTok.start, end: this.toks[j - 1].end },
+            `Write ${fixed}`,
+          );
+        }
+        this.fail('invalid-atom', strayTermMessage(t.term), { start: t.start, end: t.end });
+      }
+      case 'atom':
+      case 'open':
+      case 'quant': {
+        if (t.t === 'atom' && prevTok.t === 'atom' && prevTok.end === t.start) {
+          const a = this.src.slice(prevTok.start, prevTok.end);
+          const b = this.src.slice(t.start, t.end);
+          const plain = !prevTok.args.length && !t.args.length;
+          this.fail(
+            'invalid-atom',
+            plain
+              ? `Sentence letters are single capital letters, so “${a + b}” is two sentence letters (${a} and ${b}) with no connective between them.`
+              : `“${a + b}” is two atomic formulas (${a} and ${b}) with no connective between them.`,
             { start: prevTok.start, end: t.end },
-            `Put a connective between them, e.g. ${prevTok.name} ∧ ${t.name}.`,
+            `Put a connective between them, e.g. ${a} ∧ ${b}.`,
           );
         }
         const right = this.attempt(() => this.parseUnary(null));
         const end = right ? right.end : t.end;
-        const r = right ? show(right.f) : t.t === 'atom' ? t.name : t.ch;
+        const r = right ? show(right.f) : this.src.slice(t.start, t.end);
         this.fail(
           'missing-connective',
           `Missing connective: ${show(prev.f)} and ${r} need a connective (∧, ∨, → or ↔) between them.`,
@@ -508,7 +611,8 @@ function checkDepth(toks: Token[]): void {
   let open = 0;
   let notRun = 0;
   for (const t of toks) {
-    if (t.t === 'not') notRun++;
+    if (t.t === 'not' || t.t === 'quant') notRun++;
+    else if (t.t === 'term') continue;
     else if (t.t === 'open') {
       stack.push(1 + notRun);
       open += 1 + notRun;
@@ -541,7 +645,7 @@ export function parse(input: string): ParseResult {
   try {
     const toks = lex(input);
     checkDepth(toks);
-    const formula = new Parser(toks).parseTop();
+    const formula = new Parser(toks, input).parseTop();
     return { ok: true, formula, normalized };
   } catch (e) {
     if (e instanceof ParseFailure) return { ok: false, error: e.error, normalized };

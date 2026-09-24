@@ -1,11 +1,13 @@
 import type { Formula } from './ast';
 import type { Valuation } from './evaluate';
 import { atomsOf, compileFormula } from './evaluate';
-import { forEachRow, toValuation } from './truthTable';
+import { assertSentential, forEachRow, toValuation } from './truthTable';
 
 // All checks brute-force the truth table in standard row order (all-T first),
 // so "the first counterexample/model" matches the first such row a student sees.
 // Up to MAX_BRUTE_FORCE_ATOMS (16) sentence letters; throws beyond that.
+// Sentential only: predicate/quantified input throws NotSententialError
+// (use checkPredicateValidity / findModel).
 
 export interface ValidityResult {
   valid: boolean;
@@ -20,6 +22,7 @@ export interface ValidityResult {
 }
 
 export function checkValidity(premises: Formula[], conclusion: Formula): ValidityResult {
+  assertSentential([...premises, conclusion]);
   const atoms = atomsOf(...premises, conclusion);
   const ps = premises.map((p) => compileFormula(p, atoms));
   const c = compileFormula(conclusion, atoms);
@@ -43,6 +46,7 @@ export interface EquivalenceResult { equivalent: boolean; differingValuation?: V
 
 /** Stops at the first row where the two formulas differ. */
 export function checkEquivalence(a: Formula, b: Formula): EquivalenceResult {
+  assertSentential([a, b]);
   const atoms = atomsOf(a, b);
   const ea = compileFormula(a, atoms);
   const eb = compileFormula(b, atoms);
@@ -60,6 +64,7 @@ export interface ConsistencyResult { consistent: boolean; model?: Valuation }
 
 /** Stops at the first row making every formula true. The empty set is consistent. */
 export function checkConsistency(fs: Formula[]): ConsistencyResult {
+  assertSentential(fs);
   const atoms = atomsOf(...fs);
   const evs = fs.map((f) => compileFormula(f, atoms));
   let model: Valuation | undefined;
