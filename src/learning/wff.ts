@@ -7,6 +7,7 @@
  * OWNER: Learning System.
  */
 import { CONNECTIVE_NAME, format, mainConnective, parse } from '../logic';
+import type { Span } from '../logic';
 import type { Difficulty, Feedback, Solution, WffDefect, WffExercise } from './types';
 import { hash, makeRng, niceRandomFormula, pick, type Rng } from './util';
 
@@ -154,6 +155,7 @@ export function generateWff(difficulty: Difficulty, seed: number): WffExercise {
   }
   if (!text) text = wantWellFormed ? 'P → Q' : 'P ∧ Q ∨ R';
   const res = parse(text);
+  const diag = diagnoseWff(text);
   // Same prompt either way, so the prompt never gives the answer away.
   const askLocation = difficulty >= 2;
   return {
@@ -170,16 +172,68 @@ export function generateWff(difficulty: Difficulty, seed: number): WffExercise {
     formula: text,
     wellFormed: res.ok,
     askLocation,
-    errorSpan: res.ok ? undefined : res.error.span,
+    errorSpan: diag?.span,
     errorCode: res.ok ? undefined : res.error.code,
     defect: res.ok ? undefined : defect,
   };
 }
 
+export interface WffDiagnosis {
+  code: string;
+  /** Student-facing explanation that quotes the offending fragment (no character indices). */
+  message: string;
+  hint?: string;
+  /** Region of the formula to highlight. */
+  span: Span;
+}
+
+const quote = (s: string) => `"${s.trim()}"`;
+
+/**
+ * Explain why `text` is not a WFF (null if it is one). Uses the parser's
+ * error, but first checks for a connective dangling at either end — the
+ * parser reports whole-string ambiguity before that in cases like
+ * "R ↔ ¬(Q ∨ R) →", and the dangling connective is the real problem.
+ */
+export function diagnoseWff(text: string): WffDiagnosis | null {
+  const res = parse(text);
+  if (res.ok) return null;
+  const e = res.error;
+  const trimmedEnd = text.replace(/\s+$/, '');
+  const last = trimmedEnd.length - 1;
+  if (last >= 0 && isBinaryChar(trimmedEnd[last])) {
+    return {
+      code: 'dangling-connective',
+      message: `The ${quote(trimmedEnd[last])} at the end has nothing after it: every binary connective needs a formula on both sides.`,
+      hint: 'Add the missing right-hand formula, or remove the connective.',
+      span: { start: last, end: last + 1 },
+    };
+  }
+  const first = text.search(/\S/);
+  if (first >= 0 && isBinaryChar(text[first])) {
+    return {
+      code: 'dangling-connective',
+      message: `The ${quote(text[first])} at the start has nothing before it: every binary connective needs a formula on both sides.`,
+      hint: 'Add the missing left-hand formula, or remove the connective.',
+      span: { start: first, end: first + 1 },
+    };
+  }
+  const frag = text.slice(e.span.start, e.span.end);
+  const context = text.slice(Math.max(0, e.span.start - 2), Math.min(text.length, e.span.end + 2)).trim();
+  const whole = e.span.start === 0 && e.span.end >= text.trim().length;
+  let message = e.message;
+  if (e.code === 'misplaced-negation') {
+    message = `In ${quote(context)}, ¬ sits between two formulas. ¬ only negates the formula right after it; to join two formulas you need ∧, ∨, → or ↔.`;
+  } else if (!whole && frag.trim()) {
+    message = `${e.message} Look at ${quote(frag.length < 3 ? context : frag)}.`;
+  }
+  return { code: e.code, message, hint: e.hint, span: e.span };
+}
+
 export function checkWff(ex: WffExercise, wellFormed: boolean, errorAt?: number): Feedback {
-  const res = parse(ex.formula);
+  const d = diagnoseWff(ex.formula);
   if (wellFormed === ex.wellFormed) {
-    if (ex.wellFormed) {
+    if (ex.wellFormed || !d) {
       return {
         correct: true,
         severity: 'success',
@@ -188,25 +242,23 @@ export function checkWff(ex: WffExercise, wellFormed: boolean, errorAt?: number)
         explanation: 'Every connective has the right number of well-formed parts, every binary sub-formula nested inside another connective is in parentheses, and the brackets balance. (Outermost parentheses may be dropped.)',
       };
     }
-    const err = !res.ok ? res.error : undefined;
-    const span = err?.span ?? ex.errorSpan!;
-    const hl = [{ target: 'formula' as const, start: span.start, end: span.end, tone: 'error' as const }];
+    const hl = [{ target: 'formula' as const, start: d.span.start, end: d.span.end, tone: 'error' as const }];
     if (ex.askLocation && errorAt === undefined) {
       return { correct: false, partial: true, severity: 'warning', code: 'no-location', headline: 'Right, it is not well-formed — now show where the problem is.', explanation: 'Click the part of the string that breaks the formation rules.' };
     }
-    if (ex.askLocation && errorAt !== undefined && !(errorAt >= span.start - 1 && errorAt <= span.end)) {
+    if (ex.askLocation && errorAt !== undefined && !(errorAt >= d.span.start - 1 && errorAt <= d.span.end)) {
       return {
         correct: false,
         partial: true,
         severity: 'warning',
         code: 'wrong-location',
         headline: 'Right, it is not well-formed — but the problem is elsewhere.',
-        explanation: err ? err.message : 'Look again at the highlighted region.',
-        details: err?.hint ? [err.hint] : undefined,
+        explanation: d.message,
+        details: d.hint ? [d.hint] : undefined,
         highlight: hl,
       };
     }
-    return { correct: true, severity: 'success', code: 'correct', headline: 'Correct — it is not well-formed.', explanation: err?.message ?? '', details: err?.hint ? [err.hint] : undefined, highlight: hl };
+    return { correct: true, severity: 'success', code: 'correct', headline: 'Correct — it is not well-formed.', explanation: d.message, details: d.hint ? [d.hint] : undefined, highlight: hl };
   }
   if (ex.wellFormed) {
     return {
@@ -218,15 +270,14 @@ export function checkWff(ex: WffExercise, wellFormed: boolean, errorAt?: number)
         'Check it piece by piece: each sentence letter is a capital letter, each ¬ is followed by a formula, each binary connective (∧ ∨ → ↔) has a formula on each side, and any binary part inside a larger formula is wrapped in brackets. Outer brackets, square brackets and double negations are all allowed.',
     };
   }
-  const err = !res.ok ? res.error : undefined;
   return {
     correct: false,
     severity: 'error',
     code: 'not-well-formed',
     headline: 'This one is not well-formed.',
-    explanation: err ? err.message : 'It breaks the formation rules.',
-    details: err?.hint ? [err.hint] : undefined,
-    highlight: err ? [{ target: 'formula', start: err.span.start, end: err.span.end, tone: 'error' }] : undefined,
+    explanation: d ? d.message : 'It breaks the formation rules.',
+    details: d?.hint ? [d.hint] : undefined,
+    highlight: d ? [{ target: 'formula', start: d.span.start, end: d.span.end, tone: 'error' }] : undefined,
   };
 }
 
@@ -246,10 +297,6 @@ export function wffSolution(ex: WffExercise): Solution {
   if (res.ok) {
     return { answer: 'well-formed', summary: `Well-formed. Written canonically: ${format(res.formula)}.`, steps: [`Its main connective is the ${CONNECTIVE_NAME[mainConnective(res.formula)]}.`] };
   }
-  const e = res.error;
-  return {
-    answer: 'not well-formed',
-    summary: `Not well-formed: ${e.message}`,
-    steps: [`Problem at characters ${e.span.start}–${e.span.end}: "${ex.formula.slice(e.span.start, e.span.end)}".`, ...(e.hint ? [e.hint] : [])],
-  };
+  const d = diagnoseWff(ex.formula)!;
+  return { answer: 'not well-formed', summary: `Not well-formed. ${d.message}`, steps: d.hint ? [d.hint] : undefined };
 }

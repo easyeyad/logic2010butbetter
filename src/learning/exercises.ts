@@ -169,3 +169,27 @@ export function getSolution(ex: Exercise): Solution {
       return terminologySolution(ex);
   }
 }
+
+/**
+ * A short, concrete label for lists ("Worth reviewing", recent activity):
+ * the formula, the English sentence, or the argument "P → Q, Q ⊢ P".
+ */
+export function exerciseLabel(ex: Exercise): string {
+  const arg = (premises: string[], c: string) => `${premises.join(', ')}${premises.length ? ' ' : ''}⊢ ${c}`;
+  switch (ex.kind) {
+    case 'wff':
+    case 'truth-table':
+      return ex.formula;
+    case 'symbolization':
+      return ex.sentence;
+    case 'validity':
+    case 'countermodel':
+      return arg(ex.premises, ex.conclusion);
+    case 'derivation':
+      return arg(ex.premises, ex.goal);
+    case 'inference-rule':
+      return ex.mode === 'identify' ? `${arg(ex.lines, ex.conclusion)} — which rule?` : `${ex.lines.join(', ')} — by ${ex.rule}`;
+    case 'terminology':
+      return ex.formula ? `${ex.prompt} ${ex.formula}` : ex.prompt;
+  }
+}

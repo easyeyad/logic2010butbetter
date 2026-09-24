@@ -4,7 +4,7 @@
  *
  * OWNER: Learning System.
  */
-import { generateExercise } from './exercises';
+import { exerciseLabel, generateExercise } from './exercises';
 import type { Difficulty, Exercise, Feedback, Topic } from './types';
 import { TOPICS, clampDifficulty } from './types';
 import { hash, makeRng, pick, shuffle } from './util';
@@ -63,64 +63,142 @@ export function randomTopic(seed: number, topics: readonly Topic[] = TOPICS): To
 
 export interface ExerciseResult {
   exerciseId: string;
-  /** The final feedback for this exercise (or a bare correctness flag). */
+  /** The latest feedback for this exercise (or a bare correctness flag). */
   feedback?: Pick<Feedback, 'correct' | 'partial'>;
   correct?: boolean;
   hintsUsed?: number;
   solutionViewed?: boolean;
   skipped?: boolean;
   timeMs?: number;
+  /** How many times the student pressed Check on this exercise (default 1). */
+  attempts?: number;
+  /**
+   * Was the FIRST check fully correct? Defaults to the final correctness when
+   * attempts ≤ 1, otherwise false. `mergeResult` fills this in for you.
+   */
+  firstTryCorrect?: boolean;
 }
 
+const finalCorrect = (r: ExerciseResult) => r.feedback?.correct ?? r.correct ?? false;
+const firstTry = (r: ExerciseResult) => r.firstTryCorrect ?? ((r.attempts ?? 1) <= 1 && finalCorrect(r));
+
+/**
+ * Add a result to a session's result list, merging with an earlier result for
+ * the same exercise (a Retry): keeps the first try's correctness, counts the
+ * attempts, and takes the latest correctness/hints/time. Use this instead of
+ * replacing the earlier result, or retries will look like first-try successes.
+ */
+export function mergeResult(results: readonly ExerciseResult[], r: ExerciseResult): ExerciseResult[] {
+  const prev = results.find((x) => x.exerciseId === r.exerciseId);
+  const merged: ExerciseResult = prev
+    ? {
+        ...r,
+        attempts: (prev.attempts ?? 1) + (r.attempts ?? 1),
+        firstTryCorrect: firstTry(prev),
+        hintsUsed: Math.max(prev.hintsUsed ?? 0, r.hintsUsed ?? 0),
+        solutionViewed: Boolean(prev.solutionViewed || r.solutionViewed),
+      }
+    : { ...r, attempts: r.attempts ?? 1, firstTryCorrect: firstTry(r) };
+  return [...results.filter((x) => x.exerciseId !== r.exerciseId), merged];
+}
+
+export interface ReviewItem {
+  exerciseId: string;
+  topic: Topic;
+  title: string;
+  /** Concrete, exercise-specific label: the formula, sentence or argument. */
+  label: string;
+  /** Why it is listed. */
+  reason: 'wrong' | 'correct-after-retry' | 'solution-viewed' | 'partial';
+}
+
+/**
+ * Scoring semantics (documented contract):
+ *  - `firstTryCorrect` / `firstTryAccuracy` count only exercises answered fully
+ *    correctly on the FIRST check. This is the headline number.
+ *  - `correct` (a.k.a. eventually correct) counts exercises that ended correct,
+ *    including after retries; `correctAfterRetry` is the difference.
+ *  - `score` (0–100): first-try correct = 1, correct after retry = 0.5,
+ *    ended partially right = 0.25, wrong / skipped / solution viewed = 0;
+ *    each hint costs 0.1 of the item (at most half of it).
+ *  - ProgressStore accuracy is per recorded ATTEMPT (every Check is one attempt,
+ *    partial = ½), so a retry-heavy session lowers it too; the two agree when
+ *    every exercise is answered once.
+ */
 export interface SessionScore {
   total: number;
   answered: number;
+  /** Ended correct (first try or after retries). */
   correct: number;
+  firstTryCorrect: number;
+  correctAfterRetry: number;
   partial: number;
   skipped: number;
-  /** 0–100. Correct = 1, partial = 0.5; each hint costs 0.1 (max 0.5); viewing the solution scores 0. */
+  /** firstTryCorrect / total, 0–1 (null for an empty session). */
+  firstTryAccuracy: number | null;
   score: number;
   hintsUsed: number;
   totalTimeMs: number;
-  byTopic: Partial<Record<Topic, { total: number; correct: number; points: number }>>;
-  /** Exercises answered incorrectly or with the solution revealed, for "review mistakes". */
+  byTopic: Partial<Record<Topic, { total: number; correct: number; firstTryCorrect: number; points: number }>>;
+  /** Ids of exercises worth reviewing (wrong, retried, partial, or solution viewed). */
   toReview: string[];
+  /** The same, with concrete labels for display. */
+  review: ReviewItem[];
 }
 
 export function pointsFor(r: ExerciseResult): number {
   if (r.skipped || r.solutionViewed) return 0;
-  const correct = r.feedback?.correct ?? r.correct ?? false;
   const partial = r.feedback?.partial ?? false;
-  const base = correct ? 1 : partial ? 0.5 : 0;
-  const penalty = Math.min(0.5, 0.1 * (r.hintsUsed ?? 0));
-  return Math.max(0, base - (base > 0 ? penalty : 0));
+  const base = firstTry(r) ? 1 : finalCorrect(r) ? 0.5 : partial ? 0.25 : 0;
+  const penalty = Math.min(base / 2, 0.1 * (r.hintsUsed ?? 0));
+  return Math.max(0, base - penalty);
 }
 
 export function scoreSession(session: PracticeSession, results: readonly ExerciseResult[]): SessionScore {
   const byId = new Map(results.map((r) => [r.exerciseId, r]));
-  const out: SessionScore = { total: session.exercises.length, answered: 0, correct: 0, partial: 0, skipped: 0, score: 0, hintsUsed: 0, totalTimeMs: 0, byTopic: {}, toReview: [] };
+  const out: SessionScore = {
+    total: session.exercises.length, answered: 0, correct: 0, firstTryCorrect: 0, correctAfterRetry: 0, partial: 0, skipped: 0,
+    firstTryAccuracy: null, score: 0, hintsUsed: 0, totalTimeMs: 0, byTopic: {}, toReview: [], review: [],
+  };
   let points = 0;
   for (const ex of session.exercises) {
     const r = byId.get(ex.id);
-    const t = (out.byTopic[ex.topic] ??= { total: 0, correct: 0, points: 0 });
+    const t = (out.byTopic[ex.topic] ??= { total: 0, correct: 0, firstTryCorrect: 0, points: 0 });
     t.total++;
     if (!r || r.skipped) {
       out.skipped++;
       continue;
     }
     out.answered++;
-    const correct = r.feedback?.correct ?? r.correct ?? false;
+    const correct = finalCorrect(r);
+    const first = firstTry(r);
+    let reason: ReviewItem['reason'] | null = null;
     if (correct) {
       out.correct++;
       t.correct++;
-    } else if (r.feedback?.partial) out.partial++;
-    if (!correct || r.solutionViewed) out.toReview.push(ex.id);
+      if (first) {
+        out.firstTryCorrect++;
+        t.firstTryCorrect++;
+      } else {
+        out.correctAfterRetry++;
+        reason = 'correct-after-retry';
+      }
+    } else if (r.feedback?.partial) {
+      out.partial++;
+      reason = 'partial';
+    } else reason = 'wrong';
+    if (r.solutionViewed) reason = 'solution-viewed';
+    if (reason) {
+      out.toReview.push(ex.id);
+      out.review.push({ exerciseId: ex.id, topic: ex.topic, title: ex.title, label: exerciseLabel(ex), reason });
+    }
     out.hintsUsed += r.hintsUsed ?? 0;
     out.totalTimeMs += r.timeMs ?? 0;
     const p = pointsFor(r);
     points += p;
     t.points += p;
   }
+  out.firstTryAccuracy = out.total ? out.firstTryCorrect / out.total : null;
   out.score = out.total ? Math.round((100 * points) / out.total) : 0;
   return out;
 }

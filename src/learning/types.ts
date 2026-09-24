@@ -102,7 +102,7 @@ export interface WffExercise extends ExerciseBase<'wff'> {
   wellFormed: boolean;
   /** When malformed: ask the student to click where the problem is. */
   askLocation: boolean;
-  /** When malformed: the parser's error span / code (the location answer is checked against this). */
+  /** When malformed: where the problem is (from diagnoseWff; the location answer is checked against this) and the parser error code. */
   errorSpan?: Span;
   errorCode?: ParseErrorCode;
   /** How the malformed string was produced (for hints). */

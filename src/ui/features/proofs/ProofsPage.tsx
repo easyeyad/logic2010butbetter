@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { progressStore } from '../../learning/progress';
 import { useProofTracking } from './useProofTracking';
+import { useFormulaFocus, useKeepFocusAboveBars } from './useFormulaFocus';
 import { PageHeader } from '../../app/PageHeader';
 import { BottomSheet } from '../../components/BottomSheet';
 import { Button } from '../../components/Button';
@@ -25,7 +26,7 @@ function ProofsWorkspace() {
   const [overlayOpen, setOverlayOpen] = useState(false);
   const tracking = useProofTracking(ed);
   const [params, setParams] = useSearchParams();
-  const formulaFocused = useFormulaFocus();
+  const formulaFocused = useFormulaFocus('.proofs__editor');
 
   // /proofs?open=<saved proof id> loads a saved proof.
   const openId = params.get('open');
@@ -73,6 +74,7 @@ function ProofsWorkspace() {
   );
 
   const layout = wide ? 'three' : desktop ? 'two' : 'one';
+  useKeepFocusAboveBars('.proofs__editor', layout === 'one');
 
   return (
     <div className={`proofs proofs--${layout}`}>
@@ -140,24 +142,3 @@ export default function ProofsPage() {
   );
 }
 
-/**
- * True while a proof-line formula (or the action bar's symbol buttons) has
- * focus — the mobile bar then shows symbols instead of the panel buttons.
- */
-function useFormulaFocus(): boolean {
-  const [focused, setFocused] = useState(false);
-  useEffect(() => {
-    const update = () => {
-      const el = document.activeElement as HTMLElement | null;
-      setFocused(Boolean(el && (el.matches('.proofs__editor [data-field="formula"]') || el.closest('.actionbar'))));
-    };
-    const onOut = () => setTimeout(update, 0);
-    document.addEventListener('focusin', update);
-    document.addEventListener('focusout', onOut);
-    return () => {
-      document.removeEventListener('focusin', update);
-      document.removeEventListener('focusout', onOut);
-    };
-  }, []);
-  return focused;
-}

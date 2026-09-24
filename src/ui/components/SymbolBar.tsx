@@ -19,6 +19,7 @@ export function SymbolBar({ onInsert, label = 'Insert symbol', compact }: { onIn
           aria-label={`Insert ${s.name}`}
           title={`${s.name} — or type ${s.typed}`}
           onMouseDown={(e) => e.preventDefault()}
+          onPointerDown={(e) => e.pointerType !== "mouse" && e.preventDefault()}
           onClick={() => onInsert(s)}
         >
           {settings.asciiDisplay ? s.ascii : s.symbol}

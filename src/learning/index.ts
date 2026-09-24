@@ -51,7 +51,10 @@
  * SESSIONS
  *   createPracticeSession({ topic | 'mixed', difficulty, count, seed, topics?, difficultyByTopic?, ramp? })
  *     → { id, config, exercises }            (deterministic; no duplicate ids)
- *   scoreSession(session, results)           → SessionScore (0–100, per-topic, toReview)
+ *   mergeResult(results, r)                  → results with retries merged (keeps first-try correctness)
+ *   scoreSession(session, results)           → SessionScore: first-try vs eventually correct, score 0–100
+ *                                               (semantics documented on SessionScore), review items with labels
+ *   exerciseLabel(ex)                        → concrete label: formula / sentence / "P → Q, Q ⊢ P"
  *
  * PROGRESS
  *   const store = new ProgressStore(getDefaultStorage(), { now? })
@@ -68,7 +71,7 @@
  */
 export * from './types';
 
-export { checkAnswer, getHints, getSolution, generateExercise, getExerciseById, EXERCISE_BANK } from './exercises';
+export { checkAnswer, getHints, getSolution, generateExercise, getExerciseById, exerciseLabel, EXERCISE_BANK } from './exercises';
 export type { GenerateOptions } from './exercises';
 
 export {
@@ -81,7 +84,8 @@ export {
 export { SYMBOLIZATION_BANK, VOCABULARY } from './symbolizationBank';
 export type { SymbolizationBankItem } from './symbolizationBank';
 
-export { generateWff, checkWff } from './wff';
+export { generateWff, checkWff, diagnoseWff } from './wff';
+export type { WffDiagnosis } from './wff';
 
 export {
   generateTruthTable,
@@ -122,8 +126,8 @@ export {
   formulaPart,
 } from './terminology';
 
-export { createPracticeSession, scoreSession, pointsFor, randomTopic } from './session';
-export type { PracticeSession, PracticeSessionConfig, ExerciseResult, SessionScore } from './session';
+export { createPracticeSession, scoreSession, mergeResult, pointsFor, randomTopic } from './session';
+export type { PracticeSession, PracticeSessionConfig, ExerciseResult, SessionScore, ReviewItem } from './session';
 
 export {
   ProgressStore,
