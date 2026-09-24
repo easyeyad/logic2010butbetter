@@ -40,20 +40,33 @@ test.describe('navigation', () => {
     expect(errors).toEqual([]);
   });
 
-  test('focus moves to the page heading after navigation', async ({ page }) => {
+  test('focus moves to the page heading after navigation (page chunk already loaded)', async ({ page }) => {
+    await fresh(page);
+    await go(page, '/reference');
+    await go(page, '/');
+    const nav = page.getByRole('navigation', { name: 'Main' });
+    if (isPhone(page)) await nav.locator('a[href="#/reference"]').click();
+    else await nav.locator('a[href="#/reference"]').click();
+    await expect(page.locator('h1')).toHaveText('Reference');
+    await expect(page.locator('h1')).toBeFocused();
+  });
+
+  // BUG (ui, minor/a11y): AppShell focuses #page-title in an effect on pathname
+  // change, but lazy pages are still suspended then (no h1 yet), so on the FIRST
+  // visit to Proofs/Truth Tables/Countermodels/Reference/Settings focus stays on
+  // the nav link and screen-reader users aren't told the page changed.
+  test.fail('BUG: focus moves to the page heading on first visit to a lazy-loaded page', async ({ page }) => {
     await fresh(page);
     await go(page, '/');
     const nav = page.getByRole('navigation', { name: 'Main' });
     await nav.locator('a[href="#/reference"]').click();
     await expect(page.locator('h1')).toHaveText('Reference');
-    await expect(page.locator('h1')).toBeFocused();
+    await expect(page.locator('h1')).toBeFocused({ timeout: 3000 });
   });
 
   test('skip link is the first tab stop and moves focus to main content', async ({ page }) => {
     await fresh(page);
     await go(page, '/truth-tables');
-    await page.locator('body').click({ position: { x: 1, y: 1 } }).catch(() => {});
-    await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur());
     await page.keyboard.press('Tab');
     const skip = page.getByRole('link', { name: 'Skip to content' });
     await expect(skip).toBeFocused();

@@ -13,9 +13,16 @@ test.describe('formula input', () => {
     await input.click();
     await page.keyboard.type('~P & Q -> R', { delay: 20 });
     await expect(input).toHaveValue('¬P ∧ Q → R');
+    // Logic 2010 syntax: ∧ and → unparenthesized is ambiguous — the input explains it
+    await expect(page.locator('.fi__error')).toContainText(/ambiguous/i);
+    await expect(page.locator('.fi__error')).toContainText('(¬P ∧ Q) → R');
+    // and once parenthesized it's accepted
+    await input.fill('');
+    await input.click();
+    await page.keyboard.type('(~P & Q) -> R', { delay: 20 });
+    await expect(input).toHaveValue('(¬P ∧ Q) → R');
     await expect(page.getByText('Well-formed formula')).toBeAttached();
     await expect(input).not.toHaveAttribute('aria-invalid', 'true');
-    // table appears
     await expect(page.locator('table.tt')).toBeVisible();
     expect(errors).toEqual([]);
   });
@@ -44,7 +51,8 @@ test.describe('formula input', () => {
     const mark = err.locator('mark.fx-err');
     await expect(mark).toHaveCount(1);
     const marked = (await mark.innerText()).trim();
-    expect(['→', '∧', '∧ →', '', ' ']).toContain(marked);
+    expect(marked).toContain('→');
+    expect(marked.length).toBeLessThan('¬(P ∧ → Q)'.length);
     // no table while invalid
     await expect(page.getByText('Fix the highlighted formula first')).toBeVisible();
   });

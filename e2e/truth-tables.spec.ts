@@ -49,7 +49,7 @@ test.describe('truth tables (automatic)', () => {
     const expected = valuations(['P', 'Q', 'R']).map((v) => !(v.P && v.Q) || v.R);
     expect(await mainColumn(page)).toEqual(expected);
     // atom columns in standard order
-    const firstCol = await page.locator('table.tt tbody tr').locator('th.tt__atom >> nth=0').allInnerTexts();
+    const firstCol = await page.locator('table.tt tbody tr').evaluateAll((trs) => trs.map((tr) => tr.children[0].textContent ?? ''));
     expect(firstCol.map((t) => t.trim())).toEqual(['T', 'T', 'T', 'T', 'F', 'F', 'F', 'F']);
     await expect(page.locator('.verdict .badge')).toHaveText(/Contingent/);
     await expect(page.getByText(/True in 7 of 8 rows/)).toBeVisible();
@@ -88,13 +88,18 @@ test.describe('truth tables (practice)', () => {
     const first = grid.locator('[data-cell="0:1"]');
     await first.focus();
     // column ¬P: row0 F, row1 T (typing moves down)
+    const at = (c: string) => expect(grid.locator(`[data-cell="${c}"]`)).toBeFocused();
     await page.keyboard.press('f');
+    await at('1:1');
     await page.keyboard.press('t');
+    await at('1:1');
     await page.keyboard.press('ArrowRight');
+    await at('1:2');
     await page.keyboard.press('ArrowUp');
-    await expect(grid.locator('[data-cell="0:2"]')).toBeFocused();
+    await at('0:2');
     // main column: deliberately wrong on row 0
     await page.keyboard.press('t');
+    await at('1:2');
     await page.keyboard.press('f');
     await page.getByRole('button', { name: 'Check', exact: true }).click();
     const status = page.getByRole('status').filter({ hasText: /cells correct/ });

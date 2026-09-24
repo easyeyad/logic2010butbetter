@@ -31,7 +31,8 @@ export default defineConfig({
   expect: { timeout: 7_000 },
   fullyParallel: true,
   workers: process.env.CI ? 2 : 4,
-  retries: 0,
+  // One retry: the dev server hot-reloads while other workers edit; a pass on retry is reported as "flaky".
+  retries: 1,
   reporter: [['list']],
   use: {
     baseURL: BASE_URL,
