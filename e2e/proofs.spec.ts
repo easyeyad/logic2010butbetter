@@ -183,6 +183,9 @@ test.describe('proofs', () => {
     await expect(lineFormula(page, 6)).toHaveValue('R');
   });
 
+  // BUG (ui, minor): currently fails at 1440 and 1280 (three-column layout squeezes the
+  // derivation column: a depth-2/depth-4 Show line's formula field is 106–112px and wraps
+  // onto 3 lines) and at 375 (depth-4 Show line 119px). Passes at 1024/768/430/390.
   test('long proof (22 lines, 4+ nesting levels) stays usable at this width', async ({ page }, info) => {
     const ls: Array<Record<string, unknown>> = [
       { id: 'p1', kind: 'premise', text: '(P → Q) ∧ (R → S)', depth: 0 },
@@ -286,6 +289,8 @@ test.describe('proofs', () => {
     await expect(input).toBeFocused();
   });
 
+  // BUG (ui, major on phones): at 390x844 the focused last line sits under the fixed
+  // action bar (symbol bar) — its rule/refs fields are hidden; no scroll-padding.
   test('phone: the action bar does not cover the last proof line', async ({ page }) => {
     test.skip(!isPhone(page), 'phones only');
     await fresh(page, { 'proof-session': HS_START });

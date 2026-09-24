@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test';
-import { fresh, go, HS_START, isDesktop, isPhone, isWide } from './helpers';
+import { fresh, go, HS_START, isDesktop, isWide } from './helpers';
 
 test.describe('reference', () => {
   test('rules are searchable by abbreviation, name and concept', async ({ page }) => {
