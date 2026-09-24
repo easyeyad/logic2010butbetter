@@ -26,7 +26,7 @@ export const RULE_ARITY: Record<RuleId, number[]> = {
 };
 
 /** What the cited lines must be, for "cites exactly N lines (...)". */
-const NEEDS: Record<RuleId, string> = {
+export const NEEDS: Record<RuleId, string> = {
   MP: 'a conditional and its antecedent',
   MT: 'a conditional and the negation of its consequent',
   DN: 'the one line to add or remove ¬¬ on',
@@ -284,7 +284,7 @@ function diagMT(n: number, [a, b]: RefF[], c: Formula, ctx: DiagContext): Diagno
     if (eq(c, X)) {
       return {
         message: `Line ${n}: MT concludes the NEGATION of the antecedent. From ${F(cond.f)} and ${F(o.f)} you get ${F(Not(X))}, not ${F(X)}.`,
-        suggestion: `Write ${F(Not(X))} here.`,
+        suggestion: `MT gives the negation of the antecedent: write ${F(Not(X))} here (and use DN afterwards if you need to).`,
         target: 'formula',
       };
     }
@@ -311,7 +311,7 @@ function diagMT(n: number, [a, b]: RefF[], c: Formula, ctx: DiagContext): Diagno
   }
   if (eq(o.f, X)) {
     return {
-      message: `Line ${n}: ${capitalize(Ld(o))} is the antecedent of ${Ld(cond)} itself, not the negation of its consequent — that is a job for MP, not MT.`,
+      message: `Line ${n}: MT needs the negation of the consequent of ${Ld(cond)}, but ${Ld(o)} is its antecedent — that is a job for MP, not MT.`,
       suggestion: `With a conditional and its antecedent, use MP (Modus Ponens); it gives ${F(Y)}.`,
       badRefs: [o.n],
       target: 'rule',
@@ -678,7 +678,22 @@ function diagTransform(rule: RuleId, n: number, [a]: RefF[], c: Formula): Diagno
   };
 }
 
+/**
+ * Diagnose a failed rule application. The first mention of the rule in the
+ * message always carries its full name, e.g. "MP (Modus Ponens)".
+ */
 export function diagnoseRule(rule: RuleId, n: number, refs: RefF[], c: Formula, ctx: DiagContext): Diagnosis {
+  const d = diagnoseRaw(rule, n, refs, c, ctx);
+  const label = ruleLabel(rule);
+  if (!d.message.includes(label)) {
+    const re = new RegExp(`\\b${rule}\\b(?! \\()`);
+    d.message = re.test(d.message) ? d.message.replace(re, label) : d.message.replace(/^(Line \d+): /, `$1: ${label} — `);
+  }
+  if (!d.suggestion) d.suggestion = `Compare the step with the schema of ${label} in the reference panel.`;
+  return d;
+}
+
+function diagnoseRaw(rule: RuleId, n: number, refs: RefF[], c: Formula, ctx: DiagContext): Diagnosis {
   switch (rule) {
     case 'MP':
       return diagMP(n, refs, c, ctx);

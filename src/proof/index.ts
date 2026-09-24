@@ -9,3 +9,5 @@ export { suggestNextStep, suggestClose } from './hints';
 export type { Hint, HintLine } from './hints';
 export { solve } from './solver';
 export type { SolveOptions } from './solver';
+export { checkRuleApplication } from './ruleCheck';
+export type { RuleCheckOptions, RuleCheckResult } from './ruleCheck';

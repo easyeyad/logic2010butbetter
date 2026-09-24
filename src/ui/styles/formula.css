@@ -71,3 +71,12 @@
 @media (max-width: 400px) { .symbar { gap: 3px; } .symbar__btn { flex: 1 1 0; min-width: 0; } }
 
 .formula { font-family: var(--font-math); font-size: 1.05em; overflow-wrap: anywhere; }
+textarea.fi__input {
+  display: block; resize: none; overflow: hidden;
+  padding-top: 7px; padding-bottom: 7px;
+  line-height: 1.4;
+  white-space: pre-wrap; overflow-wrap: anywhere; word-break: break-word;
+  text-overflow: clip;
+}
+.fi--compact textarea.fi__input { min-height: 36px; padding-top: 6px; padding-bottom: 6px; }
+@media (pointer: coarse) { .fi--compact textarea.fi__input { min-height: var(--touch); padding-top: 10px; padding-bottom: 10px; } }

@@ -22,7 +22,7 @@ import {
   isBlank,
   updateLine,
 } from './draftOps';
-import { SAMPLE_PROBLEMS } from './samples';
+import { DERIVATION_EXERCISES } from '../../../learning';
 
 export interface ProofProblem {
   /** Sample id, or 'custom'. */
@@ -39,19 +39,28 @@ export interface ProofDoc {
 
 export const PROOF_STORAGE_KEY = 'proof-session';
 
-export function problemFromSample(id: string): ProofProblem {
-  const s = SAMPLE_PROBLEMS.find((p) => p.id === id) ?? SAMPLE_PROBLEMS[0];
+export function problemFromExercise(id: string): ProofProblem {
+  const s = DERIVATION_EXERCISES.find((p) => p.id === id) ?? DERIVATION_EXERCISES[0];
   return { id: s.id, title: s.title, premises: s.premises, goal: s.goal };
+}
+
+/** Stable id for saving a proof: the exercise id, or a hash of a custom problem. */
+export function proofIdFor(p: ProofProblem): string {
+  if (DERIVATION_EXERCISES.some((e) => e.id === p.id)) return p.id;
+  const text = `${p.premises.join('|')}⊢${p.goal}`;
+  let h = 0;
+  for (let i = 0; i < text.length; i++) h = (Math.imul(31, h) + text.charCodeAt(i)) | 0;
+  return `custom-${(h >>> 0).toString(36)}`;
 }
 
 export function docForProblem(problem: ProofProblem): ProofDoc {
   return { problem, lines: linesForProblem(problem.premises, problem.goal) };
 }
 
-function loadDoc(): ProofDoc {
+export function loadStoredDoc(): ProofDoc {
   const stored = readStored<ProofDoc | null>(PROOF_STORAGE_KEY, null);
   if (stored && Array.isArray(stored.lines) && stored.problem) return stored;
-  return docForProblem(problemFromSample(SAMPLE_PROBLEMS[0].id));
+  return docForProblem(problemFromExercise(DERIVATION_EXERCISES[0].id));
 }
 
 export type Field = 'formula' | 'rule' | 'refs';
@@ -69,9 +78,20 @@ export interface CloseRequest {
  * All proof-editor state: the undoable document, live (debounced) checking,
  * focus requests and structural operations. Components stay presentational.
  */
-export function useProofEditor() {
+export interface ProofEditorOptions {
+  /** Initial document (defaults to the autosaved one). */
+  initial?: () => ProofDoc;
+  /** localStorage key for autosave; null disables autosave. */
+  storageKey?: string | null;
+  /** Force derived rules on (e.g. an exercise that allows them). Settings can also enable them. */
+  allowDerived?: boolean;
+}
+
+export function useProofEditor(opts: ProofEditorOptions = {}) {
   const { settings } = useSettings();
-  const history = useUndoable<ProofDoc>(loadDoc);
+  const storageKey = opts.storageKey === undefined ? PROOF_STORAGE_KEY : opts.storageKey;
+  const allowDerived = settings.derivedRules || Boolean(opts.allowDerived);
+  const history = useUndoable<ProofDoc>(opts.initial ?? loadStoredDoc);
   const setDoc = history.set;
   const doc = history.state;
   const lines = doc.lines;
@@ -85,16 +105,16 @@ export function useProofEditor() {
       goal: doc.problem.goal || undefined,
       premises: doc.problem.premises.length ? doc.problem.premises : undefined,
       lines: trimTrailingBlank(lines),
-      allowDerivedRules: settings.derivedRules,
+      allowDerivedRules: allowDerived,
     }),
-    [doc.problem.goal, doc.problem.premises, lines, settings.derivedRules],
+    [doc.problem.goal, doc.problem.premises, lines, allowDerived],
   );
 
   // Autosave (debounced).
   const saved = useDebounced(doc, 400);
   useEffect(() => {
-    writeStored(PROOF_STORAGE_KEY, saved);
-  }, [saved]);
+    if (storageKey) writeStored(storageKey, saved);
+  }, [saved, storageKey]);
 
   // Live checking, debounced ~120ms.
   const checkedDraft = useDebounced(draft, 120);
@@ -257,12 +277,18 @@ export function useProofEditor() {
     [setDoc],
   );
 
+  const loadDocument = useCallback((d: ProofDoc) => {
+    setDoc(d);
+    setFocusReq(null);
+  }, [setDoc]);
+
   const replaceLines = useCallback(
     (next: DraftLine[]) => setDoc((d) => ({ ...d, lines: next.map((l) => ({ ...l, id: makeId() })) })),
     [setDoc],
   );
 
   return {
+    allowDerived,
     doc,
     lines,
     draft,
@@ -276,6 +302,7 @@ export function useProofEditor() {
     closeReq,
     setCloseReq,
     loadProblem,
+    loadDocument,
     replaceLines,
     undo: history.undo,
     redo: history.redo,

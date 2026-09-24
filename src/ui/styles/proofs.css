@@ -106,7 +106,7 @@
   position: relative;
 }
 .line.is-focused { background: color-mix(in srgb, var(--c-accent-soft) 70%, transparent); }
-.line.is-badref { background: var(--c-err-soft); box-shadow: inset 3px 0 0 var(--c-err); }
+.line.is-badref { box-shadow: inset 3px 0 0 var(--c-warn-border); }
 .line__gutter { grid-area: gutter; align-self: stretch; display: flex; }
 .line__num {
   width: 2.25rem; flex: none;
@@ -155,7 +155,7 @@
 @media (pointer: coarse) { .line__iconbtn { width: var(--touch); height: var(--touch); } }
 .line__badref {
   grid-area: badref; display: flex; align-items: center; gap: 6px;
-  font-size: var(--fs-xs); font-weight: 600; color: var(--c-err); padding: 0 0 4px var(--sp-2);
+  font-size: var(--fs-xs); font-weight: 600; color: var(--c-warn); padding: 0 0 4px var(--sp-2);
 }
 .line__msgs { grid-area: msgs; display: flex; flex-direction: column; gap: var(--sp-1); padding: var(--sp-1) var(--sp-2) var(--sp-2); min-width: 0; }
 .line__msg { display: flex; gap: var(--sp-2); align-items: flex-start; font-size: var(--fs-sm); overflow-wrap: anywhere; }

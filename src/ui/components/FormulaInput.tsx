@@ -1,4 +1,4 @@
-import {
+import React, {
   forwardRef,
   useCallback,
   useEffect,
@@ -43,11 +43,16 @@ export interface FormulaInputProps
   /** Hide the success check (e.g. when the parent shows its own status). */
   hideSuccess?: boolean;
   debounceMs?: number;
+  /**
+   * Wrap long formulas onto several lines (auto-growing textarea; Enter never
+   * inserts a newline). Defaults to `compact`.
+   */
+  wrap?: boolean;
 }
 
 export interface FormulaInputHandle {
   focus: (caret?: 'start' | 'end') => void;
-  input: HTMLInputElement | null;
+  input: HTMLInputElement | HTMLTextAreaElement | null;
 }
 
 export const FormulaInput = forwardRef<FormulaInputHandle, FormulaInputProps>(function FormulaInput(
@@ -64,6 +69,7 @@ export const FormulaInput = forwardRef<FormulaInputHandle, FormulaInputProps>(fu
     invalid,
     hideSuccess,
     debounceMs = 150,
+    wrap,
     id: idProp,
     className,
     onKeyDown,
@@ -79,7 +85,8 @@ export const FormulaInput = forwardRef<FormulaInputHandle, FormulaInputProps>(fu
   const autoId = useId();
   const id = idProp ?? `fi-${autoId}`;
   const msgId = `${id}-msg`;
-  const inputRef = useRef<HTMLInputElement>(null);
+  const inputRef = useRef<HTMLInputElement | HTMLTextAreaElement>(null);
+  const multiline = wrap ?? Boolean(compact);
   const pendingCaret = useRef<number | null>(null);
   const lastSel = useRef<{ start: number; end: number }>({ start: value.length, end: value.length });
   const target = useFormulaTarget();
@@ -97,6 +104,14 @@ export const FormulaInput = forwardRef<FormulaInputHandle, FormulaInputProps>(fu
     },
   }));
 
+  // Auto-grow the wrapping textarea to fit its content.
+  useLayoutEffect(() => {
+    const el = inputRef.current;
+    if (!multiline || !el) return;
+    el.style.height = 'auto';
+    el.style.height = `${el.scrollHeight}px`;
+  }, [value, multiline]);
+
   // Restore the caret after a normalization/insertion re-render.
   useLayoutEffect(() => {
     const el = inputRef.current;
@@ -108,7 +123,11 @@ export const FormulaInput = forwardRef<FormulaInputHandle, FormulaInputProps>(fu
   }, [value]);
 
   const emit = useCallback(
-    (raw: string, caret: number, force = false) => {
+    (input: string, caretIn: number, force = false) => {
+      // A formula is one line: drop pasted newlines.
+      const before = input.slice(0, caretIn).replace(/[\r\n]+/g, ' ');
+      const raw = before + input.slice(caretIn).replace(/[\r\n]+/g, ' ');
+      const caret = before.length;
       if (ascii) {
         pendingCaret.current = caret;
         onChange(raw);
@@ -170,8 +189,9 @@ export const FormulaInput = forwardRef<FormulaInputHandle, FormulaInputProps>(fu
   const isInvalid = Boolean(parseError) || Boolean(invalid);
   const showToolbar = toolbar ?? !compact;
 
-  const handleKeyDown = (e: KeyboardEvent<HTMLInputElement>) => {
-    onKeyDown?.(e);
+  const handleKeyDown = (e: KeyboardEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+    if (multiline && e.key === 'Enter') e.preventDefault(); // never a newline; parents may still act on Enter
+    onKeyDown?.(e as KeyboardEvent<HTMLInputElement>);
   };
 
   return (
@@ -180,35 +200,68 @@ export const FormulaInput = forwardRef<FormulaInputHandle, FormulaInputProps>(fu
         {label}
       </label>
       <div className={`fi__box ${isInvalid ? 'is-invalid' : ''} ${parseOk && !invalid ? 'is-valid' : ''}`}>
-        <input
-          {...rest}
-          ref={inputRef}
-          id={id}
-          type="text"
-          className="fi__input math"
-          value={value}
-          placeholder={placeholder ?? (compact ? 'formula' : 'e.g. (P & Q) -> R')}
-          autoComplete="off"
-          autoCorrect="off"
-          autoCapitalize="characters"
-          spellCheck={false}
-          inputMode="text"
-          aria-invalid={isInvalid || undefined}
-          aria-describedby={[parseError || engineDown ? msgId : null, describedBy].filter(Boolean).join(' ') || undefined}
-          onChange={(e) => emit(e.target.value, e.target.selectionStart ?? e.target.value.length)}
-          onSelect={rememberSel}
-          onKeyUp={rememberSel}
-          onKeyDown={handleKeyDown}
-          onFocus={(e: FocusEvent<HTMLInputElement>) => {
-            target?.register((d) => insertRef.current(d));
-            onFocus?.(e);
-          }}
-          onBlur={(e: FocusEvent<HTMLInputElement>) => {
-            rememberSel();
-            if (!ascii && endsWithPartialConnective(value)) emit(value, value.length, true);
-            onBlur?.(e);
-          }}
-        />
+        {multiline ? (
+          <textarea
+            {...(rest as Record<string, unknown>)}
+            ref={inputRef as React.RefObject<HTMLTextAreaElement>}
+            rows={1}
+            data-multiline=""
+            id={id}
+            className="fi__input math"
+            value={value}
+            placeholder={placeholder ?? (compact ? 'formula' : 'e.g. (P & Q) -> R')}
+            autoComplete="off"
+            autoCorrect="off"
+            autoCapitalize="characters"
+            spellCheck={false}
+            inputMode="text"
+            aria-invalid={isInvalid || undefined}
+            aria-describedby={[parseError || engineDown ? msgId : null, describedBy].filter(Boolean).join(' ') || undefined}
+            onChange={(e) => emit(e.target.value, e.target.selectionStart ?? e.target.value.length)}
+            onSelect={rememberSel}
+            onKeyUp={rememberSel}
+            onKeyDown={handleKeyDown}
+            onFocus={(e: FocusEvent<HTMLTextAreaElement>) => {
+              target?.register((d) => insertRef.current(d));
+              onFocus?.(e as unknown as FocusEvent<HTMLInputElement>);
+            }}
+            onBlur={(e: FocusEvent<HTMLTextAreaElement>) => {
+              rememberSel();
+              if (!ascii && endsWithPartialConnective(value)) emit(value, value.length, true);
+              onBlur?.(e as unknown as FocusEvent<HTMLInputElement>);
+            }}
+          />
+        ) : (
+          <input
+            {...rest}
+            ref={inputRef as React.RefObject<HTMLInputElement>}
+            type="text"
+            id={id}
+            className="fi__input math"
+            value={value}
+            placeholder={placeholder ?? (compact ? 'formula' : 'e.g. (P & Q) -> R')}
+            autoComplete="off"
+            autoCorrect="off"
+            autoCapitalize="characters"
+            spellCheck={false}
+            inputMode="text"
+            aria-invalid={isInvalid || undefined}
+            aria-describedby={[parseError || engineDown ? msgId : null, describedBy].filter(Boolean).join(' ') || undefined}
+            onChange={(e) => emit(e.target.value, e.target.selectionStart ?? e.target.value.length)}
+            onSelect={rememberSel}
+            onKeyUp={rememberSel}
+            onKeyDown={handleKeyDown}
+            onFocus={(e: FocusEvent<HTMLInputElement>) => {
+              target?.register((d) => insertRef.current(d));
+              onFocus?.(e);
+            }}
+            onBlur={(e: FocusEvent<HTMLInputElement>) => {
+              rememberSel();
+              if (!ascii && endsWithPartialConnective(value)) emit(value, value.length, true);
+              onBlur?.(e);
+            }}
+          />
+        )}
         {parseOk && !invalid && !hideSuccess && (
           <span className="fi__ok" title="Well-formed formula">
             <Icon name="check" size={16} />

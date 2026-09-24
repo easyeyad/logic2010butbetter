@@ -1,5 +1,4 @@
 import type { Formula } from '../logic/ast';
-import { Not } from '../logic/ast';
 import type { CloseMethod, DerivationDraft, DraftLine } from './types';
 import { accessProblem, analyze, type Analysis } from './checker';
 import { Prover, prune } from './prover';

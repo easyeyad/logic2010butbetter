@@ -11,14 +11,8 @@ import type {
   RuleId,
 } from './types';
 import { DERIVED_RULE_IDS, isRuleId, ruleLabel } from './rules';
-import {
-  RULE_ARITY,
-  alternativeRules,
-  diagnoseRule,
-  refCountMessage,
-  ruleApplies,
-  type RefF,
-} from './inference';
+import { NEEDS, RULE_ARITY, type RefF } from './inference';
+import { checkRuleApplication } from './ruleCheck';
 import { aKind, capitalize, contradictory, equals as eq, fmt, lineList } from './util';
 
 /**
@@ -149,7 +143,7 @@ export function analyze(draft: DerivationDraft): Analysis {
     const line = lines[i];
     let d = line.depth;
     if (typeof d !== 'number' || !Number.isInteger(d) || d < 0) {
-      issues[i].push(err('depth-invalid', `Line ${i + 1} has an invalid indentation level.`, { target: 'structure' }));
+      issues[i].push(err('depth-invalid', `Line ${i + 1} has an invalid indentation level.`, { target: 'structure', suggestion: 'Re-indent the line: 0 for the outermost level, one more for each open box.' }));
       d = 0;
     }
     depth[i] = d;
@@ -205,7 +199,7 @@ export function analyze(draft: DerivationDraft): Analysis {
     // depth checks
     if (i === 0) {
       if (d !== 0)
-        issues[i].push(err('depth-jump', 'Line 1 must be at the outermost level (not indented).', { target: 'structure' }));
+        issues[i].push(err('depth-jump', 'Line 1 must be at the outermost level (not indented).', { target: 'structure', suggestion: 'Remove the indentation from line 1.' }));
     } else {
       const pd = depth[i - 1];
       if (d > pd) {
@@ -220,6 +214,7 @@ export function analyze(draft: DerivationDraft): Analysis {
           issues[i].push(
             err('depth-jump', `Line ${i + 1} is indented ${d - pd} levels below the Show line on line ${i}; a box goes exactly one level deeper.`, {
               target: 'structure',
+              suggestion: `Indent line ${i + 1} exactly one level deeper than line ${i}.`,
             }),
           );
       }
@@ -249,7 +244,7 @@ export function analyze(draft: DerivationDraft): Analysis {
           }),
         );
       if (d !== 0)
-        issues[i].push(err('premise-depth', `Line ${i + 1}: premises belong at the outermost level, not inside a box.`, { target: 'structure' }));
+        issues[i].push(err('premise-depth', `Line ${i + 1}: premises belong at the outermost level, not inside a box.`, { target: 'structure', suggestion: 'Move the premise to the top of the derivation, unindented.' }));
     } else seenNonPremise = true;
     if (line.kind === 'show') stack.push(i);
   }
@@ -349,11 +344,11 @@ export function analyze(draft: DerivationDraft): Analysis {
       const num = typeof raw === 'number' ? raw : Number(raw);
       const r = num - 1;
       if (!Number.isInteger(num) || r < 0 || r >= n) {
-        issues[i].push(err('ref-out-of-range', `${who} cites line ${raw}, but there is no line ${raw}.`, { target: 'refs', badRefs: [num] }));
+        issues[i].push(err('ref-out-of-range', `${who} cites line ${raw}, but there is no line ${raw}.`, { target: 'refs', badRefs: [num], suggestion: 'Check the line numbers you cited — they must be lines above this one.' }));
         continue;
       }
       if (r === i) {
-        issues[i].push(err('ref-self', `${who} cites itself. A line can only use lines above it.`, { target: 'refs', badRefs: [num] }));
+        issues[i].push(err('ref-self', `${who} cites itself. A line can only use lines above it.`, { target: 'refs', badRefs: [num], suggestion: 'Cite the earlier lines the rule actually works on.' }));
         continue;
       }
       if (r > i) {
@@ -361,6 +356,7 @@ export function analyze(draft: DerivationDraft): Analysis {
           err('ref-later', `${who} cites line ${num}, which comes later. A line can only use lines above it.`, {
             target: 'refs',
             badRefs: [num],
+            suggestion: `Derive line ${num}'s formula before this line, or cite an earlier line.`,
           }),
         );
         continue;
@@ -403,16 +399,8 @@ export function analyze(draft: DerivationDraft): Analysis {
       continue;
     }
     if (!isRuleId(rule)) {
-      issues[i].push(err('unknown-rule', `Line ${num}: "${rule}" is not a rule of this system.`, { target: 'rule' }));
+      issues[i].push(err('unknown-rule', `Line ${num}: "${rule}" is not a rule of this system.`, { target: 'rule', suggestion: 'Pick one of MP, MT, DN, R, S, ADJ, ADD, MTP, BC, CB (or a derived rule, if enabled).' }));
       continue;
-    }
-    if (DERIVED_RULE_IDS.includes(rule) && !allowDerived) {
-      issues[i].push(
-        err('rule-not-allowed', `Line ${num} uses ${ruleLabel(rule)}, a derived rule, but derived rules are turned off for this exercise.`, {
-          target: 'rule',
-          suggestion: 'Use the primitive rules instead (an ID or CD subproof usually does the job), or enable derived rules in settings.',
-        }),
-      );
     }
     const f = formulas[i];
     const got = citedCount(line.refs);
@@ -420,48 +408,28 @@ export function analyze(draft: DerivationDraft): Analysis {
       issues[i].push(
         err('missing-refs', `Line ${num}: ${ruleLabel(rule)} needs to cite ${RULE_ARITY[rule][0]} line${RULE_ARITY[rule][0] === 1 ? '' : 's'} — which lines does it use?`, {
           target: 'refs',
+          suggestion: `Add the line number${RULE_ARITY[rule][0] === 1 ? '' : 's'} of the ${RULE_ARITY[rule][0] === 1 ? 'line' : 'lines'} ${rule} works on (${NEEDS[rule]}).`,
         }),
       );
       continue;
     }
     const { ok: refs } = resolveRefs(i, line.refs, who);
-    if (!f || refs.length !== got) continue;
-    const fs = refs.map((r) => r.f);
-    if (!RULE_ARITY[rule].includes(got)) {
-      // Wrong number of lines — find the helpful sub-case.
-      let suggestion: string | undefined;
-      if (got > Math.max(...RULE_ARITY[rule])) {
-        const k = Math.max(...RULE_ARITY[rule]);
-        const subset = subsets(refs, k).find((sub) => ruleApplies(rule, sub.map((r) => r.f), f));
-        if (subset) suggestion = `Cite only ${lineList(subset.map((r) => r.n))}.`;
-      }
-      const alts = alternativeRules(rule, fs, f, allowDerived);
-      if (alts.length) suggestion = `This step is valid by ${ruleLabel(alts[0])}, not ${rule}.`;
-      let message = refCountMessage(rule, num, got);
-      if (rule === 'ADD' && f.kind === 'and') message += ' Note: ADD builds a disjunction (∨), never a conjunction.';
-      if (rule === 'S' && got === 2 && f.kind === 'and') message += ' S takes a conjunction apart; to put two lines together use ADJ.';
-      issues[i].push(err('ref-count', message, { target: 'refs', suggestion }));
+    if (!f || refs.length !== got) {
+      if (DERIVED_RULE_IDS.includes(rule) && !allowDerived)
+        issues[i].push(err('rule-not-allowed', `Line ${num} uses ${ruleLabel(rule)}, a derived rule, but derived rules are turned off for this exercise.`, {
+          target: 'rule',
+          suggestion: 'Use the primitive rules instead (an ID or CD subproof usually does the job), or enable derived rules in settings.',
+        }));
       continue;
     }
-    if (ruleApplies(rule, fs, f)) continue;
-    const diag = diagnoseRule(rule, num, refs, f, {
-      allowDerived,
-      find: (t) => findAccessible(i, t),
-    });
-    const alts = alternativeRules(rule, fs, f, allowDerived);
-    let suggestion = diag.suggestion;
-    if (alts.length) suggestion = `This step is valid by ${ruleLabel(alts[0])}, not ${rule}.`;
-    else if (!allowDerived) {
-      const derivedAlt = alternativeRules(rule, fs, f, true).find((r) => DERIVED_RULE_IDS.includes(r));
-      if (derivedAlt && suggestion) suggestion += ` (With derived rules enabled, ${ruleLabel(derivedAlt)} would justify it.)`;
-    }
-    issues[i].push(
-      err('rule-mismatch', diag.message, {
-        target: diag.target ?? 'formula',
-        badRefs: diag.badRefs,
-        suggestion,
-      }),
+    const res = checkRuleApplication(
+      rule,
+      refs.map((r) => r.f),
+      f,
+      { allowDerivedRules: allowDerived, lineNumber: num, citedLineNumbers: refs.map((r) => r.n), find: (t) => findAccessible(i, t), alternativesWhenValid: false },
     );
+    if (!res.ok)
+      issues[i].push(err(res.code!, res.message!, { target: res.target, badRefs: res.badRefs, suggestion: res.suggestion }));
   }
 
   // ---- closes
@@ -469,7 +437,7 @@ export function analyze(draft: DerivationDraft): Analysis {
     const line = lines[s];
     if (line.kind !== 'show') {
       if (line.close)
-        issues[s].push(err('close-not-show', `Line ${s + 1} is not a Show line, so there is no box to close.`, { target: 'close' }));
+        issues[s].push(err('close-not-show', `Line ${s + 1} is not a Show line, so there is no box to close.`, { target: 'close', suggestion: 'Only Show lines are closed (with DD, CD or ID).' }));
       continue;
     }
     if (!line.close) continue;
@@ -480,12 +448,12 @@ export function analyze(draft: DerivationDraft): Analysis {
     const push = (code: string, message: string, extra: Partial<LineIssue> = {}) =>
       issues[s].push(err(code, message, { target: 'close', ...extra }));
     if (method !== 'DD' && method !== 'CD' && method !== 'ID') {
-      push('close-unknown-method', `Line ${num}: "${method}" is not a way to close a box. Use DD, CD or ID.`);
+      push('close-unknown-method', `Line ${num}: "${method}" is not a way to close a box.`, { suggestion: 'Use DD (Direct Derivation), CD (Conditional Derivation) or ID (Indirect Derivation).' });
       continue;
     }
     const mLabel = ruleLabel(method);
     if (boxEnd[s] === s) {
-      push('close-empty-box', `Line ${num} can't be closed: its box is empty. Work inside the box (the lines right after the Show line, one level deeper) first.`);
+      push('close-empty-box', `Line ${num} can't be closed with ${mLabel}: its box is empty.`, { suggestion: 'Work inside the box first — the lines right after the Show line, one level deeper.' });
       continue;
     }
     let openInner = -1;
@@ -501,7 +469,9 @@ export function analyze(draft: DerivationDraft): Analysis {
     }
     if (!g) continue;
     if (crefs.length === 0) {
-      push('close-missing-refs', `Line ${num}: to close with ${mLabel}, cite the line${method === 'ID' ? 's' : ''} inside the box that ${method === 'ID' ? 'contradict each other' : method === 'CD' ? 'is the consequent' : 'is the Show formula'}.`);
+      push('close-missing-refs', `Line ${num}: to close with ${mLabel}, you need to cite the line${method === 'ID' ? 's' : ''} inside the box that ${method === 'ID' ? 'contradict each other' : method === 'CD' ? 'is the consequent' : 'is the Show formula'}.`, {
+        suggestion: method === 'ID' ? 'Add the two line numbers of χ and ¬χ.' : 'Add the line number of that line.',
+      });
       continue;
     }
     // Resolve refs: must be direct members of the box.
@@ -521,7 +491,7 @@ export function analyze(draft: DerivationDraft): Analysis {
           r === s
             ? `Line ${num}: you can't cite the Show line itself to close it.`
             : `Line ${num}: ${mLabel} cites line ${rn}, which is outside the box of line ${num}. The lines you cite to close a box must be inside it.`,
-          { badRefs: [rn], suggestion: r < s ? `Use R (Repetition) to copy line ${rn} into the box, then cite the copy.` : undefined },
+          { badRefs: [rn], suggestion: r < s ? `Use R (Repetition) to copy line ${rn} into the box, then cite the copy.` : `Cite a line between line ${num} and the end of its box.` },
         );
         refsBad = true;
         continue;
@@ -539,7 +509,7 @@ export function analyze(draft: DerivationDraft): Analysis {
       }
       const f = formulas[r];
       if (!f) {
-        push('ref-unparsed', `Line ${num}: line ${rn}'s formula can't be read yet.`, { badRefs: [rn] });
+        push('ref-unparsed', `Line ${num}: ${mLabel} cites line ${rn}, whose formula can't be read yet.`, { badRefs: [rn], suggestion: `Fix the formula on line ${rn} first.` });
         refsBad = true;
         continue;
       }
@@ -797,23 +767,6 @@ export function analyze(draft: DerivationDraft): Analysis {
     goal,
     check: { lines: lineChecks, complete, valid, summary: capitalize(summary), globalIssues },
   };
-}
-
-function subsets<T>(xs: T[], k: number): T[][] {
-  const out: T[][] = [];
-  const rec = (start: number, acc: T[]) => {
-    if (acc.length === k) {
-      out.push(acc.slice());
-      return;
-    }
-    for (let i = start; i < xs.length; i++) {
-      acc.push(xs[i]);
-      rec(i + 1, acc);
-      acc.pop();
-    }
-  };
-  rec(0, []);
-  return out;
 }
 
 /** Pure, synchronous; must handle 100+ lines in well under 10ms. Never throws. */

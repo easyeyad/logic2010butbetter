@@ -146,7 +146,7 @@ export const ProofLineRow = memo(function ProofLineRow({ line, index, lc, rails,
       {citedBadlyBy && (
         <div className="line__badref">
           <Icon name="link" size={14} />
-          Cited incorrectly by line{citedBadlyBy.length > 1 ? 's' : ''} {citedBadlyBy.join(', ')}
+          Referenced by line{citedBadlyBy.length > 1 ? 's' : ''} {citedBadlyBy.join(', ')} — check how {citedBadlyBy.length > 1 ? 'those lines use' : 'that line uses'} it
         </div>
       )}
 

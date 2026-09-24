@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent } from 'react';
 import type { DraftLine } from '../../../proof';
-import { useSettings } from '../../app/settings';
 import { Button } from '../../components/Button';
 import { EngineError } from '../../components/Notice';
 import { Icon } from '../../components/Icon';
@@ -18,12 +17,11 @@ import type { Field, ProofEditorState } from './useProofEditor';
 
 /** The derivation editor: toolbar, line rows, close-box dialog, keyboard handling. */
 export function ProofEditor({ ed, inlineSymbolBar = true }: { ed: ProofEditorState; inlineSymbolBar?: boolean }) {
-  const { settings } = useSettings();
   const toast = useToast();
   const target = useFormulaTarget();
   const [helpOpen, setHelpOpen] = useState(false);
   const { lines, ops, byId, badRefTargets, check } = ed;
-  const options = useMemo(() => justificationOptions(settings.derivedRules), [settings.derivedRules]);
+  const options = useMemo(() => justificationOptions(ed.allowDerived), [ed.allowDerived]);
   const rails = useMemo(() => layoutRails(lines), [lines]);
   const complete = check.ok && check.value.complete;
 
@@ -103,7 +101,7 @@ export function ProofEditor({ ed, inlineSymbolBar = true }: { ed: ProofEditorSta
     if (index < 0) return;
     const line = lines[index];
     const field = (el.dataset.field ?? 'formula') as Field;
-    const isInput = el.tagName === 'INPUT';
+    const isInput = el.tagName === 'INPUT' || el.tagName === 'TEXTAREA';
     const go = (i: number, caret?: 'start' | 'end') => {
       const t = lines[i];
       if (t) ed.focusLine(t.id, field === 'refs' && t.kind !== 'step' ? 'formula' : field, caret);
