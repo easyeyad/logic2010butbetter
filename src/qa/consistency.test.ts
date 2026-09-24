@@ -16,6 +16,8 @@ import {
   randomFormula,
   seededRandom,
   type Formula,
+  isBinary,
+  isPredicateFormula,
 } from '../logic';
 import { checkDerivation, solve } from '../proof';
 import {
@@ -42,6 +44,8 @@ function ev(f: Formula, v: Record<string, boolean>): boolean {
       return !ev(f.left, v) || ev(f.right, v);
     case 'iff':
       return ev(f.left, v) === ev(f.right, v);
+    default:
+      throw new Error(`sentential oracle cannot evaluate ${f.kind}`);
   }
 }
 
@@ -50,7 +54,7 @@ function letters(fs: Formula[]): string[] {
   const go = (f: Formula) => {
     if (f.kind === 'atom') s.add(f.name);
     else if (f.kind === 'not') go(f.operand);
-    else {
+    else if (isBinary(f)) {
       go(f.left);
       go(f.right);
     }
@@ -85,7 +89,13 @@ function bruteClass(f: Formula): 'tautology' | 'contradiction' | 'contingent' {
 }
 
 const depth = (f: Formula): number =>
-  f.kind === 'atom' ? 0 : f.kind === 'not' ? 1 + depth(f.operand) : 1 + Math.max(depth(f.left), depth(f.right));
+  f.kind === 'atom' || f.kind === 'pred'
+    ? 0
+    : f.kind === 'not'
+      ? 1 + depth(f.operand)
+      : isBinary(f)
+        ? 1 + Math.max(depth(f.left), depth(f.right))
+        : 1 + depth(f.body);
 
 // ---------------------------------------------------------------------------
 describe('logic: parse ∘ format round trip', () => {
@@ -255,6 +265,10 @@ describe('learning: banks are internally consistent', () => {
     const bad: string[] = [];
     for (const ex of DERIVATION_EXERCISES) {
       const draft = derivationSolutionDraft(ex);
+      if (!draft) {
+        bad.push(`${ex.id}: no model solution available`);
+        continue;
+      }
       const check = checkDerivation({ ...draft, premises: ex.premises });
       if (!check.complete) {
         const errs = check.lines.flatMap((l) => l.issues.filter((i) => i.severity === 'error').map((i) => `L${l.number}: ${i.message}`));
@@ -264,7 +278,10 @@ describe('learning: banks are internally consistent', () => {
       const ps = ex.premises.map((p) => parse(p));
       const g = parse(ex.goal);
       expect(ps.every((p) => p.ok) && g.ok, ex.id).toBe(true);
-      if (g.ok) expect(bruteValid(ps.map((p) => (p as { formula: Formula }).formula), g.formula), ex.id).toBe(true);
+      // Sentential problems: independently brute-force valid. (Predicate problems
+      // are checked for countermodels in the learning suite.)
+      if (g.ok && ![g.formula, ...ps.flatMap((p) => (p.ok ? [p.formula] : []))].some(isPredicateFormula))
+        expect(bruteValid(ps.map((p) => (p as { formula: Formula }).formula), g.formula), ex.id).toBe(true);
       // checkAnswer accepts the model solution
       const fb = checkAnswer(ex, { kind: 'derivation', draft });
       if (!fb.correct) bad.push(`${ex.id}: checkAnswer rejected the model solution: ${fb.headline}`);
