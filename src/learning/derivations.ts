@@ -420,7 +420,7 @@ export function checkDerivationAnswer(ex: DerivationExercise, draft: DerivationD
     };
   }
   const details: string[] = [];
-  for (const l of errors.slice(0, 3)) for (const i of l.issues.filter((x) => x.severity === 'error')) details.push(`Line ${l.number}: ${i.message}${i.suggestion ? ` ${i.suggestion}` : ''}`);
+  for (const l of errors.slice(0, 3)) for (const i of l.issues.filter((x) => x.severity === 'error')) details.push(`${/^Line \d+/.test(i.message) ? '' : `Line ${l.number}: `}${i.message}${i.suggestion ? ` ${i.suggestion}` : ''}`);
   details.push(...check.globalIssues.filter((i) => i.severity === 'error').map((i) => i.message));
   return {
     correct: false,

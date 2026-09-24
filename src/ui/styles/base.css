@@ -204,10 +204,10 @@ button.chip:hover { border-color: var(--c-accent); background: var(--c-accent-so
 .segmented {
   display: inline-flex; padding: 3px; gap: 2px;
   border-radius: var(--radius); background: var(--c-surface-2); border: 1px solid var(--c-border);
-  max-width: 100%; overflow-x: auto;
+  max-width: 100%; flex-wrap: wrap;
 }
 .segmented button {
-  min-height: 34px; padding: 0 var(--sp-3);
+  flex-shrink: 0; min-height: 34px; padding: 0 var(--sp-3);
   border: 0; border-radius: 7px; background: transparent; color: var(--c-text-2);
   font-size: var(--fs-sm); font-weight: 550; white-space: nowrap;
 }
