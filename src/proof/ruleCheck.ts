@@ -124,7 +124,9 @@ export function checkRuleApplication(
       ok: false,
       code: 'ref-count',
       message,
-      suggestion: suggestion ?? `${ruleLabel(rule)} cites ${RULE_ARITY[rule].join(' or ')} line(s); check which lines the step really uses.`,
+      suggestion:
+        suggestion ??
+        `${ruleLabel(rule)} cites ${RULE_ARITY[rule].join(' or ')} ${RULE_ARITY[rule].length === 1 && RULE_ARITY[rule][0] === 1 ? 'line' : 'lines'}; check which lines the step really uses.`,
       target: 'refs',
       alternativeRules: alts,
     };

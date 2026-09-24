@@ -24,6 +24,14 @@ export interface Hint {
   line?: HintLine;
 }
 
+/** Drop trailing just-inserted empty lines (the hint's new line goes there). */
+function trimTrailingEmpty(draft: DerivationDraft): DerivationDraft {
+  const lines = Array.isArray(draft.lines) ? draft.lines : [];
+  let end = lines.length;
+  while (end > 0 && (typeof lines[end - 1]?.text !== 'string' || lines[end - 1].text.replace(/^\s*show\b/i, '').trim() === '')) end--;
+  return end === lines.length ? draft : { ...draft, lines: lines.slice(0, end) };
+}
+
 /** Innermost open Show line whose box contains the end of the derivation (index), or -1. */
 function targetShow(an: Analysis): number {
   const n = an.lines.length;
@@ -82,7 +90,7 @@ function closeFor(an: Analysis, t: number): { method: CloseMethod; refs: number[
 /** If the innermost open show can be closed now, which method and refs. */
 export function suggestClose(draft: DerivationDraft): { showLine: number; method: 'DD' | 'CD' | 'ID'; refs: number[] } | null {
   try {
-    const an = analyze(draft);
+    const an = analyze(trimTrailingEmpty(draft));
     const t = targetShow(an);
     if (t === -1) return null;
     const c = closeFor(an, t);
@@ -213,7 +221,7 @@ export function suggestNextStep(draft: DerivationDraft, level: 1 | 2 | 3): Hint 
 }
 
 function nextStep(draft: DerivationDraft, level: 1 | 2 | 3): Hint | null {
-  const an = analyze(draft);
+  const an = analyze(trimTrailingEmpty(draft));
   const check = an.check;
   const bad = check.lines.find((l) => !l.ok);
   if (bad) {

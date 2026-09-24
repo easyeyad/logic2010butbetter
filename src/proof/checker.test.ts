@@ -929,6 +929,59 @@ Show P | DD 3
   });
 });
 
+describe('empty lines', () => {
+  it('a trailing empty line is info only and does not block completion', () => {
+    const d = draft(`
+P → Q   | PR
+P       | PR
+Show Q  | DD 4
+  Q     | MP 1,2
+`, { goal: 'Q' });
+    d.lines.push({ id: 'b', kind: 'step', text: '', depth: 0 });
+    const c = checkDerivation(d);
+    expect(c.lines[4].issues).toEqual([
+      { severity: 'info', code: 'empty-formula', message: 'Line 5 is empty — type a formula or delete it.', target: 'formula' },
+    ]);
+    expect(c.lines[4].ok).toBe(true);
+    expect(c.valid).toBe(true);
+    expect(c.complete).toBe(true);
+  });
+
+  it('an empty step with no rule/refs is not an error, but blocks completion when not trailing', () => {
+    const d2 = draft(`
+P → Q   | PR
+P       | PR
+Show Q  | DD 5
+        |
+  Q     | MP 1,2
+`, { goal: 'Q' });
+    d2.lines[3] = { id: 'b', kind: 'step', text: '', depth: 1 };
+    const c = checkDerivation(d2);
+    expect(c.lines[3].issues.map((i) => i.code)).toEqual(['empty-formula']);
+    expect(c.lines[3].issues[0].severity).toBe('info');
+    expect(c.valid).toBe(true);
+    expect(c.complete).toBe(false);
+    expect(c.summary).toBe('Line 4 is empty — type a formula or delete it.');
+  });
+
+  it('an empty Show line is info, not an error', () => {
+    const c = checkDerivation({ lines: [{ id: 's', kind: 'show', text: '', depth: 0 }] });
+    expect(c.valid).toBe(true);
+    expect(c.lines[0].issues[0]).toMatchObject({ severity: 'info', code: 'empty-formula' });
+  });
+
+  it('citing an empty line is still an error', () => {
+    const d = draft(`
+P      | PR
+Show P |
+  P    | R 3
+`);
+    d.lines.splice(2, 0, { id: 'b', kind: 'step', text: '', depth: 1 });
+    d.lines[3].refs = [3];
+    expect(checkDerivation(d).lines[3].issues.map((i) => i.code)).toContain('ref-unparsed');
+  });
+});
+
 describe('message audit', () => {
   it('every error names its line and comes with a suggestion', () => {
     const drafts = [

@@ -108,6 +108,17 @@ Show P  |
     expect(suggestNextStep(d, 2)!.message).toContain('S (Simplification)');
   });
 
+  it('ignores a trailing empty line', () => {
+    const d = draft(`
+P → Q      | PR
+Q → R      | PR
+Show P → R |
+  P        | ASS CD
+`, { goal: 'P → R' });
+    d.lines.push({ id: 'b', kind: 'step', text: '', depth: 1 });
+    expect(suggestNextStep(d, 3)!.line).toMatchObject({ text: 'Q', rule: 'MP', refs: [1, 4] });
+  });
+
   it('returns null when complete', () => {
     const d = draft(`
 P      | PR

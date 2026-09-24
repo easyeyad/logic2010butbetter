@@ -137,6 +137,8 @@ export function analyze(draft: DerivationDraft): Analysis {
   const issues: LineIssue[][] = lines.map(() => []);
   const formulas: (Formula | undefined)[] = new Array(n);
   const depth: number[] = new Array(n);
+  /** Lines with no formula text yet (just inserted). Reported as info, not errors. */
+  const empty: boolean[] = new Array(n).fill(false);
 
   // ---- parse + depth sanitize
   for (let i = 0; i < n; i++) {
@@ -157,12 +159,7 @@ export function analyze(draft: DerivationDraft): Analysis {
       }
     }
     if (text.trim() === '') {
-      issues[i].push(
-        err('empty-formula', `Line ${i + 1} has no formula yet.`, {
-          target: 'formula',
-          suggestion: line.kind === 'show' ? 'Type the formula you want to show.' : 'Type the formula for this line.',
-        }),
-      );
+      empty[i] = true;
       continue;
     }
     const res = safeParse(text);
@@ -299,14 +296,14 @@ export function analyze(draft: DerivationDraft): Analysis {
             eq(f, g.right)
               ? `Line ${i + 1}: for CD you assume the antecedent and derive the consequent. You assumed the consequent ${fmt(g.right)} of ${show}.`
               : `Line ${i + 1}: for CD you assume exactly the antecedent of ${show}, which is ${fmt(g.left)} — you wrote ${fmt(f)}.`,
-            { target: 'formula', suggestion: `Assume ${fmt(g.left)} (ASS CD), then aim for ${fmt(g.right)}.` },
+            { target: 'formula', suggestion: `Replace it with the antecedent, then aim to derive ${fmt(g.right)}.` },
           ),
         );
       }
     } else {
       const okID = eq(f, Not(g)) || (g.kind === 'not' && eq(f, g.operand));
       if (!okID) {
-        const allowed = g.kind === 'not' ? `${fmt(g.operand)} (or ${fmt(Not(g))})` : fmt(Not(g));
+        const allowed = g.kind === 'not' ? `either ${fmt(g.operand)} or ${fmt(Not(g))}` : fmt(Not(g));
         issues[i].push(
           err(
             'assumption-wrong-formula',
@@ -318,7 +315,7 @@ export function analyze(draft: DerivationDraft): Analysis {
               suggestion:
                 g.kind === 'implies' && eq(f, g.left)
                   ? 'That looks like a CD assumption — mark it ASS CD instead.'
-                  : `Assume ${allowed} (ASS ID) and look for a contradiction.`,
+                  : 'Replace this line with that assumption, then look for a contradiction.',
             },
           ),
         );
@@ -385,7 +382,7 @@ export function analyze(draft: DerivationDraft): Analysis {
 
   for (let i = 0; i < n; i++) {
     const line = lines[i];
-    if (line.kind !== 'step') continue;
+    if (line.kind !== 'step' || empty[i]) continue;
     const num = i + 1;
     const who = `Line ${num}`;
     const rule = line.rule as string | undefined;
@@ -581,14 +578,14 @@ export function analyze(draft: DerivationDraft): Analysis {
       }
     } else {
       if (firstAsm !== 'ID') {
-        const want = g.kind === 'not' ? `${fmt(g.operand)} (or ${fmt(Not(g))})` : fmt(Not(g));
+        const want = g.kind === 'not' ? `either ${fmt(g.operand)} or ${fmt(Not(g))}` : fmt(Not(g));
         push(
           firstAsm === 'CD' ? 'close-wrong-assumption' : 'close-missing-assumption',
           firstAsm === 'CD'
             ? `Line ${num}: the box starts with an ASS CD assumption, so it closes with CD, not ID.`
-            : `Line ${num}: ID requires the first line of the box to be the opposite of the Show formula, ${want}, marked ASS ID.`,
+            : `Line ${num}: ID (Indirect Derivation) requires the first line of the box to be the opposite of the Show formula — ${want} — marked ASS ID.`,
           {
-            suggestion: firstAsm === 'CD' ? `Close with CD by citing ${g.kind === 'implies' ? fmt(g.right) : 'the consequent'}.` : `Start the box with ${want} (ASS ID).`,
+            suggestion: firstAsm === 'CD' ? `Close with CD by citing ${g.kind === 'implies' ? fmt(g.right) : 'the consequent'}.` : 'Insert that assumption as the first line of the box, or close with a different method.',
           },
         );
       } else {
@@ -675,6 +672,25 @@ export function analyze(draft: DerivationDraft): Analysis {
       );
   }
 
+  // ---- empty lines: one neutral info issue instead of errors
+  for (let i = 0; i < n; i++) {
+    if (!empty[i]) continue;
+    issues[i] = [
+      {
+        severity: 'info',
+        code: 'empty-formula',
+        message: `Line ${i + 1} is empty — type a formula or delete it.`,
+        target: 'formula',
+      },
+    ];
+  }
+  // Trailing empty lines (after the last non-empty line) don't block completion;
+  // an empty line anywhere else does.
+  let lastFilled = n - 1;
+  while (lastFilled >= 0 && empty[lastFilled]) lastFilled--;
+  const blockingEmpty: number[] = [];
+  for (let i = 0; i < lastFilled; i++) if (empty[i]) blockingEmpty.push(i + 1);
+
   // ---- assemble
   const lineChecks: LineCheck[] = lines.map((line, i) => {
     const iss = issues[i];
@@ -738,7 +754,11 @@ export function analyze(draft: DerivationDraft): Analysis {
   if (n === 0) globalIssues.push({ severity: 'info', code: 'empty-derivation', message: 'The derivation is empty.' });
 
   const complete =
-    valid && n > 0 && openShows.length === 0 && (goal ? goalShown : lines.some((l) => l.kind === 'show'));
+    valid &&
+    lastFilled >= 0 &&
+    blockingEmpty.length === 0 &&
+    openShows.length === 0 &&
+    (goal ? goalShown : lines.some((l) => l.kind === 'show'));
 
   let summary: string;
   if (complete) {
@@ -751,7 +771,12 @@ export function analyze(draft: DerivationDraft): Analysis {
         : nErr === 1
           ? `Line ${errorLines[0]} needs attention.`
           : `${nErr} lines need attention: ${lineList(errorLines)}.`;
-  } else if (n === 0) {
+  } else if (blockingEmpty.length) {
+    summary =
+      blockingEmpty.length === 1
+        ? `Line ${blockingEmpty[0]} is empty — type a formula or delete it.`
+        : `${capitalize(lineList(blockingEmpty))} are empty — type formulas or delete them.`;
+  } else if (lastFilled < 0) {
     summary = goal ? `Start by writing "Show ${fmt(goal)}".` : 'Start by adding lines.';
   } else if (openShows.length) {
     const inner = openShows[openShows.length - 1];
