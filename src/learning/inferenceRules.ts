@@ -10,7 +10,7 @@
 import type { Formula } from '../logic';
 import { checkValidity, equals, format, parse } from '../logic';
 import type { RuleId } from '../proof';
-import { getRule, ruleLabel } from '../proof';
+import { checkRuleApplication, getRule, ruleLabel } from '../proof';
 import type { Difficulty, Feedback, InferenceRuleExercise, Solution } from './types';
 import { f, hash, makeRng, pick, sample, shuffle, type Rng } from './util';
 
@@ -20,75 +20,15 @@ export const ALL_RULES: RuleId[] = [...PRIMITIVE_RULES, ...DERIVED_RULES];
 
 const ARITY: Record<RuleId, number> = { MP: 2, MT: 2, DN: 1, R: 1, S: 1, ADJ: 2, ADD: 1, MTP: 2, BC: 1, CB: 2, DM: 1, NC: 1, NB: 1, CDJ: 1, SC: 3 };
 
-
-const eq = equals;
-const isNeg = (g: Formula): g is Extract<Formula, { kind: 'not' }> => g.kind === 'not';
 const N = (x: Formula): Formula => ({ kind: 'not', operand: x });
 const Bn = (kind: 'and' | 'or' | 'implies' | 'iff', l: Formula, r: Formula): Formula => ({ kind, left: l, right: r });
 
-function permutations<T>(xs: T[]): T[][] {
-  if (xs.length <= 1) return [xs];
-  return xs.flatMap((x, i) => permutations([...xs.slice(0, i), ...xs.slice(i + 1)]).map((p) => [x, ...p]));
-}
-
-/** Two-way one-line equivalences (DM, NC, NB, CDJ): does `a` rewrite to `b` at the top level? */
-function oneWay(rule: RuleId, a: Formula, b: Formula): boolean {
-  switch (rule) {
-    case 'DM':
-      if (isNeg(a) && a.operand.kind === 'and') return eq(b, Bn('or', N(a.operand.left), N(a.operand.right)));
-      if (isNeg(a) && a.operand.kind === 'or') return eq(b, Bn('and', N(a.operand.left), N(a.operand.right)));
-      return false;
-    case 'NC':
-      return isNeg(a) && a.operand.kind === 'implies' && eq(b, Bn('and', a.operand.left, N(a.operand.right)));
-    case 'NB':
-      return isNeg(a) && a.operand.kind === 'iff' && eq(b, Bn('iff', a.operand.left, N(a.operand.right)));
-    case 'CDJ':
-      if (a.kind === 'implies') return eq(b, Bn('or', N(a.left), a.right));
-      if (a.kind === 'or') return eq(b, Bn('implies', N(a.left), a.right));
-      return false;
-    default:
-      return false;
-  }
-}
-
-/** Does `rule` justify `to` from exactly the lines `cited` (any order, all used)? */
+/**
+ * Does `rule` justify `to` from exactly the lines `cited` (any order, all used)?
+ * Delegates to the proof engine's single rule checker (derived rules allowed).
+ */
 export function ruleJustifies(rule: RuleId, cited: Formula[], to: Formula): boolean {
-  if (cited.length !== ARITY[rule] && !(rule === 'SC' && cited.length === 2)) return false;
-  return permutations(cited).some((ls) => {
-    const [a, b, c] = ls;
-    switch (rule) {
-      case 'MP':
-        return a.kind === 'implies' && eq(a.left, b) && eq(a.right, to);
-      case 'MT':
-        return a.kind === 'implies' && isNeg(b) && eq(b.operand, a.right) && eq(to, N(a.left));
-      case 'DN':
-        return eq(to, N(N(a))) || (isNeg(a) && isNeg(a.operand) && eq(a.operand.operand, to));
-      case 'R':
-        return eq(a, to);
-      case 'S':
-        return a.kind === 'and' && (eq(a.left, to) || eq(a.right, to));
-      case 'ADJ':
-        return to.kind === 'and' && eq(to.left, a) && eq(to.right, b);
-      case 'ADD':
-        return to.kind === 'or' && (eq(to.left, a) || eq(to.right, a));
-      case 'MTP':
-        return a.kind === 'or' && isNeg(b) && ((eq(b.operand, a.left) && eq(to, a.right)) || (eq(b.operand, a.right) && eq(to, a.left)));
-      case 'BC':
-        return a.kind === 'iff' && (eq(to, Bn('implies', a.left, a.right)) || eq(to, Bn('implies', a.right, a.left)));
-      case 'CB':
-        return a.kind === 'implies' && b.kind === 'implies' && eq(a.left, b.right) && eq(a.right, b.left) && eq(to, Bn('iff', a.left, a.right));
-      case 'DM':
-      case 'NC':
-      case 'NB':
-      case 'CDJ':
-        return oneWay(rule, a, to) || oneWay(rule, to, a);
-      case 'SC':
-        if (ls.length === 2) return a.kind === 'implies' && b.kind === 'implies' && eq(b.left, N(a.left)) && eq(a.right, to) && eq(b.right, to);
-        return (
-          a.kind === 'or' && b.kind === 'implies' && c.kind === 'implies' && eq(b.left, a.left) && eq(c.left, a.right) && eq(b.right, to) && eq(c.right, to)
-        );
-    }
-  });
+  return checkRuleApplication(rule, cited, to, { allowDerivedRules: true, alternativesWhenValid: false }).ok;
 }
 
 /** Every rule (from `pool`) that justifies the step. */
