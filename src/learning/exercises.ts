@@ -4,7 +4,21 @@
  *
  * OWNER: Learning System.
  */
-import { checkDerivationAnswer, derivationHints, derivationSolution, DERIVATION_EXERCISES } from './derivations';
+import { checkDerivationAnswer, derivationHints, derivationSolution, DERIVATION_EXERCISES, QUANTIFIER_DERIVATION_EXERCISES } from './derivations';
+import {
+  PREDICATE_SYMBOLIZATION_EXERCISES,
+  checkModelAnswer,
+  checkPredicateCountermodel,
+  checkPredicateSymbolization,
+  generateModelExercise,
+  generatePredicateCountermodel,
+  modelHints,
+  modelSolution,
+  predicateCountermodelHints,
+  predicateCountermodelSolution,
+  predicateSymbolizationHints,
+  predicateSymbolizationSolution,
+} from './predicateLogic';
 import { checkInferenceRule, generateInferenceRule, inferenceRuleHints, inferenceRuleSolution } from './inferenceRules';
 import {
   argumentHints,
@@ -19,7 +33,7 @@ import {
   truthTableSolution,
 } from './semantics';
 import { checkSymbolization, generateSymbolization, symbolizationHints, symbolizationSolution, SYMBOLIZATION_EXERCISES } from './symbolization';
-import { checkTerminology, generateTerminology, terminologyHints, terminologySolution, TERMINOLOGY_EXERCISES } from './terminology';
+import { checkTerminology, generateTerminology, terminologyHints, terminologySolution, PREDICATE_TERMINOLOGY_EXERCISES, TERMINOLOGY_EXERCISES } from './terminology';
 import type { Answer, Difficulty, Exercise, Feedback, Solution, Topic } from './types';
 import { makeRng, pick } from './util';
 import { checkWff, generateWff, wffHints, wffSolution } from './wff';
@@ -29,6 +43,9 @@ export const EXERCISE_BANK: Partial<Record<Topic, readonly Exercise[]>> = {
   symbolization: SYMBOLIZATION_EXERCISES,
   derivation: DERIVATION_EXERCISES,
   terminology: TERMINOLOGY_EXERCISES,
+  'predicate-symbolization': PREDICATE_SYMBOLIZATION_EXERCISES,
+  'quantifier-derivation': QUANTIFIER_DERIVATION_EXERCISES,
+  'predicate-terminology': PREDICATE_TERMINOLOGY_EXERCISES,
 };
 
 const BY_ID = new Map<string, Exercise>();
@@ -83,6 +100,22 @@ export function generateExercise(topic: Topic, difficulty: Difficulty, seed: num
       const bank = bankAt(DERIVATION_EXERCISES, difficulty, opts.exclude);
       return bank.length ? pick(rng, bank) : pick(rng, bankAt(DERIVATION_EXERCISES, difficulty));
     }
+    case 'predicate-symbolization': {
+      const bank = bankAt(PREDICATE_SYMBOLIZATION_EXERCISES, difficulty, opts.exclude);
+      return bank.length ? pick(rng, bank) : pick(rng, bankAt(PREDICATE_SYMBOLIZATION_EXERCISES, difficulty));
+    }
+    case 'model':
+      return generateModelExercise(difficulty, s);
+    case 'predicate-countermodel':
+      return generatePredicateCountermodel(difficulty, s);
+    case 'quantifier-derivation': {
+      const bank = bankAt(QUANTIFIER_DERIVATION_EXERCISES, difficulty, opts.exclude);
+      return bank.length ? pick(rng, bank) : pick(rng, bankAt(QUANTIFIER_DERIVATION_EXERCISES, difficulty));
+    }
+    case 'predicate-terminology': {
+      const bank = bankAt(PREDICATE_TERMINOLOGY_EXERCISES, difficulty, opts.exclude);
+      return bank.length ? pick(rng, bank) : pick(rng, bankAt(PREDICATE_TERMINOLOGY_EXERCISES, difficulty));
+    }
     case 'terminology': {
       const ex = generateTerminology(difficulty, s);
       if (opts.exclude?.has(ex.id)) {
@@ -122,6 +155,12 @@ export function checkAnswer(ex: Exercise, answer: Answer): Feedback {
       return checkInferenceRule(ex, answer as Extract<Answer, { kind: 'inference-rule' }>);
     case 'terminology':
       return checkTerminology(ex, answer as Extract<Answer, { kind: 'terminology' }>);
+    case 'predicate-symbolization':
+      return checkPredicateSymbolization(ex, (answer as Extract<Answer, { kind: 'predicate-symbolization' }>).formula);
+    case 'model':
+      return checkModelAnswer(ex, (answer as Extract<Answer, { kind: 'model' }>).value);
+    case 'predicate-countermodel':
+      return checkPredicateCountermodel(ex, (answer as Extract<Answer, { kind: 'predicate-countermodel' }>).model);
   }
 }
 
@@ -146,6 +185,12 @@ export function getHints(ex: Exercise): string[] {
       return inferenceRuleHints(ex);
     case 'terminology':
       return terminologyHints(ex);
+    case 'predicate-symbolization':
+      return predicateSymbolizationHints(ex);
+    case 'model':
+      return modelHints(ex);
+    case 'predicate-countermodel':
+      return predicateCountermodelHints(ex);
   }
 }
 
@@ -167,6 +212,12 @@ export function getSolution(ex: Exercise): Solution {
       return inferenceRuleSolution(ex);
     case 'terminology':
       return terminologySolution(ex);
+    case 'predicate-symbolization':
+      return predicateSymbolizationSolution(ex);
+    case 'model':
+      return modelSolution(ex);
+    case 'predicate-countermodel':
+      return predicateCountermodelSolution(ex);
   }
 }
 
@@ -191,5 +242,11 @@ export function exerciseLabel(ex: Exercise): string {
       return ex.mode === 'identify' ? `${arg(ex.lines, ex.conclusion)} — which rule?` : `${ex.lines.join(', ')} — by ${ex.rule}`;
     case 'terminology':
       return ex.formula ? `${ex.prompt} ${ex.formula}` : ex.prompt;
+    case 'predicate-symbolization':
+      return ex.sentence;
+    case 'model':
+      return `${ex.formula} (in a world with ${ex.model.domainSize} object${ex.model.domainSize === 1 ? '' : 's'})`;
+    case 'predicate-countermodel':
+      return arg(ex.premises, ex.conclusion);
   }
 }

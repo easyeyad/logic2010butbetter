@@ -19,7 +19,12 @@ function correctAnswer(ex: Exercise): Answer | null {
     case 'inference-rule':
       return ex.mode === 'identify' ? { kind: 'inference-rule', rule: ex.rule } : { kind: 'inference-rule', formula: ex.conclusion };
     case 'terminology':
+    case 'predicate-countermodel':
       return null;
+    case 'predicate-symbolization':
+      return { kind: 'predicate-symbolization', formula: ex.answer };
+    case 'model':
+      return { kind: 'model', value: ex.truth };
   }
 }
 

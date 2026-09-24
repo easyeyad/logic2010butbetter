@@ -43,7 +43,7 @@ describe('ProgressStore: attempts & stats', () => {
     const o = store.overview();
     expect(o.totalAttempts).toBe(4);
     expect(o.correct).toBe(2);
-    expect(o.topics).toHaveLength(8);
+    expect(o.topics).toHaveLength(13);
     expect(store.recentActivity(2).map((a) => a.topic)).toEqual(['wff', 'symbolization']);
   });
 
@@ -159,6 +159,14 @@ describe('ProgressStore: weak areas & recommendations', () => {
     // practise everything
     let t = at(2026, 3, 11);
     for (const topic of ['wff', 'truth-table', 'validity', 'countermodel', 'inference-rule', 'derivation', 'terminology'] as Topic[]) {
+      for (let i = 0; i < 5; i++) {
+        setNow((t += 60_000));
+        rec(topic, true);
+      }
+    }
+    // sentential done → predicate logic comes next
+    expect(store.recommendNext()).toMatchObject({ kind: 'new-topic', topic: 'predicate-symbolization' });
+    for (const topic of ['predicate-symbolization', 'model', 'predicate-countermodel', 'quantifier-derivation', 'predicate-terminology'] as Topic[]) {
       for (let i = 0; i < 5; i++) {
         setNow((t += 60_000));
         rec(topic, true);

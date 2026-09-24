@@ -110,6 +110,7 @@ export {
 
 export {
   DERIVATION_EXERCISES,
+  QUANTIFIER_DERIVATION_EXERCISES,
   createDerivationDraft,
   derivationSolutionDraft,
   parseProofScript,
@@ -118,6 +119,25 @@ export {
 } from './derivations';
 
 export {
+  PREDICATE_SYMBOLIZATION_EXERCISES,
+  checkPredicateSymbolization,
+  checkModelAnswer,
+  checkPredicateCountermodel,
+  generateModelExercise,
+  generatePredicateCountermodel,
+  boundedEquivalent,
+  describeWorld,
+  explainModelTruth,
+  interpretationProblems,
+  keyLabel as predicateKeyLabel,
+  renameSymbols,
+  INVALID_PREDICATE_FORMS,
+  PREDICATE_PATTERN_NOTES,
+} from './predicateLogic';
+export type { BoundedEquivalence, PredicateArgumentForm } from './predicateLogic';
+
+export {
+  PREDICATE_TERMINOLOGY_EXERCISES,
   TERMINOLOGY_EXERCISES,
   generateTerminology,
   checkTerminology,

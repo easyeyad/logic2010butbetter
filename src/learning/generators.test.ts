@@ -41,7 +41,7 @@ describe('determinism', () => {
     for (const t of TOPICS)
       for (const d of DS) {
         const ex = generateExercise(t, d, 11);
-        expect(ex.topic).toBe(ex.kind);
+        expect(ex.topic === ex.kind || (ex.kind === 'derivation' && ex.topic === 'quantifier-derivation') || (ex.kind === 'terminology' && ex.topic === 'predicate-terminology')).toBe(true);
         expect(getHints(ex).length).toBeGreaterThanOrEqual(2);
         expect(getSolution(ex).summary.length).toBeGreaterThan(0);
       }

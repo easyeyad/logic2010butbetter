@@ -6,7 +6,7 @@
  */
 import { exerciseLabel, generateExercise } from './exercises';
 import type { Difficulty, Exercise, Feedback, Topic } from './types';
-import { TOPICS, clampDifficulty } from './types';
+import { SENTENTIAL_TOPICS, TOPICS, clampDifficulty } from './types';
 import { hash, makeRng, pick, shuffle } from './util';
 
 export interface PracticeSessionConfig {
@@ -15,7 +15,7 @@ export interface PracticeSessionConfig {
   difficulty: Difficulty;
   count: number;
   seed: number;
-  /** For 'mixed': which topics to draw from (default: all). */
+  /** For 'mixed': which topics to draw from (default: SENTENTIAL_TOPICS; pass PREDICATE_TOPICS or TOPICS for predicate logic). */
   topics?: Topic[];
   /** Per-topic difficulty, e.g. from ProgressStore.recommendedDifficulty. */
   difficultyByTopic?: Partial<Record<Topic, Difficulty>>;
@@ -33,7 +33,7 @@ export interface PracticeSession {
 export function createPracticeSession(config: PracticeSessionConfig): PracticeSession {
   const count = Math.max(1, Math.min(100, Math.floor(config.count)));
   const rng = makeRng(config.seed);
-  const pool = config.topic === 'mixed' ? (config.topics?.length ? config.topics : [...TOPICS]) : [config.topic];
+  const pool = config.topic === 'mixed' ? (config.topics?.length ? config.topics : [...SENTENTIAL_TOPICS]) : [config.topic];
   const exercises: Exercise[] = [];
   const used = new Set<string>();
   // For mixed sessions, cycle through a shuffled topic order so topics are spread evenly.

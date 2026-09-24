@@ -152,11 +152,11 @@ const ITEMS: Item[] = [
   { id: 'term-41', difficulty: 2, concept: 'negation', format: 'type-formula', prompt: 'Write the negation of P → Q (a formula whose main connective is ¬).', accepted: ['¬(P → Q)'], explanation: 'Negate the whole formula: parentheses are needed, since ¬P → Q would only negate P.' },
 ];
 
-function toExercise(it: Item): TerminologyExercise {
+function toExercise(it: Item, topic: TerminologyExercise['topic'] = 'terminology'): TerminologyExercise {
   const title =
     it.title ??
     ({ 'click-connective': 'Main connective', 'type-part': 'Parts of a formula', 'type-formula': 'Write the formula', 'fill-in': 'Fill in the term', 'true-false': 'True or false?', 'multiple-choice': 'Concept check' } as Record<TerminologyFormat, string>)[it.format];
-  const ex: TerminologyExercise = { ...it, kind: 'terminology', topic: 'terminology', source: 'bank', title, tags: it.tags ?? [it.concept] };
+  const ex: TerminologyExercise = { ...it, kind: 'terminology', topic, source: 'bank', title, tags: it.tags ?? [it.concept] };
   if (ex.format === 'true-false' && ex.options && ex.correctOption !== undefined) {
     // Authored with the right reason first; present in a stable shuffled order.
     const right = ex.options[ex.correctOption];
@@ -171,7 +171,31 @@ function toExercise(it: Item): TerminologyExercise {
   return ex;
 }
 
-export const TERMINOLOGY_EXERCISES: TerminologyExercise[] = ITEMS.map(toExercise).sort((a, b) => a.difficulty - b.difficulty);
+export const TERMINOLOGY_EXERCISES: TerminologyExercise[] = ITEMS.map((it) => toExercise(it)).sort((a, b) => a.difficulty - b.difficulty);
+
+const PREDICATE_ITEMS: Item[] = [
+  { id: 'pterm-01', difficulty: 1, concept: 'bound variable', format: 'fill-in', prompt: 'An occurrence of a variable that lies within the scope of a quantifier on that same variable is ___.', accepted: ['bound'], confusions: { free: 'Free is the opposite: NOT within the scope of a quantifier on that variable.' }, explanation: 'Bound: governed by a quantifier ∀x or ∃x whose scope contains it.' },
+  { id: 'pterm-02', difficulty: 1, concept: 'free variable', format: 'fill-in', prompt: 'In ∀x Fx → Gx, the occurrence of x in Gx is ___.', accepted: ['free'], confusions: { bound: 'The ∀x covers only Fx — a quantifier binds just the formula right after it, like ¬.' }, explanation: 'The quantifier\'s scope is only Fx, so the x in Gx is free. Write ∀x(Fx → Gx) to bind it.' },
+  { id: 'pterm-03', difficulty: 2, concept: 'scope', format: 'true-false', prompt: 'True or false: in ∀x(Fx → Gx) ∧ Hx, every occurrence of x is bound.', truth: false, options: ['The ∀x covers only the parenthesized conditional, so the x in Hx is free.', 'All occurrences are bound because ∀x comes first.', 'Variables are always bound in a sentence.'], correctOption: 0, explanation: 'The scope of ∀x is (Fx → Gx); Hx lies outside it.' },
+  { id: 'pterm-04', difficulty: 1, concept: 'sentence', format: 'true-false', prompt: 'True or false: a sentence of predicate logic may contain free variables.', truth: false, options: ['A sentence is by definition a formula with no free variables.', 'Only names may be free.', 'Sentences need at least one free variable.'], correctOption: 0, explanation: 'Formulas with free variables are open formulas; sentences are closed.' },
+  { id: 'pterm-05', difficulty: 1, concept: 'instance', format: 'fill-in', prompt: 'Fa is an ___ of ∀xFx (the result of dropping the quantifier and replacing x by a term).', accepted: ['instance', 'instantiation', 'substitution instance'], explanation: 'An instance replaces every free occurrence of the quantified variable in the body by one term.' },
+  { id: 'pterm-06', difficulty: 2, concept: 'instance', format: 'type-formula', prompt: 'Write the instance of ∀x(Fx → Gx) for the name a.', accepted: ['Fa → Ga'], explanation: 'Drop ∀x and replace EVERY free x by a.' },
+  { id: 'pterm-07', difficulty: 2, concept: 'scope', format: 'type-formula', prompt: 'Type the scope (the formula it governs) of the main quantifier of ∀x(Fx → ∃yRxy).', accepted: ['Fx → ∃yRxy'], explanation: 'The scope of the leading ∀x is the whole parenthesized conditional.' },
+  { id: 'pterm-08', difficulty: 2, concept: 'main connective', format: 'click-connective', prompt: 'Click the main operator (connective or quantifier).', formula: '∀x(Fx → Gx)', explanation: 'The ∀x has the whole formula as its scope, so it is the main operator.' },
+  { id: 'pterm-09', difficulty: 3, concept: 'main connective', format: 'click-connective', prompt: 'Click the main operator (connective or quantifier).', formula: '∃xFx → ∀yGy', explanation: 'The → joins ∃xFx and ∀yGy; each quantifier governs only its own side.' },
+  { id: 'pterm-10', difficulty: 2, concept: 'UI', format: 'multiple-choice', prompt: 'Which line follows from ∀x(Fx → Gx) by UI (universal instantiation)?', options: ['Fa → Ga', 'Fa → Gb', '∃x(Fx → Gx)', 'Fx → Ga'], correctOption: 0, explanation: 'UI replaces every free x in the body by the SAME term.' },
+  { id: 'pterm-11', difficulty: 3, concept: 'EI', format: 'multiple-choice', prompt: 'In Logic 2010, existential instantiation (EI) from ∃xFx must instantiate to…', options: ['a variable that does not occur earlier in the derivation', 'any name', 'the name a', 'any variable at all'], correctOption: 0, explanation: 'The instantiated object is unknown, so EI uses a NEW variable — never a name or a variable already in use.' },
+  { id: 'pterm-12', difficulty: 3, concept: 'UD', format: 'true-false', prompt: 'True or false: you may close a Show ∀x φ line with UD even if x is free in an undischarged assumption.', truth: false, options: ['UD needs x to be arbitrary: x may not be free in any open assumption or premise (or in a line obtained by EI).', 'UD has no restrictions.', 'Only premises matter, not assumptions.'], correctOption: 0, explanation: 'If x is free in an assumption, facts about x are not general facts about everything.' },
+  { id: 'pterm-13', difficulty: 2, concept: 'EG', format: 'true-false', prompt: 'True or false: from Raa, EG allows you to infer ∃xRxa.', truth: true, options: ['EG may generalize on some or all occurrences of the name.', 'EG must replace every occurrence of a.', 'EG only works on variables.'], correctOption: 0, explanation: 'EG is flexible: ∃xRxa, ∃xRax and ∃xRxx all follow from Raa.' },
+  { id: 'pterm-14', difficulty: 1, concept: 'domain', format: 'fill-in', prompt: 'The collection of objects the quantifiers range over is called the ___ (of discourse).', accepted: ['domain', 'universe', 'universe of discourse', 'domain of discourse'], explanation: 'The domain: "everything" and "something" mean everything / something in the domain.' },
+  { id: 'pterm-15', difficulty: 1, concept: 'extension', format: 'fill-in', prompt: 'The set of objects a one-place predicate is true of is its ___.', accepted: ['extension'], explanation: 'The extension of F is the set of objects that are F; for a two-place predicate, a set of ordered pairs.' },
+  { id: 'pterm-16', difficulty: 2, concept: 'interpretation', format: 'fill-in', prompt: 'A domain together with an extension for every predicate and a referent for every name is an ___ (also called a model).', accepted: ['interpretation', 'model', 'structure'], explanation: 'An interpretation fixes the truth value of every sentence.' },
+  { id: 'pterm-17', difficulty: 3, concept: 'quantifier order', format: 'true-false', prompt: 'True or false: ∀x∃yLxy and ∃y∀xLxy say the same thing.', truth: false, options: ['∀x∃y lets each x have its own y; ∃y∀x needs one y for every x.', 'Quantifier order never matters.', 'They differ only when the domain is empty.'], correctOption: 0, explanation: 'Everyone loves someone ≠ someone is loved by everyone. (The second implies the first, not conversely.)' },
+  { id: 'pterm-18', difficulty: 2, concept: 'vacuous truth', format: 'true-false', prompt: 'True or false: ∀x(Fx → Gx) is true in a world where nothing is F.', truth: true, options: ['Every instance Fo → Go has a false antecedent, so every instance is true.', 'It is false because there are no F to be G.', 'It has no truth value.'], correctOption: 0, explanation: 'A universal conditional with an empty antecedent class is vacuously true.' },
+];
+
+/** Predicate-logic concepts (topic 'predicate-terminology'). */
+export const PREDICATE_TERMINOLOGY_EXERCISES: TerminologyExercise[] = PREDICATE_ITEMS.map((it) => toExercise(it, 'predicate-terminology')).sort((a, b) => a.difficulty - b.difficulty);
 
 // ---------------------------------------------------------------------------
 // Generator: formula anatomy
@@ -324,7 +348,7 @@ export function terminologyHints(ex: TerminologyExercise): string[] {
     case 'type-part':
       return ['First find the main connective.', `The ${PART_INFO[ex.part!].noun} is the complete formula on the ${PART_INFO[ex.part!].side === 'operand' ? 'right of the ¬' : `${PART_INFO[ex.part!].side} of the main connective`}; drop only its outer parentheses.`];
     case 'type-formula':
-      return ['Work from the definition in the question; keep negations exactly as they are and add parentheses where needed.'];
+      return ['Work from the definition in the question; keep negations exactly as they are and add parentheses where needed.', `The concept here is ${ex.concept}. Start from the formula given in the question and change only what the definition requires.`];
     case 'fill-in':
       return [`Think about the concept: ${ex.concept}.`, `The answer starts with "${(ex.accepted?.[0] ?? '')[0] ?? ''}".`];
     case 'true-false':
