@@ -12,6 +12,9 @@ const TruthTablesPage = lazy(() => import('../features/truthTables/TruthTablesPa
 const CountermodelsPage = lazy(() => import('../features/countermodels/CountermodelsPage'));
 const ReferencePage = lazy(() => import('../features/reference/ReferencePage'));
 const SettingsPage = lazy(() => import('../features/settings/SettingsPage'));
+const PracticePage = lazy(() => import('../features/practice/PracticePage'));
+const SymbolizationPage = lazy(() => import('../features/symbolization/SymbolizationPage'));
+const ProgressPage = lazy(() => import('../features/progress/ProgressPage'));
 
 function Page({ label, children }: { label: string; children: ReactNode }) {
   const { pathname } = useLocation();
@@ -26,13 +29,13 @@ export function AppRoutes() {
   return (
     <Routes>
       <Route path="/" element={<Page label="Dashboard"><DashboardPage /></Page>} />
-      <Route path="/practice" element={<Page label="Practice"><PlaceholderPage kind="practice" /></Page>} />
+      <Route path="/practice" element={<Page label="Practice"><PracticePage /></Page>} />
       <Route path="/proofs" element={<Page label="Proofs"><ProofsPage /></Page>} />
       <Route path="/truth-tables" element={<Page label="Truth Tables"><TruthTablesPage /></Page>} />
-      <Route path="/symbolization" element={<Page label="Symbolization"><PlaceholderPage kind="symbolization" /></Page>} />
+      <Route path="/symbolization" element={<Page label="Symbolization"><SymbolizationPage /></Page>} />
       <Route path="/countermodels" element={<Page label="Countermodels"><CountermodelsPage /></Page>} />
       <Route path="/reference" element={<Page label="Reference"><ReferencePage /></Page>} />
-      <Route path="/progress" element={<Page label="Progress"><PlaceholderPage kind="progress" /></Page>} />
+      <Route path="/progress" element={<Page label="Progress"><ProgressPage /></Page>} />
       <Route path="/settings" element={<Page label="Settings"><SettingsPage /></Page>} />
       <Route path="*" element={<Page label="Not found"><PlaceholderPage kind="notFound" /></Page>} />
     </Routes>

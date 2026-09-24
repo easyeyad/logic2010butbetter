@@ -1,0 +1,19 @@
+import type { Topic } from '../../../learning';
+import type { IconName } from '../../components/Icon';
+
+export type PracticeTopic = Topic | 'mixed';
+
+export const TOPIC_ICON: Record<PracticeTopic, IconName> = {
+  wff: 'symbol',
+  symbolization: 'symbol',
+  'truth-table': 'table',
+  validity: 'scale',
+  countermodel: 'target',
+  derivation: 'proof',
+  'inference-rule': 'book',
+  terminology: 'info',
+  mixed: 'sparkle',
+};
+
+/** Order shown in the topic picker. */
+export const PICKER_TOPICS: PracticeTopic[] = ['wff', 'symbolization', 'truth-table', 'validity', 'countermodel', 'derivation', 'inference-rule', 'terminology', 'mixed'];
