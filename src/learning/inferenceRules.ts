@@ -8,7 +8,7 @@
  * OWNER: Learning System.
  */
 import type { Formula } from '../logic';
-import { checkValidity, equals, format, parse } from '../logic';
+import { CONNECTIVE_NAME, checkValidity, equals, format, isPredicateFormula, parse } from '../logic';
 import type { RuleId } from '../proof';
 import { checkRuleApplication, getRule, ruleLabel } from '../proof';
 import type { Difficulty, Feedback, InferenceRuleExercise, Solution } from './types';
@@ -18,7 +18,7 @@ export const PRIMITIVE_RULES: RuleId[] = ['MP', 'MT', 'DN', 'R', 'S', 'ADJ', 'AD
 export const DERIVED_RULES: RuleId[] = ['DM', 'NC', 'NB', 'CDJ', 'SC'];
 export const ALL_RULES: RuleId[] = [...PRIMITIVE_RULES, ...DERIVED_RULES];
 
-const ARITY: Record<RuleId, number> = { MP: 2, MT: 2, DN: 1, R: 1, S: 1, ADJ: 2, ADD: 1, MTP: 2, BC: 1, CB: 2, DM: 1, NC: 1, NB: 1, CDJ: 1, SC: 3 };
+const ARITY: Record<RuleId, number> = { MP: 2, MT: 2, DN: 1, R: 1, S: 1, ADJ: 2, ADD: 1, MTP: 2, BC: 1, CB: 2, DM: 1, NC: 1, NB: 1, CDJ: 1, SC: 3, UI: 1, EG: 1, EI: 1, QN: 1, AV: 1 };
 
 const N = (x: Formula): Formula => ({ kind: 'not', operand: x });
 const Bn = (kind: 'and' | 'or' | 'implies' | 'iff', l: Formula, r: Formula): Formula => ({ kind, left: l, right: r });
@@ -73,6 +73,7 @@ function instance(rule: RuleId, x: Formula, y: Formula, z: Formula, rng: Rng): I
     case 'NB': return { cited: [N(Bn('iff', x, y))], to: Bn('iff', x, N(y)) };
     case 'CDJ': return coin ? { cited: [Bn('implies', x, y)], to: Bn('or', N(x), y) } : { cited: [Bn('or', x, y)], to: Bn('implies', N(x), y) };
     case 'SC': return { cited: [Bn('or', x, y), Bn('implies', x, z), Bn('implies', y, z)], to: z };
+    default: return { cited: [Bn('implies', x, y), x], to: y }; // quantifier rules are not generated here
   }
 }
 
@@ -180,7 +181,7 @@ export function checkInferenceRule(ex: InferenceRuleExercise, answer: { rule?: R
   if (others.length) {
     return { correct: false, severity: 'error', code: 'other-rule', headline: `${format(g)} does follow — but by ${joinRules(others)}, not ${ex.rule}.`, explanation: `The question asks for ${ruleLabel(ex.rule)}. Match its pattern exactly.`, details };
   }
-  if (checkValidity(cited, g).valid) {
+  if (!isPredicateFormula(g) && checkValidity(cited, g).valid) {
     return { correct: false, severity: 'error', code: 'not-one-step', headline: `${format(g)} is a logical consequence, but not a single ${ex.rule} step.`, explanation: 'Rules apply to whole lines, one step at a time. Apply the pattern of the rule to the lines exactly as they are.', details };
   }
   return { correct: false, severity: 'error', code: 'does-not-follow', headline: `${format(g)} does not follow from ${ex.lines.length > 1 ? 'these lines' : 'this line'}.`, explanation: r?.pitfalls[0] ?? 'Compare with the rule’s pattern.', details };
@@ -190,7 +191,7 @@ const joinRules = (rs: RuleId[]) => rs.map(ruleLabel).join(' or ');
 
 export function inferenceRuleHints(ex: InferenceRuleExercise): string[] {
   const cited = ex.lines.map(f);
-  const kinds = cited.map((g) => ({ atom: 'a sentence letter', not: 'a negation', and: 'a conjunction', or: 'a disjunction', implies: 'a conditional', iff: 'a biconditional' })[g.kind]);
+  const kinds = cited.map((g) => `${/^[aeiou]/.test(CONNECTIVE_NAME[g.kind]) ? 'an' : 'a'} ${CONNECTIVE_NAME[g.kind]}`);
   const hints = [`The cited line${cited.length > 1 ? 's are' : ' is'} ${kinds.join(' and ')}. Which rules take ${cited.length > 1 ? 'lines of those shapes' : 'a line of that shape'}?`];
   if (ex.mode === 'identify') {
     hints.push(`The rule cites exactly ${cited.length} line${cited.length > 1 ? 's' : ''}.`);

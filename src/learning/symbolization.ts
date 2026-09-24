@@ -12,7 +12,7 @@
  * OWNER: Learning System.
  */
 import type { Formula, Valuation } from '../logic';
-import { CONNECTIVE_NAME, SYMBOL, atomsOf, checkEquivalence, equals, evaluate, format, mainConnective, parse } from '../logic';
+import { CONNECTIVE_NAME, SYMBOL, atomsOf, checkEquivalence, equals, evaluate, format, isBinary, isPredicateFormula, mainConnective, parse } from '../logic';
 import { SYMBOLIZATION_BANK, VOCABULARY, type SymbolizationBankItem } from './symbolizationBank';
 import type { Difficulty, Feedback, HighlightSpan, Solution, SymbolKeyEntry, SymbolizationExercise } from './types';
 import { capitalize, f, hash, joinList, makeRng, pick, trueFalse, type Rng } from './util';
@@ -132,6 +132,9 @@ const MAIN_CUE: Record<Formula['kind'], string> = {
   or: 'the sentence offers alternatives',
   implies: 'the sentence states a condition',
   iff: 'the sentence says two things stand or fall together',
+  pred: 'it is a single predication',
+  forall: 'it says something about everything',
+  exists: 'it says something exists',
 };
 
 // ---------------------------------------------------------------------------
@@ -198,6 +201,7 @@ function localMutations(g: Formula): { code: MutationCode; to: Formula }[] {
       break;
     }
     default: {
+      if (!isBinary(g)) break; // predications / quantifiers: sentential exercises never contain them
       const { left: l, right: r } = g;
       if (g.kind === 'and' && l.kind === 'not' && r.kind === 'not') out.push({ code: 'neither-as-not-both', to: N(B('and', l.operand, r.operand)) });
       if (g.kind === 'or' && l.kind === 'not' && r.kind === 'not') out.push({ code: 'not-both-as-neither', to: N(B('or', l.operand, r.operand)) });
@@ -223,8 +227,8 @@ function localMutations(g: Formula): { code: MutationCode; to: Formula }[] {
         out.push({ code: 'conjunction-as-conditional', to: B('implies', l, r) });
       }
       // Regrouping: (A ∘ B) • C  ⇄  A ∘ (B • C)
-      if (l.kind !== 'atom' && l.kind !== 'not') out.push({ code: 'grouping', to: B(l.kind, l.left, B(g.kind, l.right, r)) });
-      if (r.kind !== 'atom' && r.kind !== 'not') out.push({ code: 'grouping', to: B(r.kind, B(g.kind, l, r.left), r.right) });
+      if (isBinary(l)) out.push({ code: 'grouping', to: B(l.kind, l.left, B(g.kind, l.right, r)) });
+      if (isBinary(r)) out.push({ code: 'grouping', to: B(r.kind, B(g.kind, l, r.left), r.right) });
     }
   }
   return out;
@@ -241,6 +245,7 @@ function allMutations(key: Formula): Mutation[] {
         walk(g.operand, (x) => rebuild(N(x)));
         return;
       default: {
+        if (!isBinary(g)) return;
         const { kind, left, right } = g;
         walk(left, (x) => rebuild(B(kind, x, right)));
         walk(right, (x) => rebuild(B(kind, left, x)));
@@ -253,7 +258,7 @@ function allMutations(key: Formula): Mutation[] {
     for (let j = i + 1; j < atoms.length; j++) {
       const [a, b] = [atoms[i], atoms[j]];
       const swap = (g: Formula): Formula =>
-        g.kind === 'atom' ? { kind: 'atom', name: g.name === a ? b : g.name === b ? a : g.name } : g.kind === 'not' ? N(swap(g.operand)) : B(g.kind, swap(g.left), swap(g.right));
+        g.kind === 'atom' ? { kind: 'atom', name: g.name === a ? b : g.name === b ? a : g.name } : g.kind === 'not' ? N(swap(g.operand)) : isBinary(g) ? B(g.kind, swap(g.left), swap(g.right)) : g;
       out.push({ code: 'swapped-letters', original: key, replaced: swap(key), whole: swap(key), letters: [a, b] });
     }
   return out.sort((x, y) => PRIORITY.indexOf(x.code) - PRIORITY.indexOf(y.code));
@@ -275,7 +280,7 @@ const neg = (g: Formula) => `¬${inner(g)}`;
 /** The two sides of a binary formula, or of the formula a negation applies to. */
 function sides(g: Formula): [Formula, Formula] | null {
   if (g.kind === 'not') return sides(g.operand);
-  if (g.kind === 'atom') return null;
+  if (!isBinary(g)) return null;
   if (g.kind === 'and' && g.left.kind === 'not' && g.right.kind === 'not') return [g.left.operand, g.right.operand];
   if (g.kind === 'or' && g.left.kind === 'not' && g.right.kind === 'not') return [g.left.operand, g.right.operand];
   return [g.left, g.right];
@@ -433,6 +438,10 @@ function canon(g: Formula): string {
       return g.name;
     case 'not':
       return `~${canon(g.operand)}`;
+    case 'pred':
+    case 'forall':
+    case 'exists':
+      return format(g);
     default: {
       let a = canon(g.left);
       let b = canon(g.right);
@@ -469,6 +478,15 @@ export function checkSymbolization(ex: SymbolizationExercise, text: string): Fee
     };
   }
   const ans = parsed.formula;
+  if (isPredicateFormula(ans)) {
+    return {
+      correct: false,
+      severity: 'error',
+      code: 'predicate-in-sentential',
+      headline: 'Use sentence letters only here.',
+      explanation: `This exercise is in sentential logic: symbolize each clause with a single capital letter from the key (${ex.key.map((k) => k.letter).join(', ')}), without predicates, names or quantifiers.`,
+    };
+  }
   const key = f(ex.answer);
   const keyLetters = new Set(ex.key.map((k) => k.letter));
   const used = atomsOf(ans);
@@ -536,7 +554,7 @@ export function checkSymbolization(ex: SymbolizationExercise, text: string): Fee
 
 function skeleton(g: Formula): string {
   const masked = (x: Formula): Formula =>
-    x.kind === 'atom' ? { kind: 'atom', name: '□' } : x.kind === 'not' ? N(masked(x.operand)) : B(x.kind, masked(x.left), masked(x.right));
+    x.kind === 'atom' ? { kind: 'atom', name: '□' } : x.kind === 'not' ? N(masked(x.operand)) : isBinary(x) ? B(x.kind, masked(x.left), masked(x.right)) : x;
   return format(masked(g));
 }
 

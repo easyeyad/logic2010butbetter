@@ -28,7 +28,7 @@ describe('curated derivation problems', () => {
   });
 
   it.each(DERIVATION_EXERCISES.map((e) => [e.id, e] as const))('%s: model solution is structurally sound', (_id, ex) => {
-    const d = derivationSolutionDraft(ex);
+    const d = derivationSolutionDraft(ex)!;
     const lines = d.lines;
     // premises first, exactly the problem's premises, in order
     const prem = lines.filter((l) => l.kind === 'premise');
@@ -52,7 +52,7 @@ describe('curated derivation problems', () => {
   });
 
   it.each(DERIVATION_EXERCISES.map((e) => [e.id, e] as const))('%s: every rule step in the model solution is a correct one-step application', (_id, ex) => {
-    const d = derivationSolutionDraft(ex);
+    const d = derivationSolutionDraft(ex)!;
     const F = d.lines.map((l) => parseOrThrow(l.text));
     d.lines.forEach((l, i) => {
       if (l.kind === 'step') {
@@ -84,7 +84,7 @@ describe('curated derivation problems', () => {
 
   it('the proof engine accepts every model solution as complete', () => {
     for (const ex of DERIVATION_EXERCISES) {
-      const d = derivationSolutionDraft(ex);
+      const d = derivationSolutionDraft(ex)!;
       const r = checkDerivation(d);
       const errs = r.lines.flatMap((l) => l.issues.filter((i) => i.severity === 'error').map((i) => `line ${l.number}: ${i.message}`));
       expect([ex.id, r.complete, errs]).toEqual([ex.id, true, []]);

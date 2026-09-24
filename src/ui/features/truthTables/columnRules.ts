@@ -8,4 +8,7 @@ export const COLUMN_RULE: Record<Formula['kind'], string> = {
   or: 'A disjunction is false only when both sides are false.',
   implies: 'A conditional is false only when the antecedent is true and the consequent is false.',
   iff: 'A biconditional is true exactly when both sides have the same truth value.',
+  pred: 'An atomic predication like Fa is true when the object named is in the predicate’s extension.',
+  forall: 'A universal quantification is true when its body is true for every object in the domain.',
+  exists: 'An existential quantification is true when its body is true for at least one object in the domain.',
 };

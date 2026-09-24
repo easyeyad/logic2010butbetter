@@ -7,7 +7,7 @@
  * OWNER: Learning System.
  */
 import type { Formula } from '../logic';
-import { CONNECTIVE_NAME, SYMBOL, equals, format, formatWithSpans, parse } from '../logic';
+import { CONNECTIVE_NAME, SYMBOL, equals, format, formatWithSpans, isBinary, isQuantified, parse } from '../logic';
 import type { Difficulty, Feedback, FormulaPart, Solution, TerminologyExercise, TerminologyFormat } from './types';
 import { editDistance, f, hash, makeRng, niceRandomFormula, pick, shuffle } from './util';
 
@@ -17,15 +17,14 @@ import { editDistance, f, hash, makeRng, niceRandomFormula, pick, shuffle } from
 
 /** Character index of the main connective in `format(g)` (canonical text), or -1 for an atom. */
 export function mainConnectiveIndex(g: Formula): number {
-  if (g.kind === 'atom') return -1;
-  if (g.kind === 'not') return 0;
+  if (!isBinary(g)) return g.kind === 'not' || isQuantified(g) ? 0 : -1;
   return format(g.left, { dropOuter: false }).length + 1;
 }
 
 /** Character indices of every connective symbol in `text` (clickable targets for the UI). */
 export function connectivePositions(text: string): number[] {
   const out: number[] = [];
-  for (let i = 0; i < text.length; i++) if ('¬∧∨→↔'.includes(text[i])) out.push(i);
+  for (let i = 0; i < text.length; i++) if ('¬∧∨→↔∀∃'.includes(text[i])) out.push(i);
   return out;
 }
 
@@ -45,7 +44,7 @@ export function formulaPart(g: Formula, part: FormulaPart): Formula | null {
   const info = PART_INFO[part];
   if (g.kind !== info.kind) return null;
   if (g.kind === 'not') return g.operand;
-  if (g.kind === 'atom') return null;
+  if (!isBinary(g)) return null;
   return info.side === 'left' ? g.left : g.right;
 }
 
@@ -310,9 +309,9 @@ export function checkTerminology(ex: TerminologyExercise, a: { position?: number
 function scopeAt(g: Formula, pos: number): string | null {
   const { text, spans } = formatWithSpans(g);
   for (const { formula: h, span } of spans) {
-    if (h.kind === 'atom') continue;
+    if (h.kind === 'atom' || h.kind === 'pred') continue;
     const top = span.start === 0 && span.end === text.length;
-    const main = h.kind === 'not' ? span.start : span.start + (top ? 0 : 1) + format(h.left, { dropOuter: false }).length + 1;
+    const main = !isBinary(h) ? span.start : span.start + (top ? 0 : 1) + format(h.left, { dropOuter: false }).length + 1;
     if (main === pos) return format(h);
   }
   return null;

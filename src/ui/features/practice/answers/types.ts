@@ -1,7 +1,7 @@
-import type { AnswerOf, ExerciseOf, Feedback, HighlightSpan, Solution, Topic } from '../../../../learning';
+import type { AnswerOf, ExerciseKind, ExerciseOf, Feedback, HighlightSpan, Solution } from '../../../../learning';
 
 /** Contract shared by every per-kind answer UI. */
-export interface AnswerProps<K extends Topic> {
+export interface AnswerProps<K extends ExerciseKind> {
   exercise: ExerciseOf<K>;
   /** Restored work in progress. */
   initial?: AnswerOf<K>;

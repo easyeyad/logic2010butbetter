@@ -7,7 +7,7 @@
  *
  * OWNER: Learning System.
  */
-import type { Classification, ParseErrorCode, Span, Valuation } from '../logic';
+import type { Classification, Interpretation, ParseErrorCode, Span, Valuation } from '../logic';
 import type { CloseMethod, DerivationDraft, RuleId } from '../proof';
 
 // ---------------------------------------------------------------------------
@@ -22,10 +22,15 @@ export type Topic =
   | 'countermodel'
   | 'inference-rule'
   | 'derivation'
-  | 'terminology';
+  | 'terminology'
+  // Predicate logic (Logic 2010 quantifier chapters)
+  | 'predicate-symbolization'
+  | 'model'
+  | 'predicate-countermodel'
+  | 'quantifier-derivation'
+  | 'predicate-terminology';
 
-/** Curriculum order (also the order used when recommending new topics). */
-export const TOPICS: readonly Topic[] = [
+export const SENTENTIAL_TOPICS: readonly Topic[] = [
   'wff',
   'symbolization',
   'truth-table',
@@ -36,6 +41,21 @@ export const TOPICS: readonly Topic[] = [
   'terminology',
 ];
 
+export const PREDICATE_TOPICS: readonly Topic[] = [
+  'predicate-symbolization',
+  'model',
+  'predicate-countermodel',
+  'quantifier-derivation',
+  'predicate-terminology',
+];
+
+/** Curriculum order (also the order used when recommending new topics): sentential, then predicate. */
+export const TOPICS: readonly Topic[] = [...SENTENTIAL_TOPICS, ...PREDICATE_TOPICS];
+
+export function isPredicateTopic(t: Topic): boolean {
+  return PREDICATE_TOPICS.includes(t);
+}
+
 export const TOPIC_INFO: Record<Topic, { title: string; description: string }> = {
   wff: { title: 'Well-formed formulas', description: 'Decide whether a string is a formula of sentential logic, and find the error when it is not.' },
   symbolization: { title: 'Symbolization', description: 'Translate English sentences into sentential logic.' },
@@ -45,6 +65,11 @@ export const TOPIC_INFO: Record<Topic, { title: string; description: string }> =
   'inference-rule': { title: 'Inference rules', description: 'Recognise which rule justifies a step, and apply a rule to given lines.' },
   derivation: { title: 'Derivations', description: 'Prove conclusions from premises with Show lines, DD, CD and ID.' },
   terminology: { title: 'Concepts & terminology', description: 'Validity, soundness, tautologies, main connectives, antecedents and more.' },
+  'predicate-symbolization': { title: 'Predicate symbolization', description: 'Translate English into predicate logic with quantifiers, predicates and names.' },
+  model: { title: 'Truth in a model', description: 'Decide whether a quantified sentence is true in a small, fully described world.' },
+  'predicate-countermodel': { title: 'Predicate countermodels', description: 'Build a small world where the premises are true and the conclusion is false.' },
+  'quantifier-derivation': { title: 'Quantifier derivations', description: 'Derivations with UI, EG, EI, UD and quantifier negation.' },
+  'predicate-terminology': { title: 'Predicate-logic concepts', description: 'Bound and free variables, scope, instances, domains, extensions and interpretations.' },
 };
 
 export type Difficulty = 1 | 2 | 3 | 4 | 5;
@@ -150,7 +175,9 @@ export interface CountermodelExercise extends ExerciseBase<'countermodel'> {
   form?: string;
 }
 
-export interface DerivationExercise extends ExerciseBase<'derivation'> {
+export interface DerivationExercise extends Omit<ExerciseBase<'derivation'>, 'topic'> {
+  /** 'quantifier-derivation' for predicate-logic problems (same kind, same editor). */
+  topic: 'derivation' | 'quantifier-derivation';
   premises: string[];
   goal: string;
   /** Main strategy for the outermost Show line. */
@@ -161,6 +188,8 @@ export interface DerivationExercise extends ExerciseBase<'derivation'> {
   /**
    * Model solution in the compact script format understood by
    * `parseProofScript` (see derivations.ts). Revealed only by getSolution.
+   * May be empty for quantifier problems: the solution then comes from the
+   * proof engine's automatic prover (`solve`).
    */
   solution: string[];
 }
@@ -196,7 +225,8 @@ export type FormulaPart =
   | 'right-side'
   | 'negated';
 
-export interface TerminologyExercise extends ExerciseBase<'terminology'> {
+export interface TerminologyExercise extends Omit<ExerciseBase<'terminology'>, 'topic'> {
+  topic: 'terminology' | 'predicate-terminology';
   format: TerminologyFormat;
   /** The concept being tested, e.g. 'main connective', 'validity'. */
   concept: string;
@@ -220,8 +250,50 @@ export interface TerminologyExercise extends ExerciseBase<'terminology'> {
   confusions?: Record<string, string>;
 }
 
+/** Symbol-key entry for predicate logic. */
+export type PredicateKeyEntry =
+  /** e.g. { symbol: 'L', arity: 2, meaning: 'x loves y' } — the meaning uses x, y, z for the argument places in order. */
+  | { kind: 'predicate'; symbol: string; arity: number; meaning: string }
+  /** e.g. { symbol: 'a', meaning: 'Alice' }. */
+  | { kind: 'name'; symbol: string; meaning: string };
+
+export interface PredicateSymbolizationExercise extends ExerciseBase<'predicate-symbolization'> {
+  sentence: string;
+  key: PredicateKeyEntry[];
+  /** Standard symbolization (canonical text). */
+  answer: string;
+  /** Other standard renderings (all equivalent to `answer`). */
+  alternatives: string[];
+  explanation: string;
+}
+
+export interface ModelExercise extends ExerciseBase<'model'> {
+  /** The sentence to evaluate (canonical text). */
+  formula: string;
+  /** The world: domain 0..size-1 (show as 1, 2, 3 …), extensions, names. */
+  model: Interpretation;
+  /** Optional English readings of the symbols. */
+  key: PredicateKeyEntry[];
+  /** Ground truth: evaluateIn(formula, model). */
+  truth: boolean;
+}
+
+export interface PredicateCountermodelExercise extends ExerciseBase<'predicate-countermodel'> {
+  premises: string[];
+  conclusion: string;
+  /** Symbols the model must interpret. */
+  predicates: { name: string; arity: number }[];
+  names: string[];
+  /** A countermodel exists with at most this many objects (a hint for the domain-size control). */
+  maxDomain: number;
+  form?: string;
+}
+
 export type Exercise =
   | WffExercise
+  | PredicateSymbolizationExercise
+  | ModelExercise
+  | PredicateCountermodelExercise
   | SymbolizationExercise
   | TruthTableExercise
   | ValidityExercise
@@ -230,7 +302,8 @@ export type Exercise =
   | InferenceRuleExercise
   | TerminologyExercise;
 
-export type ExerciseOf<K extends Topic> = Extract<Exercise, { kind: K }>;
+export type ExerciseKind = Exercise['kind'];
+export type ExerciseOf<K extends ExerciseKind> = Extract<Exercise, { kind: K }>;
 
 // ---------------------------------------------------------------------------
 // Answers
@@ -254,6 +327,9 @@ export type Answer =
   | { kind: 'countermodel'; valuation: Valuation }
   | { kind: 'derivation'; draft: DerivationDraft }
   | { kind: 'inference-rule'; rule?: RuleId; formula?: string }
+  | { kind: 'predicate-symbolization'; formula: string }
+  | { kind: 'model'; value: boolean }
+  | { kind: 'predicate-countermodel'; model: Interpretation }
   | {
       kind: 'terminology';
       /** click-connective: character index clicked. */
@@ -266,7 +342,7 @@ export type Answer =
       choice?: number;
     };
 
-export type AnswerOf<K extends Topic> = Extract<Answer, { kind: K }>;
+export type AnswerOf<K extends ExerciseKind> = Extract<Answer, { kind: K }>;
 
 // ---------------------------------------------------------------------------
 // Feedback

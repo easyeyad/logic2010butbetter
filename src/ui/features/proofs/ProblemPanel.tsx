@@ -186,14 +186,19 @@ function ExerciseGroups({ currentId, onPick }: { currentId: string; onPick: (e: 
   const current = DERIVATION_EXERCISES.find((e) => e.id === currentId);
   return (
     <div className="levels">
-      {LEVELS.map((lvl) => {
-        const items = DERIVATION_EXERCISES.filter((e) => e.difficulty === lvl);
+      {[...LEVELS, 'q' as const].map((lvl) => {
+        const quant = lvl === 'q';
+        const items = DERIVATION_EXERCISES.filter((e) => (quant ? e.topic === 'quantifier-derivation' : e.topic !== 'quantifier-derivation' && e.difficulty === lvl));
         if (!items.length) return null;
         const done = items.filter((e) => store.isSolved(e.id)).length;
         return (
-          <details key={lvl} className="level" open={current ? current.difficulty === lvl : lvl === 1}>
+          <details
+            key={lvl}
+            className="level"
+            open={current ? (quant ? current.topic === 'quantifier-derivation' : current.topic !== 'quantifier-derivation' && current.difficulty === lvl) : lvl === 1}
+          >
             <summary className="level__summary">
-              <span className="level__name">Level {lvl}</span>
+              <span className="level__name">{quant ? 'Quantifiers (∀ ∃)' : `Level ${lvl}`}</span>
               <span className="level__count">
                 {done} of {items.length} done
               </span>

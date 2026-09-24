@@ -5,7 +5,7 @@ export interface JustOption {
   key: string;
   abbr: string;
   name: string;
-  group: 'Rules' | 'Derived rules' | 'Line types';
+  group: 'Rules' | 'Quantifier rules' | 'Derived rules' | 'Line types';
 }
 
 const PRIMITIVE: [RuleId, string][] = [
@@ -19,6 +19,9 @@ const PRIMITIVE: [RuleId, string][] = [
   ['MTP', 'Modus Tollendo Ponens'],
   ['BC', 'Biconditional to Conditional'],
   ['CB', 'Conditionals to Biconditional'],
+  ['UI', 'Universal Instantiation'],
+  ['EG', 'Existential Generalization'],
+  ['EI', 'Existential Instantiation'],
 ];
 const DERIVED: [RuleId, string][] = [
   ['DM', "De Morgan's"],
@@ -26,22 +29,31 @@ const DERIVED: [RuleId, string][] = [
   ['NB', 'Negation of Biconditional'],
   ['CDJ', 'Conditional as Disjunction'],
   ['SC', 'Separation of Cases'],
+  ['QN', 'Quantifier Negation'],
+  ['AV', 'Alphabetic Variance'],
 ];
 
 /**
  * Options for the justification combobox. Uses the proof engine's rule list
  * when available (falls back to the Logic 2010 rule ids).
  */
+export const QUANTIFIER_RULE_IDS = new Set(['UI', 'EG', 'EI', 'UD', 'QN', 'AV']);
+
+function groupOf(id: string, derived: boolean): JustOption['group'] {
+  if (derived) return 'Derived rules';
+  return QUANTIFIER_RULE_IDS.has(id) ? 'Quantifier rules' : 'Rules';
+}
+
 export function justificationOptions(allowDerived: boolean): JustOption[] {
   const fromEngine = ruleList().filter((r) => r.category !== 'structural');
   let rules: JustOption[];
   if (fromEngine.length > 0) {
     rules = fromEngine
       .filter((r) => allowDerived || !r.derived)
-      .map((r) => ({ key: String(r.id), abbr: r.abbreviation, name: r.name, group: r.derived ? 'Derived rules' : 'Rules' }));
+      .map((r) => ({ key: String(r.id), abbr: r.abbreviation, name: r.name, group: groupOf(String(r.id), r.derived) }));
   } else {
     rules = [
-      ...PRIMITIVE.map(([k, n]) => ({ key: k, abbr: k, name: n, group: 'Rules' as const })),
+      ...PRIMITIVE.map(([k, n]) => ({ key: k, abbr: k, name: n, group: groupOf(k, false) })),
       ...(allowDerived ? DERIVED.map(([k, n]) => ({ key: k, abbr: k, name: n, group: 'Derived rules' as const })) : []),
     ];
   }

@@ -4,7 +4,7 @@ import { Button } from '../../components/Button';
 import { Icon } from '../../components/Icon';
 import { useProgress } from '../../learning/progress';
 import { attempt } from '../../engine/safe';
-import { PICKER_TOPICS, TOPIC_ICON, type PracticeTopic } from './topics';
+import { PREDICATE_PICKER, SENTENTIAL_PICKER, TOPIC_ICON, type PracticeTopic } from './topics';
 
 export interface SetupChoice {
   topic: PracticeTopic;
@@ -49,18 +49,27 @@ export function PracticeSetup({ onStart }: { onStart: (c: SetupChoice) => void }
         <h2 id="setup-h" className="card__title">Build a practice session</h2>
         <fieldset className="plain-fieldset">
           <legend className="field__label">Topic</legend>
-          <div className="topic-grid">
-            {PICKER_TOPICS.map((t) => (
-              <label key={t} className={`topic-card ${topic === t ? 'is-selected' : ''}`}>
-                <input type="radio" name="practice-topic" value={t} checked={topic === t} onChange={() => setTopic(t)} />
-                <span className="topic-card__icon"><Icon name={TOPIC_ICON[t]} size={20} /></span>
-                <span className="topic-card__text">
-                  <span className="topic-card__title">{topicTitle(t)}</span>
-                  <span className="topic-card__desc">{t === 'mixed' ? 'A bit of everything, each at your level.' : TOPIC_INFO[t].description}</span>
-                </span>
-              </label>
-            ))}
-          </div>
+          {[
+            { title: 'Sentential logic', list: SENTENTIAL_PICKER },
+            { title: 'Predicate logic', list: PREDICATE_PICKER },
+            { title: 'Mix it up', list: ['mixed'] as PracticeTopic[] },
+          ].map((g) => (
+            <div key={g.title} className="topic-group">
+              <h3 className="topic-group__h">{g.title}</h3>
+              <div className="topic-grid">
+                {g.list.map((t) => (
+                  <label key={t} className={`topic-card ${topic === t ? 'is-selected' : ''}`}>
+                    <input type="radio" name="practice-topic" value={t} checked={topic === t} onChange={() => setTopic(t)} />
+                    <span className="topic-card__icon"><Icon name={TOPIC_ICON[t]} size={20} /></span>
+                    <span className="topic-card__text">
+                      <span className="topic-card__title">{topicTitle(t)}</span>
+                      <span className="topic-card__desc">{t === 'mixed' ? 'A bit of everything, each at your level.' : TOPIC_INFO[t].description}</span>
+                    </span>
+                  </label>
+                ))}
+              </div>
+            </div>
+          ))}
         </fieldset>
 
         <div className="setup-row">

@@ -11,6 +11,7 @@ const METHODS: { m: CloseMethod; name: string; fallback: string }[] = [
   { m: 'DD', name: 'Direct derivation', fallback: 'The formula you are showing appears on an earlier line inside the box.' },
   { m: 'CD', name: 'Conditional derivation', fallback: 'You assumed the antecedent (ASS CD) and derived the consequent inside the box.' },
   { m: 'ID', name: 'Indirect derivation', fallback: 'You assumed the opposite (ASS ID) and derived a formula and its negation inside the box.' },
+  { m: 'UD', name: 'Universal derivation', fallback: 'To show ∀x φ: derive φ for a variable that is not free in any line the box depends on, then close with UD.' },
 ];
 
 /** Choose DD/CD/ID and the cited lines to close a show line's box. */
@@ -103,7 +104,7 @@ export function CloseBoxDialog({
             inputMode="decimal"
             value={refsText}
             onChange={(e) => setRefsText(e.target.value)}
-            placeholder={method === 'ID' ? 'e.g. 4, 6 (the contradiction)' : 'e.g. 5'}
+            placeholder={method === 'ID' ? 'e.g. 4, 6 (the contradiction)' : method === 'UD' ? 'e.g. 7 (the instance)' : 'e.g. 5'}
             aria-invalid={refs === null || undefined}
             aria-describedby="close-refs-help"
           />
@@ -114,6 +115,8 @@ export function CloseBoxDialog({
                 ? 'Cite the two lines that contradict each other.'
                 : method === 'CD'
                   ? 'Cite the line where you derived the consequent.'
+                  : method === 'UD'
+                    ? 'Cite the line with the instance φ (for a new variable) that you generalize.'
                   : 'Cite the line where you derived the formula.'}
           </span>
         </div>

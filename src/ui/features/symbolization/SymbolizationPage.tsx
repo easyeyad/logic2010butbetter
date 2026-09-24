@@ -1,6 +1,6 @@
 import { useMemo, useRef, useState } from 'react';
-import type { Difficulty, SymbolizationExercise } from '../../../learning';
-import { generateSymbolization, SYMBOLIZATION_EXERCISES } from '../../../learning';
+import type { Difficulty, PredicateSymbolizationExercise, SymbolizationExercise } from '../../../learning';
+import { EXERCISE_BANK, generateExercise, generateSymbolization, SYMBOLIZATION_EXERCISES } from '../../../learning';
 import { PageHeader } from '../../app/PageHeader';
 import { Button } from '../../components/Button';
 import { EmptyState } from '../../components/EmptyState';
@@ -11,6 +11,13 @@ import { useProgress } from '../../learning/progress';
 import { ExerciseRunner } from '../practice/ExerciseRunner';
 
 type Mode = 'bank' | 'generate';
+type Logic = 'sentential' | 'predicate';
+type SymEx = SymbolizationExercise | PredicateSymbolizationExercise;
+
+function predicateBank(): PredicateSymbolizationExercise[] {
+  const r = attempt(() => (EXERCISE_BANK['predicate-symbolization'] ?? []).filter((e): e is PredicateSymbolizationExercise => e.kind === 'predicate-symbolization'));
+  return r.ok ? r.value : [];
+}
 const LEVELS: Difficulty[] = [1, 2, 3, 4, 5];
 
 function label(tag: string) {
@@ -22,15 +29,17 @@ export default function SymbolizationPage() {
   const [mode, setMode] = useState<Mode>('bank');
   const [level, setLevel] = useState<Difficulty | 0>(0);
   const [category, setCategory] = useState('');
-  const [current, setCurrent] = useState<SymbolizationExercise | null>(null);
+  const [logic, setLogic] = useState<Logic>('sentential');
+  const [current, setCurrent] = useState<SymEx | null>(null);
   const [genLevel, setGenLevel] = useState<Difficulty>(2);
   const [error, setError] = useState<string | null>(null);
   const runnerRef = useRef<HTMLDivElement>(null);
 
-  const categories = useMemo(() => [...new Set(SYMBOLIZATION_EXERCISES.flatMap((e) => e.tags))], []);
-  const list = SYMBOLIZATION_EXERCISES.filter((e) => (!level || e.difficulty === level) && (!category || e.tags.includes(category)));
+  const source: SymEx[] = useMemo(() => (logic === 'sentential' ? SYMBOLIZATION_EXERCISES : predicateBank()), [logic]);
+  const categories = useMemo(() => [...new Set(source.flatMap((e) => e.tags))], [source]);
+  const list = source.filter((e) => (!level || e.difficulty === level) && (!category || e.tags.includes(category)));
 
-  const open = (ex: SymbolizationExercise) => {
+  const open = (ex: SymEx) => {
     setCurrent(ex);
     requestAnimationFrame(() => {
       if (window.innerWidth < 1280) runnerRef.current?.scrollIntoView?.({ block: 'start' });
@@ -42,7 +51,10 @@ export default function SymbolizationPage() {
     if (i >= 0 && i + 1 < list.length) open(list[i + 1]);
   };
   const generate = () => {
-    const r = attempt(() => generateSymbolization(genLevel, Math.floor(Math.random() * 0x7fffffff)));
+    const seed = Math.floor(Math.random() * 0x7fffffff);
+    const r = attempt((): SymEx =>
+      logic === 'sentential' ? generateSymbolization(genLevel, seed) : (generateExercise('predicate-symbolization', genLevel, seed) as PredicateSymbolizationExercise),
+    );
     if (!r.ok) return setError(r.error);
     setError(null);
     open(r.value);
@@ -53,6 +65,10 @@ export default function SymbolizationPage() {
       <PageHeader title="Symbolization" description="Translate English into sentential logic using a symbol key. Answers are checked for meaning, not exact wording." />
       <div className="sym-layout">
         <section className="card stack sym-browser" aria-label="Choose a sentence">
+          <div className="segmented" role="radiogroup" aria-label="Logic">
+            <button type="button" role="radio" aria-checked={logic === 'sentential'} onClick={() => { setLogic('sentential'); setCategory(''); }}>Sentential</button>
+            <button type="button" role="radio" aria-checked={logic === 'predicate'} onClick={() => { setLogic('predicate'); setCategory(''); }}>Predicate (∀ ∃)</button>
+          </div>
           <div className="segmented" role="tablist" aria-label="Source">
             <button type="button" role="tab" aria-selected={mode === 'bank'} onClick={() => setMode('bank')}>Exercise bank</button>
             <button type="button" role="tab" aria-selected={mode === 'generate'} onClick={() => setMode('generate')}>Generate new</button>
@@ -74,7 +90,10 @@ export default function SymbolizationPage() {
                   ))}
                 </select>
               </div>
-              <p className="subtle" role="status">{list.length} sentences</p>
+              <p className="subtle" role="status">
+                {list.length} sentences
+                {logic === 'predicate' && list.length === 0 && ' — the predicate bank is still being written; use Generate new.'}
+              </p>
               <ul className="sym-list">
                 {list.map((e) => {
                   const solved = store.isSolved(e.id);

@@ -6,7 +6,7 @@
  * OWNER: Learning System.
  */
 import type { Classification, Formula, Valuation } from '../logic';
-import { atomsOf, buildTruthTable, checkValidity, classify, evaluate, format } from '../logic';
+import { CONNECTIVE_NAME, SYMBOL, atomsOf, buildTruthTable, checkValidity, classify, evaluate, format } from '../logic';
 import type { CountermodelExercise, Difficulty, Feedback, Solution, TruthTableExercise, ValidityExercise } from './types';
 import { explainValue, f, formatValuation, hash, joinList, makeRng, missingAtoms, niceRandomFormula, pick, sample, substitute, tf, type Rng } from './util';
 
@@ -212,7 +212,7 @@ export function truthTableHints(ex: TruthTableExercise): string[] {
   const n = ex.atoms.length;
   const hints = [
     `There ${n === 1 ? 'is 1 sentence letter' : `are ${n} sentence letters`}, so the table has ${2 ** n} rows. Standard order: the first letter is T in the top half, the last letter alternates T, F every row.`,
-    `Work from the inside out: compute the columns for the smallest parts first. The main connective here is the ${g.kind === 'atom' ? 'sentence letter itself' : { not: '¬', and: '∧', or: '∨', implies: '→', iff: '↔' }[g.kind]}.`,
+    `Work from the inside out: compute the columns for the smallest parts first. The main connective here is the ${g.kind === 'atom' ? 'sentence letter itself' : SYMBOL[g.kind as keyof typeof SYMBOL] ?? CONNECTIVE_NAME[g.kind]}.`,
   ];
   if (g.kind === 'implies') hints.push('A conditional is false in exactly one kind of row: antecedent T and consequent F. Look for such rows.');
   if (g.kind === 'and') hints.push('A conjunction is true only when both conjuncts are true.');

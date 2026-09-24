@@ -96,3 +96,54 @@ export function safeSolve(premises: string[], goal: string): Safe<DraftLine[] | 
     return proof.solve(ps, g);
   });
 }
+
+// ---------------------------------------------------------------- predicate logic
+
+export type { Interpretation, PredicateValidityResult } from '../../logic';
+
+/** True if any formula uses predicates with arguments, quantifiers or variables. */
+export function isPredicateInput(fs: Formula[]): boolean {
+  const preds = attempt(() => logic.predicatesOf(...fs));
+  if (preds.ok && preds.value.some((p) => p.arity > 0)) return true;
+  const vars = attempt(() => logic.variablesOf(...fs));
+  if (vars.ok && vars.value.length > 0) return true;
+  // Fallback while the predicate toolkit is unavailable: look at the AST kinds.
+  const walk = (f: Formula): boolean => {
+    switch (f.kind) {
+      case 'pred':
+      case 'forall':
+      case 'exists':
+        return true;
+      case 'atom':
+        return false;
+      case 'not':
+        return walk(f.operand);
+      default:
+        return walk(f.left) || walk(f.right);
+    }
+  };
+  return fs.some(walk);
+}
+
+export function safePredicateValidity(premises: Formula[], conclusion: Formula, maxDomain = 4): Safe<logic.PredicateValidityResult> {
+  return attempt(() => logic.checkPredicateValidity(premises, conclusion, { maxDomain }));
+}
+
+export function safeEvaluateIn(f: Formula, m: logic.Interpretation): Safe<boolean> {
+  return attempt(() => logic.evaluateIn(f, m));
+}
+
+export function safeDescribeInterpretation(m: logic.Interpretation): string[] {
+  const r = attempt(() => logic.describeInterpretation(m));
+  return r.ok ? r.value : [];
+}
+
+export function safePredicatesOf(fs: Formula[]): { name: string; arity: number }[] {
+  const r = attempt(() => logic.predicatesOf(...fs));
+  return r.ok ? r.value : [];
+}
+
+export function safeNamesOf(fs: Formula[]): string[] {
+  const r = attempt(() => logic.namesOf(...fs));
+  return r.ok ? r.value : [];
+}

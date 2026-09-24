@@ -17,8 +17,9 @@
  *
  * OWNER: Proof Engine.
  */
-import type { Formula } from '../logic/ast';
-import { And, Iff, Implies, Not, Or } from '../logic/ast';
+import type { Formula, Term } from '../logic/ast';
+import { And, Exists, Forall, Iff, Implies, Name, Not, Or, Var, isPredicateFormula } from '../logic/ast';
+import { freeVariables, freshVariable, isGeneralizationOf, namesOf, substitute } from '../logic/index';
 import type { CloseMethod, DraftLine, LineKind, RuleId } from './types';
 import { entails, equals as eq, fmt } from './util';
 
@@ -37,7 +38,21 @@ export interface ProverOptions {
   maxLines?: number;
   /** Never open a Show whose formula is any currently open Show's formula (hints). */
   strictNesting?: boolean;
+  /** Hard wall-clock budget in ms (search aborts with a Budget error). */
+  timeBudgetMs?: number;
 }
+
+function tryOr<T>(fn: () => T, fallback: T): T {
+  try {
+    return fn();
+  } catch {
+    return fallback;
+  }
+}
+const subst = (f: Formula, v: string, t: Term): Formula | null => tryOr(() => substitute(f, v, t), null);
+const freeIn = (f: Formula, v: string): boolean => tryOr(() => freeVariables(f).includes(v), false);
+const MAX_UNIVERSE = 8;
+const MAX_EI = 8;
 
 export class Prover {
   out: DraftLine[] = [];
@@ -53,11 +68,48 @@ export class Prover {
    * same formula (always redundant, and it would make hints regress).
    */
   openStack: string[] = [];
+  /** Formulas of the open Show lines (parallel to openStack). */
+  goalStack: Formula[] = [];
+  /** Formula of each line in `out` (undefined for unparseable student lines). */
+  outF: (Formula | undefined)[] = [];
   private strict: boolean;
+  private deadline: number;
+  /** Quantifier machinery switches on once a predicate formula is seen. */
+  private quant = false;
+  private eiCount = 0;
+  private eiInstance = new Map<string, Formula>();
+  private defaultTerm: Term | undefined;
 
   constructor(opts: ProverOptions = {}) {
     this.maxLines = opts.maxLines ?? 6000;
     this.strict = !!opts.strictNesting;
+    this.deadline = opts.timeBudgetMs === undefined ? Infinity : Date.now() + opts.timeBudgetMs;
+  }
+
+  private checkTime(): void {
+    if (Date.now() > this.deadline) throw new Budget();
+  }
+
+  /** Terms to instantiate universals with: names and free variables around, else one fresh variable. */
+  private universe(): Term[] {
+    const names = new Set<string>();
+    const vars = new Set<string>();
+    const scan = (f: Formula) => {
+      for (const n of tryOr(() => namesOf(f), [] as string[])) names.add(n);
+      for (const v of tryOr(() => freeVariables(f), [] as string[])) vars.add(v);
+    };
+    this.avail.forEach((a) => scan(a.f));
+    this.goalStack.forEach(scan);
+    const terms: Term[] = [...[...names].sort().map(Name), ...[...vars].sort().map(Var)].slice(0, MAX_UNIVERSE);
+    if (terms.length) return terms;
+    this.defaultTerm ??= Var(this.fresh());
+    return [this.defaultTerm];
+  }
+
+  /** A variable occurring on no line so far (nor in any open goal). */
+  fresh(): string {
+    const fs = [...this.outF.filter((f): f is Formula => !!f), ...this.goalStack];
+    return tryOr(() => freshVariable(...fs), 'u9');
   }
 
   // ------------------------------------------------------------ bookkeeping
@@ -75,6 +127,7 @@ export class Prover {
   }
 
   addAvail(f: Formula, n: number): void {
+    if (!this.quant && isPredicateFormula(f)) this.quant = true;
     const key = fmt(f);
     this.avail.push({ f, n, key });
     if (!this.map.has(key)) this.map.set(key, n);
@@ -91,6 +144,7 @@ export class Prover {
 
   restore([o, a, d]: [number, number, number]): void {
     this.out.length = o;
+    this.outF.length = o;
     this.avail.length = a;
     this.depth = d;
     this.rebuild();
@@ -98,7 +152,9 @@ export class Prover {
 
   private emit(kind: LineKind, f: Formula, extra: Partial<DraftLine> = {}): number {
     if (++this.emitted > this.maxLines) throw new Budget();
+    if ((this.emitted & 15) === 0) this.checkTime();
     this.out.push({ id: `p${++this.idSeq}`, kind, text: fmt(f), depth: this.depth, ...extra });
+    this.outF.push(f);
     const n = this.out.length;
     if (kind !== 'show') this.addAvail(f, n);
     return n;
@@ -157,13 +213,16 @@ export class Prover {
     const snap = this.snapshot();
     const availAtShow = this.avail.length;
     const show = this.emit('show', G);
+    if (!this.quant && isPredicateFormula(G)) this.quant = true;
     this.depth++;
     this.openStack.push(key);
+    this.goalStack.push(G);
     let refs: number[] | null;
     try {
       refs = body(show);
     } finally {
       this.openStack.pop();
+      this.goalStack.pop();
     }
     if (!refs) {
       this.restore(snap);
@@ -278,15 +337,40 @@ export class Prover {
             const op = f.operand;
             if (op.kind === 'not') {
               if (this.add(op.operand, 'DN', [n])) changed = true;
+            } else if (op.kind === 'forall' || op.kind === 'exists') {
+              if (macros && this.quant && this.macroNegQuant(n, op)) changed = true;
             } else if (macros) {
               if (this.macroNeg(n, op)) changed = true;
             }
             break;
           }
-          default:
+          case 'forall': {
+            for (const t of this.universe()) {
+              const inst = subst(f.body, f.variable, t);
+              if (inst && this.add(inst, 'UI', [n])) changed = true;
+            }
+            break;
+          }
+          case 'exists': {
+            const key = fmt(f);
+            const prev = this.eiInstance.get(key);
+            if (prev && this.has(prev) !== undefined) break;
+            if (this.eiCount >= MAX_EI) break;
+            const inst = freeIn(f.body, f.variable) ? subst(f.body, f.variable, Var(this.fresh())) : f.body;
+            if (inst && this.has(inst) === undefined) {
+              this.eiCount++;
+              this.eiInstance.set(key, inst);
+              this.step(inst, 'EI', [n]);
+              changed = true;
+            }
+            break;
+          }
+          case 'atom':
+          case 'pred':
             break;
         }
       }
+      this.checkTime();
       if (!changed) return;
     }
   }
@@ -422,6 +506,37 @@ export class Prover {
     return changed;
   }
 
+  /** ¬∃xφ → ¬φ[t] for each term t;  ¬∀xφ → ∃x¬φ (the QN derivation, primitive rules only). */
+  private macroNegQuant(nNeg: number, op: Extract<Formula, { variable: string }>): boolean {
+    let changed = false;
+    if (op.kind === 'exists') {
+      for (const t of this.universe()) {
+        const inst = subst(op.body, op.variable, t);
+        if (!inst || this.has(Not(inst)) !== undefined) continue;
+        const r = this.showID(Not(inst), (show, asm) => [this.step(op, 'EG', [asm]), this.ensureIn(nNeg, show)]);
+        if (r !== null) changed = true;
+      }
+      return changed;
+    }
+    const x = op.variable;
+    const target = Exists(x, Not(op.body));
+    if (this.has(target) !== undefined) return false;
+    const r = this.showID(target, (show, asmOuter) => {
+      const u = this.box(Forall(x, op.body), 'UD', (s2) => {
+        if (this.avail.some((a) => a.n < s2 && freeIn(a.f, x))) return null;
+        const l = this.showID(op.body, (s3) => {
+          const nb = this.getOrDN(Not(op.body));
+          if (nb === undefined) return null;
+          const e = this.step(target, 'EG', [nb]);
+          return [e, this.ensureIn(asmOuter, s3)];
+        });
+        return l === null ? null : [this.ensureIn(l, s2)];
+      });
+      return u === null ? null : [u, this.ensureIn(nNeg, show)];
+    });
+    return r !== null;
+  }
+
   contradiction(): Pair | null {
     for (const a of this.avail) {
       if (a.f.kind === 'not') {
@@ -449,6 +564,22 @@ export class Prover {
     } else if (G.kind === 'or') {
       const a = this.obtainInline(G.left, depth - 1) ?? this.obtainInline(G.right, depth - 1);
       if (a !== null) r = this.step(G, 'ADD', [a]);
+    } else if (G.kind === 'exists' && this.quant) {
+      for (const a of this.avail) {
+        if (tryOr(() => isGeneralizationOf(G, a.f), false)) {
+          r = this.step(G, 'EG', [a.n]);
+          break;
+        }
+      }
+      if (r === null)
+        for (const t of this.universe()) {
+          const inst = subst(G.body, G.variable, t);
+          const l = inst ? this.obtainInline(inst, depth - 1) : null;
+          if (l !== null) {
+            r = this.step(G, 'EG', [l]);
+            break;
+          }
+        }
     } else if (G.kind === 'iff') {
       const a = this.obtainInline(Implies(G.left, G.right), depth - 1);
       const b = a === null ? null : this.obtainInline(Implies(G.right, G.left), depth - 1);
@@ -481,7 +612,13 @@ export class Prover {
       case 'or':
         out.push({ method: 'DD', body: (show) => this.bodyOrByAdd(G, show) });
         break;
-      default:
+      case 'forall':
+        out.push({ method: 'UD', body: (show) => this.bodyUD(G, show) });
+        break;
+      case 'atom':
+      case 'pred':
+      case 'not':
+      case 'exists':
         break;
     }
     // Anything can be shown indirectly — the complete last resort.
@@ -502,6 +639,14 @@ export class Prover {
     this.saturate();
     const l = this.obtainInline(G);
     return l === null ? null : [this.ensureIn(l, show)];
+  }
+
+  /** UD: x not free in any available line above the Show; derive φ inside. */
+  bodyUD(G: Extract<Formula, { kind: 'forall' }>, show: number): number[] | null {
+    if (this.avail.some((a) => a.n < show && freeIn(a.f, G.variable))) return null;
+    this.saturate();
+    const b = this.obtain(G.body);
+    return b === null ? null : [this.ensureIn(b, show)];
   }
 
   /** Disjunction goal: if one disjunct follows (truth table), prove it and use ADD. */

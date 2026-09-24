@@ -96,6 +96,15 @@ export default function SettingsPage() {
           />
         </Section>
 
+        <Section title="Predicate logic">
+          <Switch
+            title="Quantifier buttons"
+            desc="Show ∀ ∃ and common variables/names (x y z a b) under formula fields, and keep lowercase letters as you type."
+            checked={settings.predicateMode}
+            onChange={(predicateMode) => update({ predicateMode })}
+          />
+        </Section>
+
         <Section title="Proofs">
           <Switch
             title="Allow derived rules"

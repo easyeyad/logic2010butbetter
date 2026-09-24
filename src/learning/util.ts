@@ -112,6 +112,9 @@ export function explainValue(g: Formula, v: Valuation): string {
       return val
         ? `${s} is T because both sides have the same value (${tf(evaluate(g.left, v))}).`
         : `${s} is F because its sides differ: ${part(g.left)} but ${part(g.right)}.`;
+    default:
+      // Predications and quantifiers have no truth-table row; callers only pass sentential formulas.
+      return `${s} is ${tf(val)}.`;
   }
 }
 
@@ -135,8 +138,13 @@ export function substitute(g: Formula, sub: Record<string, Formula>): Formula {
   switch (g.kind) {
     case 'atom':
       return sub[g.name] ?? g;
+    case 'pred':
+      return g;
     case 'not':
       return { kind: 'not', operand: substitute(g.operand, sub) };
+    case 'forall':
+    case 'exists':
+      return { kind: g.kind, variable: g.variable, body: substitute(g.body, sub) };
     default:
       return { kind: g.kind, left: substitute(g.left, sub), right: substitute(g.right, sub) };
   }
@@ -146,9 +154,13 @@ export function substitute(g: Formula, sub: Record<string, Formula>): Formula {
 export function size(g: Formula): number {
   switch (g.kind) {
     case 'atom':
+    case 'pred':
       return 0;
     case 'not':
       return 1 + size(g.operand);
+    case 'forall':
+    case 'exists':
+      return 1 + size(g.body);
     default:
       return 1 + size(g.left) + size(g.right);
   }
@@ -157,9 +169,13 @@ export function size(g: Formula): number {
 export function depth(g: Formula): number {
   switch (g.kind) {
     case 'atom':
+    case 'pred':
       return 0;
     case 'not':
       return 1 + depth(g.operand);
+    case 'forall':
+    case 'exists':
+      return 1 + depth(g.body);
     default:
       return 1 + Math.max(depth(g.left), depth(g.right));
   }
@@ -169,9 +185,13 @@ export function depth(g: Formula): number {
 export function hasTrivialNode(g: Formula): boolean {
   switch (g.kind) {
     case 'atom':
+    case 'pred':
       return false;
     case 'not':
       return hasTrivialNode(g.operand);
+    case 'forall':
+    case 'exists':
+      return hasTrivialNode(g.body);
     default:
       return equalsF(g.left, g.right) || hasTrivialNode(g.left) || hasTrivialNode(g.right);
   }

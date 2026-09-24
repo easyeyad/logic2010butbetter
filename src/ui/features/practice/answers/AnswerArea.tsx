@@ -1,5 +1,8 @@
 import type { Answer, Exercise, Feedback, Solution } from '../../../../learning';
 import { CountermodelAnswer } from './CountermodelAnswer';
+import { ModelAnswer } from './ModelAnswer';
+import { PredicateCountermodelAnswer } from './PredicateCountermodelAnswer';
+import { PredicateSymbolizationAnswer } from './PredicateSymbolizationAnswer';
 import { DerivationAnswer } from './DerivationAnswer';
 import { InferenceRuleAnswer } from './InferenceRuleAnswer';
 import { SymbolizationAnswer } from './SymbolizationAnswer';
@@ -40,13 +43,21 @@ export function AnswerArea({
       return <InferenceRuleAnswer exercise={exercise} initial={initial?.kind === 'inference-rule' ? initial : undefined} {...common} />;
     case 'terminology':
       return <TerminologyAnswer exercise={exercise} initial={initial?.kind === 'terminology' ? initial : undefined} {...common} />;
+    case 'predicate-symbolization':
+      return <PredicateSymbolizationAnswer exercise={exercise} initial={initial?.kind === 'predicate-symbolization' ? initial : undefined} {...common} />;
+    case 'model':
+      return <ModelAnswer exercise={exercise} initial={initial?.kind === 'model' ? initial : undefined} {...common} />;
+    case 'predicate-countermodel':
+      return <PredicateCountermodelAnswer exercise={exercise} initial={initial?.kind === 'predicate-countermodel' ? initial : undefined} {...common} />;
+    default:
+      return <p className="subtle">This kind of exercise can't be shown yet.</p>;
   }
 }
 
 /** The typed text of an answer (for "your answer" highlights). */
 export function answerText(a: Answer | null): string | undefined {
   if (!a) return undefined;
-  if (a.kind === 'symbolization') return a.formula;
+  if (a.kind === 'symbolization' || a.kind === 'predicate-symbolization') return a.formula;
   if (a.kind === 'inference-rule') return a.formula;
   if (a.kind === 'terminology') return a.text;
   return undefined;

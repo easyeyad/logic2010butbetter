@@ -1,9 +1,10 @@
 import type { Formula } from '../logic/ast';
 import type { CloseMethod, DerivationDraft, DraftLine } from './types';
-import { accessProblem, analyze, type Analysis } from './checker';
+import { accessProblem, analyze, udViolation, type Analysis } from './checker';
 import { Prover, prune } from './prover';
 import { ruleLabel } from './rules';
-import { consistent, contradictory, entails, equals as eq, fmt, lineList } from './util';
+import { consistent, contradictory, entails, equals as eq, fmt, lineList, predicateCountermodel } from './util';
+import { isPredicateFormula } from '../logic/ast';
 
 /** A concrete suggested line (level 3), or a close instruction. */
 export interface HintLine {
@@ -82,13 +83,18 @@ function closeFor(an: Analysis, t: number): { method: CloseMethod; refs: number[
     for (const a of kids)
       for (const b of kids) if (a < b && contradictory(an.formulas[a]!, an.formulas[b]!)) return { method: 'ID', refs: [a + 1, b + 1] };
   }
+  if (!asm && G.kind === 'forall') {
+    const k = kids.find((k) => eq(an.formulas[k]!, G.body));
+    const inBox = (s: number, i: number) => s < i && i <= an.boxEnd[s];
+    if (k !== undefined && udViolation(an, t, inBox) === null) return { method: 'UD', refs: [k + 1] };
+  }
   const k = kids.find((k) => eq(an.formulas[k]!, G));
   if (k !== undefined) return { method: 'DD', refs: [k + 1] };
   return null;
 }
 
 /** If the innermost open show can be closed now, which method and refs. */
-export function suggestClose(draft: DerivationDraft): { showLine: number; method: 'DD' | 'CD' | 'ID'; refs: number[] } | null {
+export function suggestClose(draft: DerivationDraft): { showLine: number; method: CloseMethod; refs: number[] } | null {
   try {
     const an = analyze(trimTrailingEmpty(draft));
     const t = targetShow(an);
@@ -111,7 +117,15 @@ const RULE_NUDGE: Record<string, string> = {
   BC: 'A biconditional can give you a conditional to work with.',
   CB: 'You have both directions of a biconditional.',
   R: 'Something you need is outside the current box — bring it inside with R so you can cite it when closing.',
+  UI: 'A universal line can be instantiated to a term you are working with.',
+  EI: 'An existential line can be instantiated — to a variable that is new to the derivation.',
+  EG: 'You have an instance of what you need — generalize it with ∃.',
+  QN: 'A negated quantifier can be pushed inside (the quantifier flips).',
+  AV: 'Rename a bound variable to match what you need.',
 };
+
+/** Hard time budget for computing one hint. */
+const HINT_TIME_MS = 300;
 
 /** Continue the student's derivation with the prover; return the new lines (pruned) or null. */
 /**
@@ -139,13 +153,15 @@ function continueBudget(an: Analysis, t: number, budget: number): { lines: Draft
 function continueWith(an: Analysis, t: number, strict: boolean, budget: number): { lines: DraftLine[]; origN: number } | null {
   const G = an.formulas[t]!;
   const n = an.lines.length;
-  const p = new Prover({ maxLines: budget, strictNesting: strict });
+  const p = new Prover({ maxLines: budget, strictNesting: strict, timeBudgetMs: HINT_TIME_MS });
   p.out = an.lines.map((l) => ({ ...l, refs: l.refs ? [...l.refs] : undefined, close: l.close ? { ...l.close, refs: [...l.close.refs] } : undefined }));
+  p.outF = [...an.formulas];
   for (const a of accessibleFor(an, t)) p.addAvail(a.f, a.n);
   p.depth = an.lines[t].depth + 1;
   const stack: string[] = [];
   for (let s = t; s !== -1; s = an.parent[s]) if (an.formulas[s] && !an.closed[s]) stack.unshift(fmt(an.formulas[s]!));
   p.openStack.push(...stack);
+  for (let s = t; s !== -1; s = an.parent[s]) if (an.formulas[s] && !an.closed[s]) p.goalStack.unshift(an.formulas[s]!);
   const show = t + 1;
   const first = t + 1 < n && an.parent[t + 1] === t ? t + 1 : -1;
   const asm = first !== -1 && an.lines[first].kind === 'assumption' ? an.asmKind[first] : undefined;
@@ -166,6 +182,15 @@ function continueWith(an: Analysis, t: number, strict: boolean, budget: number):
           break;
         }
         p.restore(snap);
+      }
+    } else if (G.kind === 'forall' && !asm) {
+      const snap = p.snapshot();
+      const ud = p.bodyUD(G, show);
+      if (ud) result = { method: 'UD', refs: ud };
+      else {
+        p.restore(snap);
+        const dd = p.bodyDD(G, show, true);
+        if (dd) result = { method: 'DD', refs: dd };
       }
     } else {
       const r = p.bodyDD(G, show, true);
@@ -199,7 +224,18 @@ function goalStrategy(G: Formula, t: number, method: CloseMethod | undefined): s
       return method === 'ID'
         ? `Your goal on ${L} is a negation — Indirect Derivation (ID) is the natural approach: assume what's negated and look for a contradiction.`
         : `Your goal on ${L} may follow directly from what you have — work forward with the rules.`;
-    default:
+    case 'forall':
+      return method === 'UD'
+        ? `Your goal on ${L} is a universal — try Universal Derivation (UD): derive ${fmt(G.body)} for an arbitrary ${G.variable} inside the box (no assumption), then close with UD.`
+        : method === 'ID'
+          ? `Your goal on ${L} is a universal, but ${G.variable} isn't arbitrary here — try Indirect Derivation (ID).`
+          : `Your goal on ${L} may follow directly from what you have — work forward with the rules.`;
+    case 'exists':
+      return method === 'ID'
+        ? `Your goal on ${L} is an existential. If no instance is easy to get, try Indirect Derivation (ID): assume ${fmt({ kind: 'not', operand: G })} and look for a contradiction.`
+        : `Your goal on ${L} is an existential — derive one instance of ${fmt(G.body)} and use EG.`;
+    case 'atom':
+    case 'pred':
       return method === 'ID'
         ? `Nothing gives ${fmt(G)} on ${L} directly — try Indirect Derivation (ID): assume the opposite and aim for a contradiction.`
         : `Your goal on ${L} may follow directly from what you have — work forward with the rules (DD).`;
@@ -266,6 +302,15 @@ function nextStep(draft: DerivationDraft, level: 1 | 2 | 3): Hint | null {
     const avail = accessibleFor(an, t).map((a) => a.f);
     const target: Formula = asm === 'CD' && G.kind === 'implies' ? G.right : G;
     const ok = asm === 'ID' ? (consistent(avail) === null ? null : !consistent(avail)) : entails(avail, target);
+    if (ok === null && asm !== 'ID') {
+      const model = predicateCountermodel(avail, target);
+      if (model)
+        return {
+          message: `${fmt(target)} does not follow from the lines available at line ${T} — here is a countermodel: ${model.join('; ')}. Double-check that line ${T}'s Show formula is what you need.`,
+        };
+    }
+    if (ok === null && isPredicateFormula(G))
+      return { message: `No automatic hint is available for this step. ${goalStrategy(G, t, undefined)}` };
     if (ok === false)
       return {
         message:

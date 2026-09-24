@@ -80,3 +80,16 @@ textarea.fi__input {
 }
 .fi--compact textarea.fi__input { min-height: 36px; padding-top: 6px; padding-bottom: 6px; }
 @media (pointer: coarse) { .fi--compact textarea.fi__input { min-height: var(--touch); padding-top: 10px; padding-bottom: 10px; } }
+
+/* Predicate mode: connectives row + quantifier/term row */
+.symbar--pred { flex-direction: row; flex-wrap: wrap; gap: var(--sp-1) var(--sp-3); }
+.symbar__row { display: flex; flex-wrap: wrap; gap: var(--sp-1); }
+.symbar__row--q { padding-left: var(--sp-3); border-left: 1px solid var(--c-border); }
+.symbar__btn--term { font-style: italic; color: var(--c-text-2); background: var(--c-surface); }
+.symbar__btn--quantifier { font-weight: 600; }
+@media (max-width: 767px) {
+  .symbar--pred { flex-direction: column; gap: 4px; }
+  .symbar--pred .symbar__row { flex-wrap: nowrap; gap: 3px; }
+  .symbar--pred .symbar__row--q { padding-left: 0; border-left: 0; }
+  .symbar--pred .symbar__btn { flex: 1 1 0; min-width: 0; }
+}

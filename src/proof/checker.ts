@@ -1,6 +1,6 @@
 import type { Formula } from '../logic/ast';
-import { Not } from '../logic/ast';
-import { parse } from '../logic/index';
+import { Forall, Not } from '../logic/ast';
+import { alphaEquals, freeVariables, freshVariable, parse, variablesOf } from '../logic/index';
 import type {
   CloseMethod,
   DerivationCheck,
@@ -124,6 +124,58 @@ export function accessProblem(an: Pick<Analysis, 'lines' | 'formulas' | 'parent'
     message: `${who} cites line ${num}, which is inside the box of ${showDesc} — and ${who.toLowerCase()} is not in that box. Lines in a box can only be used inside that box.`,
     suggestion: `Work inside the box of line ${blocker + 1} (and close it) instead.`,
   };
+}
+
+function safeAlpha(a: Formula, b: Formula): boolean {
+  try {
+    return alphaEquals(a, b);
+  } catch {
+    return false;
+  }
+}
+
+function freeIn(f: Formula, v: string): boolean {
+  try {
+    return freeVariables(f).includes(v);
+  } catch {
+    return false;
+  }
+}
+
+function safeVars(f: Formula): string[] {
+  try {
+    return variablesOf(f);
+  } catch {
+    return [];
+  }
+}
+
+function safeFresh(fs: Formula[]): string | undefined {
+  try {
+    return freshVariable(...fs);
+  } catch {
+    return undefined;
+  }
+}
+
+/**
+ * UD restriction for Show line s (formula ∀xφ): index of a line above s that
+ * is still available at s and has x free — or null if none.
+ */
+export function udViolation(
+  an: Pick<Analysis, 'lines' | 'formulas' | 'parent' | 'closed'>,
+  s: number,
+  inBox: (show: number, i: number) => boolean,
+): number | null {
+  const g = an.formulas[s];
+  if (!g || g.kind !== 'forall') return null;
+  for (let r = 0; r < s; r++) {
+    const f = an.formulas[r];
+    if (!f || !freeIn(f, g.variable)) continue;
+    if (accessProblem(an, r, (t) => inBox(t, s), '')) continue;
+    return r;
+  }
+  return null;
 }
 
 function err(code: string, message: string, extra: Partial<LineIssue> = {}): LineIssue {
@@ -396,7 +448,7 @@ export function analyze(draft: DerivationDraft): Analysis {
       continue;
     }
     if (!isRuleId(rule)) {
-      issues[i].push(err('unknown-rule', `Line ${num}: "${rule}" is not a rule of this system.`, { target: 'rule', suggestion: 'Pick one of MP, MT, DN, R, S, ADJ, ADD, MTP, BC, CB (or a derived rule, if enabled).' }));
+      issues[i].push(err('unknown-rule', `Line ${num}: "${rule}" is not a rule of this system.`, { target: 'rule', suggestion: 'Pick one of MP, MT, DN, R, S, ADJ, ADD, MTP, BC, CB, UI, EG, EI (or a derived rule, if enabled).' }));
       continue;
     }
     const f = formulas[i];
@@ -423,7 +475,25 @@ export function analyze(draft: DerivationDraft): Analysis {
       rule,
       refs.map((r) => r.f),
       f,
-      { allowDerivedRules: allowDerived, lineNumber: num, citedLineNumbers: refs.map((r) => r.n), find: (t) => findAccessible(i, t), alternativesWhenValid: false },
+      {
+        allowDerivedRules: allowDerived,
+        lineNumber: num,
+        citedLineNumbers: refs.map((r) => r.n),
+        find: (t) => findAccessible(i, t),
+        alternativesWhenValid: false,
+        ...(rule === 'EI'
+          ? {
+              variableOccursOn: (v: string) => {
+                for (let r = 0; r < i; r++) {
+                  const fr = formulas[r];
+                  if (fr && safeVars(fr).includes(v)) return r + 1;
+                }
+                return undefined;
+              },
+              freshVariableHint: safeFresh(formulas.slice(0, i + 1).filter((x): x is Formula => !!x)),
+            }
+          : {}),
+      },
     );
     if (!res.ok)
       issues[i].push(err(res.code!, res.message!, { target: res.target, badRefs: res.badRefs, suggestion: res.suggestion }));
@@ -444,8 +514,10 @@ export function analyze(draft: DerivationDraft): Analysis {
     const crefs = Array.isArray(line.close.refs) ? line.close.refs : [];
     const push = (code: string, message: string, extra: Partial<LineIssue> = {}) =>
       issues[s].push(err(code, message, { target: 'close', ...extra }));
-    if (method !== 'DD' && method !== 'CD' && method !== 'ID') {
-      push('close-unknown-method', `Line ${num}: "${method}" is not a way to close a box.`, { suggestion: 'Use DD (Direct Derivation), CD (Conditional Derivation) or ID (Indirect Derivation).' });
+    if (method !== 'DD' && method !== 'CD' && method !== 'ID' && method !== 'UD') {
+      push('close-unknown-method', `Line ${num}: "${method}" is not a way to close a box.`, {
+        suggestion: 'Use DD (Direct Derivation), CD (Conditional Derivation), ID (Indirect Derivation) or UD (Universal Derivation).',
+      });
       continue;
     }
     const mLabel = ruleLabel(method);
@@ -540,6 +612,46 @@ export function analyze(draft: DerivationDraft): Analysis {
                   : `Keep deriving inside the box until you reach ${fmt(g)}.`,
           },
         );
+      }
+    } else if (method === 'UD') {
+      if (g.kind !== 'forall') {
+        push('close-ud-not-universal', `Line ${num}: UD (Universal Derivation) only closes a Show line whose formula is a universal ∀xφ, but ${showG} is ${aKind(g)}.`, {
+          suggestion: g.kind === 'exists' ? 'For an existential, derive an instance and use EG, or use ID.' : 'Use DD, CD or ID for this Show line.',
+        });
+      } else if (firstAsm) {
+        push('close-wrong-assumption', `Line ${num}: the box starts with an ASS ${firstAsm} assumption, so it can't be closed with UD — a UD box has no assumption.`, {
+          suggestion: `Close it with ${firstAsm}, or start a fresh Show ${fmt(g)} box without an assumption.`,
+        });
+      } else if (!good.some((r) => eq(r.f, g.body))) {
+        const r0 = good[0];
+        const has = directWith(g.body);
+        const variant = r0.f.kind !== 'forall' && safeAlpha(Forall(g.variable, r0.f), g);
+        push(
+          'close-mismatch',
+          eq(r0.f, g)
+            ? `Line ${num}: UD closes ${showG} by citing ${fmt(g.body)} — the formula WITHOUT the quantifier, with ${g.variable} free. Line ${r0.n} is the universal itself; close with DD instead.`
+            : `Line ${num}: UD (Universal Derivation) closes ${showG} by citing a line in the box that is exactly ${fmt(g.body)}, but line ${r0.n} is ${fmt(r0.f)}.`,
+          {
+            badRefs: [r0.n],
+            suggestion:
+              has !== undefined
+                ? `Line ${has} is ${fmt(g.body)} — cite that line.`
+                : variant
+                  ? `UD needs the same variable as the quantifier (${g.variable}). Derive ${fmt(g.body)} instead.`
+                  : `Keep deriving inside the box until you reach ${fmt(g.body)} (with ${g.variable} free).`,
+          },
+        );
+      } else {
+        const bad = udViolation({ lines, formulas, parent, closed }, s, inBox);
+        if (bad)
+          push(
+            'close-ud-restriction',
+            `Line ${num}: UD (Universal Derivation) can't generalize on ${g.variable} here: ${g.variable} occurs free in line ${bad + 1} (${fmt(formulas[bad]!)}), which is available above the Show line. That line says something special about ${g.variable}, so ${g.variable} isn't arbitrary.`,
+            {
+              badRefs: [bad + 1],
+              suggestion: `Prove the universal with a variable that is not free in any line above the Show line (and rename it afterwards with AV, if derived rules are on).`,
+            },
+          );
       }
     } else if (method === 'CD') {
       if (g.kind !== 'implies') {

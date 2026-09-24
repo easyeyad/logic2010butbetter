@@ -308,6 +308,103 @@ const LIST: RuleInfo[] = [
       'Derived rule: only available when derived rules are enabled.',
     ],
   },
+  // --------------------------------------------------------------- quantifier
+  {
+    id: 'UI',
+    name: 'Universal Instantiation',
+    abbreviation: 'UI',
+    derived: false,
+    category: 'primitive',
+    premisesCount: 1,
+    schema: { from: ['∀x φ'], to: 'φ[t/x]   (t any name or variable)' },
+    example: { from: ['∀x(Fx → Gx)'], to: 'Fa → Ga' },
+    explanation:
+      'What holds for everything holds for any particular thing. From ∀x φ you may write φ with EVERY free occurrence of x replaced by one and the same term — a name (a, b, …) or a variable (x, y, …).',
+    requirements: [
+      'Cite exactly one line whose main connective is ∀ (the quantifier must govern the whole line).',
+      'Replace every free occurrence of the quantified variable by the same term, and drop the quantifier.',
+      'The term must be free for the variable: a variable may not get captured by another quantifier inside φ.',
+    ],
+    pitfalls: [
+      'Applying UI to a line like ∀xFx → P: its main connective is →, not ∀, so UI does not apply.',
+      'Replacing only some occurrences: from ∀x(Fx → Gx) you may not write Fa → Gx.',
+      'Confusing UI with EI: an existential ∃xφ needs EI (with a new variable), not UI.',
+    ],
+  },
+  {
+    id: 'EG',
+    name: 'Existential Generalization',
+    abbreviation: 'EG',
+    derived: false,
+    category: 'primitive',
+    premisesCount: 1,
+    schema: { from: ['φ[t/x]'], to: '∃x φ' },
+    example: { from: ['Fa ∧ Ga'], to: '∃x(Fx ∧ Ga)' },
+    explanation:
+      'If a particular thing has a property, then something has it. From a line about a term t you may write ∃x φ, where φ has x in place of some (not necessarily all) occurrences of t.',
+    requirements: [
+      'Cite exactly one line.',
+      'The conclusion must be ∃x φ such that replacing x in φ by one term t gives back exactly the cited line.',
+      'Occurrences of t you do not generalize stay as they are.',
+    ],
+    pitfalls: [
+      'Generalizing to ∀ instead of ∃ — a universal needs UD (a Show ∀x… box).',
+      'Generalizing on two different terms at once: Fa ∧ Gb does not give ∃x(Fx ∧ Gx).',
+      'Capturing a variable that should stay free.',
+    ],
+  },
+  {
+    id: 'EI',
+    name: 'Existential Instantiation',
+    abbreviation: 'EI',
+    derived: false,
+    category: 'primitive',
+    premisesCount: 1,
+    schema: { from: ['∃x φ'], to: 'φ[y/x]   (y a variable new to the derivation)' },
+    example: { from: ['∃x(Fx ∧ Gx)'], to: 'Fy ∧ Gy' },
+    explanation:
+      'If something has a property, give that thing a temporary label and reason about it. The label must be a VARIABLE that does not occur on any earlier line, so you assume nothing else about it.',
+    requirements: [
+      'Cite exactly one line whose main connective is ∃.',
+      'Replace every free occurrence of the quantified variable by the same variable.',
+      'That variable must be new: it may not occur anywhere on an earlier line of the derivation (including premises and Show lines).',
+    ],
+    pitfalls: [
+      'Instantiating to a name: from ∃xFx you may NOT conclude Fa — you do not know the thing is a.',
+      'Reusing a variable that already occurs above (the new-variable restriction).',
+      'Using UI on an existential, or EI on a universal.',
+    ],
+  },
+  {
+    id: 'QN',
+    name: 'Quantifier Negation',
+    abbreviation: 'QN',
+    derived: true,
+    category: 'derived',
+    premisesCount: 1,
+    schema: { from: ['¬∀x φ'], to: '∃x ¬φ   (and ¬∃x φ ⊣⊢ ∀x ¬φ, both directions)' },
+    example: { from: ['¬∃x Fx'], to: '∀x ¬Fx' },
+    explanation:
+      '"Not everything is φ" says the same as "something is not φ", and "nothing is φ" says the same as "everything is not φ". QN moves a negation across a quantifier, flipping ∀ and ∃. Also accepted: ∀x φ ⊣⊢ ¬∃x ¬φ and ∃x φ ⊣⊢ ¬∀x ¬φ.',
+    requirements: ['Cite exactly one line and apply QN to the whole line.', 'The quantifier flips (∀ ↔ ∃) as the negation moves across it.'],
+    pitfalls: [
+      'Forgetting to flip the quantifier: ¬∀x Fx is NOT ∀x ¬Fx.',
+      'Derived rule: only available when derived rules are enabled.',
+    ],
+  },
+  {
+    id: 'AV',
+    name: 'Alphabetic Variance',
+    abbreviation: 'AV',
+    derived: true,
+    category: 'derived',
+    premisesCount: 1,
+    schema: { from: ['∀x φ'], to: '∀y φ[y/x]   (rename a bound variable)' },
+    example: { from: ['∀x(Fx → Gx)'], to: '∀y(Fy → Gy)' },
+    explanation: 'Renaming a bound variable consistently does not change what a formula says. AV lets you rewrite a line into an alphabetic variant.',
+    requirements: ['Cite exactly one line.', 'Only bound variables may be renamed, consistently, without capturing anything.'],
+    pitfalls: ['Renaming a free variable (that changes the meaning).', 'Derived rule: only available when derived rules are enabled.'],
+  },
   // ---------------------------------------------------------- closing methods
   {
     id: 'DD',
@@ -372,6 +469,27 @@ const LIST: RuleInfo[] = [
       'χ can be anything, not just the Show formula.',
     ],
   },
+  {
+    id: 'UD',
+    name: 'Universal Derivation',
+    abbreviation: 'UD',
+    derived: false,
+    category: 'structural',
+    premisesCount: 1,
+    schema: { from: ['Show ∀x φ', '  …', '  φ'], to: 'close the box: ∀x φ is shown' },
+    example: { from: ['Show ∀x(Fx → Hx)', '  …', '  Fx → Hx'], to: 'close with UD citing the Fx → Hx line' },
+    explanation:
+      'To prove that everything is φ, prove φ about an arbitrary x: derive φ (with x free) inside the box. It only works if nothing above the Show line says anything special about x.',
+    requirements: [
+      'The Show formula must be a universal ∀x φ, and the box has no assumption.',
+      'Cite a line directly inside the box that is exactly φ (same variable x).',
+      'Restriction: x must not occur free in any line that is available above the Show line (premises, open assumptions, earlier derived lines).',
+    ],
+    pitfalls: [
+      'Generalizing on a variable introduced by EI or occurring free in a premise — that is what the restriction forbids.',
+      'Using the Show formula ∀x φ itself inside its own box.',
+    ],
+  },
   // --------------------------------------------------------------- structural
   {
     id: 'PR',
@@ -417,8 +535,12 @@ export function getRule(id: string): RuleInfo | undefined {
 }
 
 /** Inference rules (things a 'step' line can use), in reference order. */
-export const INFERENCE_RULE_IDS: RuleId[] = ['MP', 'MT', 'DN', 'R', 'S', 'ADJ', 'ADD', 'MTP', 'BC', 'CB', 'DM', 'NC', 'NB', 'CDJ', 'SC'];
-export const DERIVED_RULE_IDS: RuleId[] = ['DM', 'NC', 'NB', 'CDJ', 'SC'];
+export const INFERENCE_RULE_IDS: RuleId[] = [
+  'MP', 'MT', 'DN', 'R', 'S', 'ADJ', 'ADD', 'MTP', 'BC', 'CB', 'UI', 'EG', 'EI',
+  'DM', 'NC', 'NB', 'CDJ', 'SC', 'QN', 'AV',
+];
+export const DERIVED_RULE_IDS: RuleId[] = ['DM', 'NC', 'NB', 'CDJ', 'SC', 'QN', 'AV'];
+export const QUANTIFIER_RULE_IDS: RuleId[] = ['UI', 'EG', 'EI', 'QN', 'AV'];
 
 export function isRuleId(id: string): id is RuleId {
   return (INFERENCE_RULE_IDS as string[]).includes(id);

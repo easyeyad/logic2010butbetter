@@ -7,8 +7,9 @@
  *
  * OWNER: Proof Engine.
  */
-import type { Formula } from '../logic/ast';
-import { And, Iff, Implies, Not, Or } from '../logic/ast';
+import type { Formula, Term } from '../logic/ast';
+import { And, Exists, Forall, Iff, Implies, Name, Not, Or } from '../logic/ast';
+import { alphaEquals, freeVariables, isGeneralizationOf, matchInstance, namesOf, substitute } from '../logic/index';
 import type { RuleId } from './types';
 import { DERIVED_RULE_IDS, INFERENCE_RULE_IDS, ruleLabel } from './rules';
 import { aKind, capitalize, contradictory, equals as eq, fmt, isNegationOf, lineList, stripDN } from './util';
@@ -23,6 +24,7 @@ export interface RefF {
 export const RULE_ARITY: Record<RuleId, number[]> = {
   MP: [2], MT: [2], DN: [1], R: [1], S: [1], ADJ: [2], ADD: [1], MTP: [2], BC: [1], CB: [2],
   DM: [1], NC: [1], NB: [1], CDJ: [1], SC: [3, 2],
+  UI: [1], EG: [1], EI: [1], QN: [1], AV: [1],
 };
 
 /** What the cited lines must be, for "cites exactly N lines (...)". */
@@ -42,6 +44,11 @@ export const NEEDS: Record<RuleId, string> = {
   NB: 'the one line to rewrite',
   CDJ: 'the one line to rewrite',
   SC: 'a disjunction φ ∨ ψ plus φ → χ and ψ → χ',
+  UI: 'the universal ∀xφ to instantiate',
+  EG: 'the line about a particular term',
+  EI: 'the existential ∃xφ to instantiate',
+  QN: 'the one line to rewrite',
+  AV: 'the one line to rename',
 };
 
 // ------------------------------------------------------------------ transforms
@@ -85,6 +92,18 @@ export function transforms(rule: RuleId, f: Formula): Formula[] {
       if (f.kind === 'iff' && f.right.kind === 'not') out.push(Not(Iff(f.left, f.right.operand)));
       if (f.kind === 'iff' && f.left.kind === 'not') out.push(Not(Iff(f.left.operand, f.right)));
       break;
+    case 'QN':
+      if (f.kind === 'not' && f.operand.kind === 'forall') out.push(Exists(f.operand.variable, Not(f.operand.body)));
+      if (f.kind === 'not' && f.operand.kind === 'exists') out.push(Forall(f.operand.variable, Not(f.operand.body)));
+      if (f.kind === 'exists' && f.body.kind === 'not') out.push(Not(Forall(f.variable, f.body.operand)));
+      if (f.kind === 'forall' && f.body.kind === 'not') out.push(Not(Exists(f.variable, f.body.operand)));
+      if (f.kind === 'forall') out.push(Not(Exists(f.variable, Not(f.body))));
+      if (f.kind === 'exists') out.push(Not(Forall(f.variable, Not(f.body))));
+      if (f.kind === 'not' && f.operand.kind === 'exists' && f.operand.body.kind === 'not')
+        out.push(Forall(f.operand.variable, f.operand.body.operand));
+      if (f.kind === 'not' && f.operand.kind === 'forall' && f.operand.body.kind === 'not')
+        out.push(Exists(f.operand.variable, f.operand.body.operand));
+      break;
     case 'CDJ':
       if (f.kind === 'implies') {
         out.push(Or(Not(f.left), f.right));
@@ -101,7 +120,28 @@ export function transforms(rule: RuleId, f: Formula): Formula[] {
   return out;
 }
 
-const ONE_PREMISE_TRANSFORM = new Set<RuleId>(['R', 'DN', 'S', 'BC', 'DM', 'NC', 'NB', 'CDJ']);
+const ONE_PREMISE_TRANSFORM = new Set<RuleId>(['R', 'DN', 'S', 'BC', 'DM', 'NC', 'NB', 'CDJ', 'QN']);
+
+/**
+ * If c is an instance of the quantified formula q (every free occurrence of
+ * q's variable replaced by one term), the term — or 'vacuous' — else null.
+ * Never throws (the logic engine may not support something yet).
+ */
+export function instanceTerm(q: Extract<Formula, { variable: string }>, c: Formula): Term | 'vacuous' | null {
+  try {
+    return matchInstance(q.body, q.variable, c);
+  } catch {
+    return null;
+  }
+}
+
+function safe<T>(fn: () => T, fallback: T): T {
+  try {
+    return fn();
+  } catch {
+    return fallback;
+  }
+}
 
 // -------------------------------------------------------------------- matching
 
@@ -139,6 +179,17 @@ function matchOrdered(rule: RuleId, fs: Formula[], c: Formula): boolean {
         c.kind === 'iff' &&
         ((eq(c.left, a.left) && eq(c.right, a.right)) || (eq(c.left, a.right) && eq(c.right, a.left)))
       );
+    case 'UI':
+      return a.kind === 'forall' && instanceTerm(a, c) !== null;
+    case 'EI': {
+      if (a.kind !== 'exists') return false;
+      const t = instanceTerm(a, c);
+      return t === 'vacuous' || (t !== null && t.kind === 'var');
+    }
+    case 'EG':
+      return c.kind === 'exists' && safe(() => isGeneralizationOf(c, a), false);
+    case 'AV':
+      return safe(() => alphaEquals(a, c), false);
     case 'SC':
       if (fs.length === 3) {
         return (
@@ -641,6 +692,183 @@ function diagSC(n: number, refs: RefF[], c: Formula): Diagnosis {
   };
 }
 
+/** A sample instance of q for messages: with a term from c if any, else 'a'. */
+function sampleInstance(q: Extract<Formula, { variable: string }>, c: Formula): Formula | null {
+  const names = safe(() => namesOf(c), [] as string[]);
+  const t: Term = names.length ? Name(names[0]) : Name('a');
+  return safe(() => substitute(q.body, q.variable, t), null);
+}
+
+function mainIs(f: Formula): string {
+  return f.kind === 'atom' || f.kind === 'pred' ? `${aKind(f)}` : `${aKind(f)} (main connective ${mainSymbol(f)})`;
+}
+
+function mainSymbol(f: Formula): string {
+  switch (f.kind) {
+    case 'not':
+      return '¬';
+    case 'and':
+      return '∧';
+    case 'or':
+      return '∨';
+    case 'implies':
+      return '→';
+    case 'iff':
+      return '↔';
+    case 'forall':
+      return '∀';
+    case 'exists':
+      return '∃';
+    case 'atom':
+    case 'pred':
+      return '';
+  }
+}
+
+function containsQuantifier(f: Formula, kind: 'forall' | 'exists'): boolean {
+  switch (f.kind) {
+    case 'atom':
+    case 'pred':
+      return false;
+    case 'not':
+      return containsQuantifier(f.operand, kind);
+    case 'forall':
+    case 'exists':
+      return f.kind === kind || containsQuantifier(f.body, kind);
+    case 'and':
+    case 'or':
+    case 'implies':
+    case 'iff':
+      return containsQuantifier(f.left, kind) || containsQuantifier(f.right, kind);
+  }
+}
+
+function diagInstantiation(rule: 'UI' | 'EI', n: number, [a]: RefF[], c: Formula): Diagnosis {
+  const want = rule === 'UI' ? 'forall' : 'exists';
+  const q = rule === 'UI' ? '∀' : '∃';
+  const what = rule === 'UI' ? 'a universal ∀xφ' : 'an existential ∃xφ';
+  if (a.f.kind !== want) {
+    if (a.f.kind === 'forall' || a.f.kind === 'exists') {
+      return {
+        message: `Line ${n}: ${rule} applies only to ${what}, but ${Ld(a)} is ${aKind(a.f)}.`,
+        suggestion:
+          rule === 'UI'
+            ? 'For an existential use EI, and instantiate to a variable that is new to the derivation.'
+            : 'For a universal use UI — it may be instantiated to any term.',
+        badRefs: [a.n],
+        target: 'rule',
+      };
+    }
+    const inside = containsQuantifier(a.f, want);
+    return {
+      message: inside
+        ? `Line ${n}: ${rule} works only when ${q} is the main connective of the whole line. In ${Ld(a)} the main connective is ${mainSymbol(a.f)}, and the ${q} covers only part of the formula.`
+        : `Line ${n}: ${rule} applies to ${what}, but ${Ld(a)} is ${mainIs(a.f)}.`,
+      suggestion: inside
+        ? `Break line ${a.n} apart with the sentential rules first (e.g. MP, S) so the quantified part stands on its own line.`
+        : `Cite a line whose main connective is ${q}.`,
+      badRefs: [a.n],
+      target: 'refs',
+    };
+  }
+  const Q = a.f as Extract<Formula, { variable: string }>;
+  const t = instanceTerm(Q, c);
+  if (rule === 'EI' && t !== null && t !== 'vacuous' && t.kind === 'name') {
+    return {
+      message: `Line ${n}: EI must instantiate to a new VARIABLE, not to the name ${t.name}. From ${F(a.f)} you only know that something is ${F(Q.body)} — not that ${t.name} is.`,
+      suggestion: 'Use a variable that occurs nowhere above (e.g. y or z) instead of a name.',
+      target: 'formula',
+    };
+  }
+  const sample = sampleInstance(Q, c);
+  const terms = termsAt(Q.body, Q.variable, c);
+  const partial = terms !== null && terms.size > 1;
+  return {
+    message: partial
+      ? `Line ${n}: ${rule} must replace EVERY free occurrence of ${Q.variable} in ${F(Q.body)} by one and the same term; ${F(c)} replaces only some of them (or uses different terms).`
+      : `Line ${n}: ${rule} from ${Ld(a)} drops the ${q}${Q.variable} and puts one term for every free ${Q.variable} in ${F(Q.body)}${sample ? ` (for example ${F(sample)})` : ''}, but ${F(c)} is not of that form.`,
+    suggestion:
+      rule === 'UI'
+        ? `Write ${F(Q.body)} with each free ${Q.variable} replaced by the same name or variable.`
+        : `Write ${F(Q.body)} with each free ${Q.variable} replaced by the same NEW variable.`,
+    target: 'formula',
+  };
+}
+
+/**
+ * If c has the same shape as body except where body has a free occurrence
+ * of v, return the set of terms (as text) found at those positions; else null.
+ */
+function termsAt(body: Formula, v: string, c: Formula): Set<string> | null {
+  const found = new Set<string>();
+  const walk = (b: Formula, x: Formula, bound: Set<string>): boolean => {
+    if (b.kind !== x.kind) return false;
+    switch (b.kind) {
+      case 'atom':
+        return b.name === (x as typeof b).name;
+      case 'pred': {
+        const xa = (x as typeof b).args;
+        if (b.name !== (x as typeof b).name || b.args.length !== xa.length) return false;
+        return b.args.every((t, i) => {
+          if (t.kind === 'var' && t.name === v && !bound.has(v)) {
+            found.add(`${xa[i].kind}:${xa[i].name}`);
+            return true;
+          }
+          return t.kind === xa[i].kind && t.name === xa[i].name;
+        });
+      }
+      case 'not':
+        return walk(b.operand, (x as typeof b).operand, bound);
+      case 'forall':
+      case 'exists': {
+        const xq = x as typeof b;
+        if (b.variable !== xq.variable) return false;
+        return walk(b.body, xq.body, new Set([...bound, b.variable]));
+      }
+      case 'and':
+      case 'or':
+      case 'implies':
+      case 'iff': {
+        const xb = x as typeof b;
+        return walk(b.left, xb.left, bound) && walk(b.right, xb.right, bound);
+      }
+    }
+  };
+  return walk(body, c, new Set()) ? found : null;
+}
+
+function diagEG(n: number, [a]: RefF[], c: Formula): Diagnosis {
+  if (c.kind !== 'exists') {
+    return {
+      message:
+        c.kind === 'forall'
+          ? `Line ${n}: EG concludes an existential ∃xφ, but ${F(c)} is a universal. One instance never justifies "everything".`
+          : `Line ${n}: EG concludes an existential ∃xφ, but ${F(c)} is ${aKind(c)}.`,
+      suggestion:
+        c.kind === 'forall'
+          ? 'To prove a universal, open "Show ∀x…" and close it with UD (Universal Derivation).'
+          : 'EG puts ∃x in front of a formula in which x replaces a term of the cited line.',
+      target: 'formula',
+    };
+  }
+  const free = safe(() => freeVariables(c.body), [] as string[]);
+  return {
+    message: `Line ${n}: EG from ${Ld(a)} needs ${F(c)} to be a generalization of it — replacing ${c.variable} in ${F(c.body)} by one term should give back exactly ${F(a.f)}, but it doesn't.`,
+    suggestion: free.includes(c.variable)
+      ? `Put ${c.variable} exactly where one term (a name or variable) occurs in line ${a.n}, and leave the rest of the formula unchanged.`
+      : `${F(c)} doesn't use ${c.variable} at all inside — generalize by replacing a term of line ${a.n} with ${c.variable}.`,
+    target: 'formula',
+  };
+}
+
+function diagAV(n: number, [a]: RefF[], c: Formula): Diagnosis {
+  return {
+    message: `Line ${n}: AV only renames bound variables consistently, but ${F(c)} is not an alphabetic variant of ${Ld(a)}.`,
+    suggestion: 'Rename each bound variable everywhere it is bound (and nothing else); free variables and names must stay the same.',
+    target: 'formula',
+  };
+}
+
 function diagTransform(rule: RuleId, n: number, [a]: RefF[], c: Formula): Diagnosis {
   const outs = transforms(rule, a.f);
   const label = ruleLabel(rule);
@@ -650,6 +878,7 @@ function diagTransform(rule: RuleId, n: number, [a]: RefF[], c: Formula): Diagno
       NC: 'a negated conditional ¬(φ → ψ), or a conjunction φ ∧ ¬ψ',
       NB: 'a negated biconditional ¬(φ ↔ ψ), or a biconditional with a negated side such as φ ↔ ¬ψ',
       CDJ: 'a conditional φ → ψ or a disjunction φ ∨ ψ',
+      QN: 'a negated quantifier such as ¬∀xφ or ¬∃xφ, or a quantifier over a negation such as ∃x¬φ',
     };
     return {
       message: `Line ${n}: ${label} applies to ${shape[rule] ?? 'a specific form'}, but ${Ld(a)} is ${aKind(a.f)}.`,
@@ -668,6 +897,11 @@ function diagTransform(rule: RuleId, n: number, [a]: RefF[], c: Formula): Diagno
     const imp = a.f.operand;
     if (eq(c, Implies(Not(imp.left), Not(imp.right))) || eq(c, And(Not(imp.left), imp.right)))
       extra = ' The antecedent stays as it is; only the consequent gets negated, and the result is a conjunction.';
+  }
+  if (rule === 'QN' && a.f.kind === 'not' && (a.f.operand.kind === 'forall' || a.f.operand.kind === 'exists')) {
+    const op = a.f.operand;
+    const sameQ = op.kind === 'forall' ? Forall(op.variable, Not(op.body)) : Exists(op.variable, Not(op.body));
+    if (eq(c, sameQ)) extra = ` Careful: QN flips the quantifier — ${op.kind === 'forall' ? '∀ becomes ∃' : '∃ becomes ∀'} as the ¬ moves inside.`;
   }
   if (rule === 'CDJ' && a.f.kind === 'implies' && eq(c, Or(a.f.left, Not(a.f.right))))
     extra = ' It is the antecedent that gets negated, not the consequent.';
@@ -717,6 +951,13 @@ function diagnoseRaw(rule: RuleId, n: number, refs: RefF[], c: Formula, ctx: Dia
       return diagCB(n, refs, c);
     case 'SC':
       return diagSC(n, refs, c);
+    case 'UI':
+    case 'EI':
+      return diagInstantiation(rule, n, refs, c);
+    case 'EG':
+      return diagEG(n, refs, c);
+    case 'AV':
+      return diagAV(n, refs, c);
     default:
       return diagTransform(rule, n, refs, c);
   }

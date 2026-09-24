@@ -32,6 +32,16 @@ function ProofsWorkspace() {
   const [params, setParams] = useSearchParams();
   const formulaFocused = useFormulaFocus('.proofs__editor');
 
+  // /proofs?premises=…&goal=… starts a custom problem (e.g. from Countermodels).
+  const goalParam = params.get('goal');
+  useEffect(() => {
+    if (!goalParam) return;
+    const premises = (params.get('premises') ?? '').split('\n').filter((p) => p.trim());
+    ed.loadProblem({ id: 'custom', title: 'Your problem', premises, goal: goalParam });
+    setParams({}, { replace: true });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [goalParam]);
+
   // /proofs?open=<saved proof id> loads a saved proof.
   const openId = params.get('open');
   useEffect(() => {

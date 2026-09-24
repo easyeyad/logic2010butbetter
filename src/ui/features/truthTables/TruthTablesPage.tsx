@@ -4,7 +4,8 @@ import { PageHeader } from '../../app/PageHeader';
 import { EmptyState } from '../../components/EmptyState';
 import { FormulaList } from '../../components/FormulaList';
 import { EngineError, Notice } from '../../components/Notice';
-import { safeParse, safeTruthTable } from '../../engine/safe';
+import { isPredicateInput, safeParse, safeTruthTable } from '../../engine/safe';
+import { Link } from 'react-router-dom';
 import { useDebounced } from '../../hooks/useDebounced';
 import { useLocalStorage } from '../../hooks/useLocalStorage';
 import { Classifications } from './Classifications';
@@ -29,6 +30,7 @@ export default function TruthTablesPage() {
       if (!r.value.ok) return { kind: 'invalid' as const };
       parsed.push(r.value.formula);
     }
+    if (isPredicateInput(parsed)) return { kind: 'predicate' as const };
     const table = safeTruthTable(parsed);
     if (!table.ok) return { kind: 'engine' as const, error: table.error };
     return { kind: 'ok' as const, table: table.value, key: texts.join('|') };
@@ -74,6 +76,21 @@ export default function TruthTablesPage() {
             </Notice>
           )}
           {result.kind === 'engine' && <EngineError error={result.error} />}
+          {result.kind === 'predicate' && (
+            <Notice
+              tone="info"
+              title="Truth tables are for sentential logic"
+              actions={
+                <Link to="/countermodels" className="btn btn--primary">
+                  Test it with models
+                </Link>
+              }
+            >
+              This formula uses predicates or quantifiers (like Fx or ∀x). Its truth depends on what the objects in a domain are like, not
+              just on sentence letters being true or false — so it has no truth table. On the Countermodels page you can check arguments
+              with quantifiers and see a model that makes a sentence true or false.
+            </Notice>
+          )}
           {result.kind === 'ok' &&
             (mode === 'auto' ? (
               <>

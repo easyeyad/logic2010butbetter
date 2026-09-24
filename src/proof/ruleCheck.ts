@@ -8,7 +8,7 @@
 import type { Formula } from '../logic/ast';
 import type { LineIssue, RuleId } from './types';
 import { DERIVED_RULE_IDS, isRuleId, ruleLabel } from './rules';
-import { RULE_ARITY, alternativeRules, diagnoseRule, refCountMessage, ruleApplies, type RefF } from './inference';
+import { RULE_ARITY, alternativeRules, diagnoseRule, instanceTerm, refCountMessage, ruleApplies, type RefF } from './inference';
 import { lineList } from './util';
 
 export interface RuleCheckOptions {
@@ -20,13 +20,21 @@ export interface RuleCheckOptions {
   citedLineNumbers?: number[];
   /** Optional lookup of an earlier accessible line containing a formula (sharper suggestions). */
   find?: (f: Formula) => number | undefined;
+  /**
+   * For EI's new-variable restriction: the number of an earlier line on which
+   * variable v occurs (free or bound), or undefined. Without it, the
+   * restriction is not checked (single-step use).
+   */
+  variableOccursOn?: (v: string) => number | undefined;
+  /** For EI feedback: a variable that is new to the derivation, to suggest. */
+  freshVariableHint?: string;
   /** Also list alternative rules when the step is valid (default true; the derivation checker turns it off for speed). */
   alternativesWhenValid?: boolean;
 }
 
 export interface RuleCheckResult {
   ok: boolean;
-  /** Issue code when not ok: 'unknown-rule' | 'rule-not-allowed' | 'missing-refs' | 'ref-count' | 'rule-mismatch'. */
+  /** Issue code when not ok: 'unknown-rule' | 'rule-not-allowed' | 'missing-refs' | 'ref-count' | 'rule-mismatch' | 'ei-variable-not-new'. */
   code?: string;
   /** Student-facing explanation naming the line(s), the rule and why it fails. */
   message?: string;
@@ -75,7 +83,7 @@ export function checkRuleApplication(
       ok: false,
       code: 'unknown-rule',
       message: `Line ${num}: "${rule}" is not a rule of this system.`,
-      suggestion: 'Pick one of MP, MT, DN, R, S, ADJ, ADD, MTP, BC, CB (or a derived rule, if enabled).',
+      suggestion: 'Pick one of MP, MT, DN, R, S, ADJ, ADD, MTP, BC, CB, UI, EG, EI (or a derived rule, if enabled).',
       target: 'rule',
       alternativeRules: [],
     };
@@ -95,6 +103,22 @@ export function checkRuleApplication(
       target: 'rule',
       alternativeRules: alts,
     };
+  }
+  if (applies && rule === 'EI' && opts.variableOccursOn && cited[0].kind === 'exists') {
+    const t = instanceTerm(cited[0], conclusion);
+    if (t && t !== 'vacuous' && t.kind === 'var') {
+      const on = opts.variableOccursOn(t.name);
+      if (on !== undefined) {
+        return {
+          ok: false,
+          code: 'ei-variable-not-new',
+          message: `Line ${num}: EI (Existential Instantiation) must use a variable that is new to the derivation, but ${t.name} already occurs on line ${on}.`,
+          suggestion: `Instantiate to a variable that appears nowhere above${opts.freshVariableHint ? `, e.g. ${opts.freshVariableHint}` : ''}. (Otherwise you would be assuming the "something" is the same thing line ${on} talks about.)`,
+          target: 'formula',
+          alternativeRules: alts,
+        };
+      }
+    }
   }
   if (applies) return { ok: true, alternativeRules: alts };
   if (cited.length === 0) {

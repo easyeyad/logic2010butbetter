@@ -5,13 +5,23 @@ import { EmptyState } from '../../components/EmptyState';
 import { Icon } from '../../components/Icon';
 import { ruleList } from '../../engine/safe';
 import { RuleCard } from './RuleCard';
+import { QUANTIFIER_RULE_IDS } from '../proofs/justification';
 
-type Group = 'all' | RuleInfo['category'];
-const GROUPS: { key: RuleInfo['category']; title: string; blurb: string }[] = [
-  { key: 'primitive', title: 'Primitive rules', blurb: 'The basic inference rules of Logic 2010.' },
+type Cat = 'sentential' | 'quantifier' | 'derived' | 'structural';
+type Group = 'all' | Cat;
+const GROUPS: { key: Cat; title: string; blurb: string }[] = [
+  { key: 'sentential', title: 'Sentential rules', blurb: 'The basic inference rules for ¬ ∧ ∨ → ↔.' },
+  { key: 'quantifier', title: 'Quantifier rules', blurb: 'Instantiating and generalizing ∀ and ∃, and closing a “Show ∀x” box with UD.' },
   { key: 'derived', title: 'Derived rules', blurb: 'Shortcuts provable from the primitive rules. Turn them on in Settings.' },
   { key: 'structural', title: 'Structure: premises, assumptions & closing boxes', blurb: 'How derivations are organized.' },
 ];
+
+/** Reference grouping (the engine's category, with quantifier rules pulled out). */
+function catOf(r: RuleInfo): Cat {
+  if (r.derived || r.category === 'derived') return 'derived';
+  if (QUANTIFIER_RULE_IDS.has(String(r.id))) return 'quantifier';
+  return r.category === 'structural' ? 'structural' : 'sentential';
+}
 
 /** Searchable rule reference. Used full-page and (compact) in the proof side panel. */
 export function RulesPanel({ compact }: { compact?: boolean }) {
@@ -24,7 +34,7 @@ export function RulesPanel({ compact }: { compact?: boolean }) {
   const filtered = useMemo(() => {
     const s = q.trim().toLowerCase();
     return rules.filter((r) => {
-      if (group !== 'all' && r.category !== group) return false;
+      if (group !== 'all' && catOf(r) !== group) return false;
       if (!s) return true;
       return (
         r.abbreviation.toLowerCase().includes(s) ||
@@ -58,7 +68,7 @@ export function RulesPanel({ compact }: { compact?: boolean }) {
           />
         </div>
         <div className="segmented" role="group" aria-label="Filter by category">
-          {(['all', 'primitive', 'derived', 'structural'] as Group[]).map((g) => (
+          {(['all', 'sentential', 'quantifier', 'derived', 'structural'] as Group[]).map((g) => (
             <button key={g} type="button" aria-pressed={group === g} onClick={() => setGroup(g)}>
               {g === 'all' ? 'All' : g[0].toUpperCase() + g.slice(1)}
             </button>
@@ -68,7 +78,7 @@ export function RulesPanel({ compact }: { compact?: boolean }) {
       <p className="visually-hidden" role="status">{filtered.length} rules shown</p>
       {filtered.length === 0 && <p className="subtle">No rules match “{q}”.</p>}
       {GROUPS.map((g) => {
-        const items = filtered.filter((r) => r.category === g.key);
+        const items = filtered.filter((r) => catOf(r) === g.key);
         if (items.length === 0) return null;
         return (
           <section key={g.key} className="rules-group" aria-labelledby={`grp-${g.key}${compact ? '-c' : ''}`}>

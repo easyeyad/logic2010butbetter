@@ -1,4 +1,8 @@
 /** Symbol toolbar definitions and caret-aware insertion (pure text editing). */
+import { ASCII_SYMBOL } from '../../logic';
+
+// The logic engine owns the ASCII spellings; fall back until it publishes quantifier ones.
+const asciiFor = (k: string, fallback: string) => (ASCII_SYMBOL as Record<string, string>)[k] ?? fallback;
 export interface SymbolDef {
   key: string;
   symbol: string;
@@ -7,6 +11,8 @@ export interface SymbolDef {
   /** Shortcut hint shown in tooltips, e.g. "type ~". */
   typed: string;
   binary?: boolean;
+  /** Quantifier / term buttons (shown in predicate mode). */
+  group?: 'quantifier' | 'term';
 }
 
 export const SYMBOLS: SymbolDef[] = [
@@ -17,6 +23,16 @@ export const SYMBOLS: SymbolDef[] = [
   { key: 'iff', symbol: '↔', ascii: '<->', name: 'if and only if (biconditional)', typed: '<->', binary: true },
   { key: 'lparen', symbol: '(', ascii: '(', name: 'open parenthesis', typed: '(' },
   { key: 'rparen', symbol: ')', ascii: ')', name: 'close parenthesis', typed: ')' },
+];
+
+export const QUANTIFIER_SYMBOLS: SymbolDef[] = [
+  { key: 'forall', symbol: '∀', ascii: asciiFor('forall', '@'), name: 'for all (universal quantifier)', typed: asciiFor('forall', '@'), group: 'quantifier' },
+  { key: 'exists', symbol: '∃', ascii: asciiFor('exists', '$'), name: 'there exists (existential quantifier)', typed: asciiFor('exists', '$'), group: 'quantifier' },
+  { key: 'x', symbol: 'x', ascii: 'x', name: 'variable x', typed: 'x', group: 'term' },
+  { key: 'y', symbol: 'y', ascii: 'y', name: 'variable y', typed: 'y', group: 'term' },
+  { key: 'z', symbol: 'z', ascii: 'z', name: 'variable z', typed: 'z', group: 'term' },
+  { key: 'a', symbol: 'a', ascii: 'a', name: 'name a', typed: 'a', group: 'term' },
+  { key: 'b', symbol: 'b', ascii: 'b', name: 'name b', typed: 'b', group: 'term' },
 ];
 
 export function insertAt(

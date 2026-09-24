@@ -21,7 +21,7 @@ export function draft(src: string, extra: Partial<DerivationDraft> = {}): Deriva
     const nums = (s: string) => (s.trim() === '' ? [] : s.split(',').map((x) => Number(x.trim())));
     if (left.startsWith('Show')) {
       const text = left.replace(/^Show\s*/, '');
-      const m = right.match(/^(DD|CD|ID)\s*(.*)$/);
+      const m = right.match(/^(DD|CD|ID|UD)\s*(.*)$/);
       return { id, kind: 'show', text, depth, ...(m ? { close: { method: m[1] as 'DD', refs: nums(m[2]) } } : {}) };
     }
     if (right === 'PR') return { id, kind: 'premise', text: left, depth };

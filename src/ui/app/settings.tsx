@@ -11,6 +11,8 @@ export interface Settings {
   derivedRules: boolean;
   /** Display formulas in ASCII (~ & v -> <->) rather than symbols. */
   asciiDisplay: boolean;
+  /** Predicate logic: show quantifier buttons (∀ ∃, terms) and allow lowercase terms. */
+  predicateMode: boolean;
 }
 
 export const DEFAULT_SETTINGS: Settings = {
@@ -18,6 +20,7 @@ export const DEFAULT_SETTINGS: Settings = {
   motion: 'system',
   derivedRules: false,
   asciiDisplay: false,
+  predicateMode: true,
 };
 
 interface SettingsApi {

@@ -152,7 +152,10 @@ export function RulePicker({
               <li className="picker__empty" role="presentation">No rule matches “{text}”</li>
             );
           })()}
-          {filtered.map((o, i) => (
+          {filtered.map((o, i) => [
+            !text.trim() && (i === 0 || filtered[i - 1].group !== o.group) ? (
+              <li key={`g-${o.group}`} role="presentation" className="picker__group">{o.group}</li>
+            ) : null,
             <li
               key={o.key}
               id={`${id}-opt-${i}`}
@@ -165,8 +168,8 @@ export function RulePicker({
             >
               <span className="picker__abbr">{o.abbr}</span>
               <span className="picker__name">{o.name}</span>
-            </li>
-          ))}
+            </li>,
+          ])}
         </ul>
       )}
     </div>

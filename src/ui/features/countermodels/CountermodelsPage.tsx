@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import type { Formula, ValidityResult } from '../../../logic';
+import type { Formula, PredicateValidityResult, ValidityResult } from '../../../logic';
 import { PageHeader } from '../../app/PageHeader';
 import { useSettings } from '../../app/settings';
 import { Button } from '../../components/Button';
@@ -8,11 +8,13 @@ import { FormulaInput } from '../../components/FormulaInput';
 import { FormulaList } from '../../components/FormulaList';
 import { Icon } from '../../components/Icon';
 import { EngineError, Notice } from '../../components/Notice';
-import { safeAtoms, safeParse, safeValidity } from '../../engine/safe';
+import { isPredicateInput, safeAtoms, safeParse, safePredicateValidity, safeValidity } from '../../engine/safe';
+import { PredicateVerdict } from './PredicateVerdict';
 import { useLocalStorage } from '../../hooks/useLocalStorage';
 import { CounterexampleTable, CountermodelView } from './CountermodelView';
 
 type Outcome =
+  | { kind: 'predicate'; result: PredicateValidityResult; premises: Formula[]; conclusion: Formula }
   | { kind: 'invalid-input'; message: string }
   | { kind: 'engine'; error: string }
   | { kind: 'done'; result: ValidityResult; premises: Formula[]; conclusion: Formula; atoms: string[] };
@@ -21,6 +23,13 @@ const EXAMPLES: { label: string; premises: string[]; conclusion: string }[] = [
   { label: 'Affirming the consequent', premises: ['P → Q', 'Q'], conclusion: 'P' },
   { label: 'Modus tollens', premises: ['P → Q', '¬Q'], conclusion: '¬P' },
   { label: 'Disjunctive syllogism?', premises: ['P ∨ Q', 'P'], conclusion: '¬Q' },
+];
+
+const PREDICATE_EXAMPLES: { label: string; premises: string[]; conclusion: string }[] = [
+  { label: 'All F are G; a is G ∴ a is F', premises: ['∀x(Fx → Gx)', 'Ga'], conclusion: 'Fa' },
+  { label: 'Some F, some G ∴ some F and G', premises: ['∃xFx', '∃xGx'], conclusion: '∃x(Fx ∧ Gx)' },
+  { label: 'Quantifier shift ∀∃ ∴ ∃∀', premises: ['∀x∃yLxy'], conclusion: '∃y∀xLxy' },
+  { label: 'All men are mortal', premises: ['∀x(Mx → Dx)', 'Ms'], conclusion: 'Ds' },
 ];
 
 export default function CountermodelsPage() {
@@ -50,6 +59,11 @@ export default function CountermodelsPage() {
     const rc = safeParse(c);
     if (!rc.ok) return setOutcome({ kind: 'engine', error: rc.error });
     if (!rc.value.ok) return setOutcome({ kind: 'invalid-input', message: `The conclusion isn't well-formed: ${rc.value.error.message}` });
+    if (isPredicateInput([...parsed, rc.value.formula])) {
+      const pr = safePredicateValidity(parsed, rc.value.formula, 4);
+      if (!pr.ok) return setOutcome({ kind: 'engine', error: pr.error });
+      return setOutcome({ kind: 'predicate', result: pr.value, premises: parsed, conclusion: rc.value.formula });
+    }
     const res = safeValidity(parsed, rc.value.formula);
     if (!res.ok) return setOutcome({ kind: 'engine', error: res.error });
     setOutcome({ kind: 'done', result: res.value, premises: parsed, conclusion: rc.value.formula, atoms: safeAtoms([...parsed, rc.value.formula]) });
@@ -59,7 +73,7 @@ export default function CountermodelsPage() {
     <div className="page">
       <PageHeader
         title="Countermodels"
-        description="Is the argument valid? If not, see an assignment of truth values that makes every premise true and the conclusion false."
+        description="Is the argument valid? If not, see a countermodel: truth values (or, with quantifiers, a small world of objects) that make every premise true and the conclusion false."
       />
       <div className="cm-layout">
         <section className="card stack" aria-labelledby="cm-arg-h">
@@ -81,23 +95,28 @@ export default function CountermodelsPage() {
             </div>
             <Button type="submit" variant="primary" icon="scale">Check validity</Button>
           </form>
-          <div className="row">
-            <span className="subtle">Examples:</span>
-            {EXAMPLES.map((ex) => (
-              <button
-                key={ex.label}
-                type="button"
-                className="chip"
-                onClick={() => {
-                  setPremises(ex.premises);
-                  setConclusion(ex.conclusion);
-                  run(ex.premises, ex.conclusion);
-                }}
-              >
-                {ex.label}
-              </button>
-            ))}
-          </div>
+          {[
+            { title: 'Sentential examples', list: EXAMPLES },
+            { title: 'With quantifiers', list: PREDICATE_EXAMPLES },
+          ].map((g) => (
+            <div key={g.title} className="row">
+              <span className="subtle">{g.title}:</span>
+              {g.list.map((ex) => (
+                <button
+                  key={ex.label}
+                  type="button"
+                  className="chip"
+                  onClick={() => {
+                    setPremises(ex.premises);
+                    setConclusion(ex.conclusion);
+                    run(ex.premises, ex.conclusion);
+                  }}
+                >
+                  {ex.label}
+                </button>
+              ))}
+            </div>
+          ))}
         </section>
 
         <section ref={verdictRef} className="stack verdict-section" aria-label="Verdict" aria-live="polite">
@@ -108,6 +127,9 @@ export default function CountermodelsPage() {
           )}
           {outcome?.kind === 'invalid-input' && <Notice tone="warn" title="Check your input">{outcome.message}</Notice>}
           {outcome?.kind === 'engine' && <EngineError error={outcome.error} />}
+          {outcome?.kind === 'predicate' && (
+            <PredicateVerdict result={outcome.result} premises={outcome.premises} conclusion={outcome.conclusion} ascii={settings.asciiDisplay} />
+          )}
           {outcome?.kind === 'done' && outcome.result.valid && (
             <div className="verdict-card verdict-card--valid">
               <div className="verdict-card__title"><Icon name="checkCircle" size={28} /> Valid</div>
