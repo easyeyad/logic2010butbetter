@@ -8,11 +8,12 @@ import { useFormulaTarget } from '../../components/FormulaTarget';
 import { useToast } from '../../components/Toast';
 import { CloseBoxDialog } from './CloseBoxDialog';
 import { containingOpenShow, layoutRails, maxDepthAt } from './draftOps';
-import { justificationOptions } from './justification';
+import { disabledDerivedOptions, justificationOptions } from './justification';
 import type { MenuAction } from './LineMenu';
 import { ProofLineRow, type LineRowHandlers } from './ProofLineRow';
 import { ShortcutsDialog } from './ShortcutsDialog';
 import { matchShortcut, SHORTCUT_LABEL } from './shortcuts';
+import { visibleErrorCount } from './status';
 import type { Field, ProofEditorState } from './useProofEditor';
 
 /** The derivation editor: toolbar, line rows, close-box dialog, keyboard handling. */
@@ -22,6 +23,7 @@ export function ProofEditor({ ed, inlineSymbolBar = true }: { ed: ProofEditorSta
   const [helpOpen, setHelpOpen] = useState(false);
   const { lines, ops, byId, badRefTargets, check } = ed;
   const options = useMemo(() => justificationOptions(ed.allowDerived), [ed.allowDerived]);
+  const unavailable = useMemo(() => disabledDerivedOptions(ed.allowDerived), [ed.allowDerived]);
   const rails = useMemo(() => layoutRails(lines), [lines]);
   const complete = check.ok && check.value.complete;
 
@@ -228,6 +230,7 @@ export function ProofEditor({ ed, inlineSymbolBar = true }: { ed: ProofEditorSta
             lc={byId.get(line.id)}
             rails={rails[i]}
             options={options}
+            unavailable={unavailable}
             focused={ed.focusedId === line.id}
             citedBadlyBy={badRefTargets.get(i + 1)}
             handlers={handlers}
@@ -239,7 +242,7 @@ export function ProofEditor({ ed, inlineSymbolBar = true }: { ed: ProofEditorSta
       </button>
 
       <p className="editor__summary subtle" role="status" aria-live="polite">
-        {check.ok ? check.value.summary : ''}
+        {!check.ok ? '' : complete || visibleErrorCount(lines, check.value.lines) > 0 ? check.value.summary : 'No mistakes so far — keep going.'}
       </p>
 
       <CloseBoxDialog

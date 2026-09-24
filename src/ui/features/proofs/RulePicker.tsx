@@ -1,4 +1,5 @@
 import { useEffect, useId, useMemo, useRef, useState, type KeyboardEvent } from 'react';
+import { useSettings } from '../../app/settings';
 import { exactMatch, filterOptions, type JustOption } from './justification';
 
 /**
@@ -13,6 +14,7 @@ export function RulePicker({
   invalid,
   onKeyDown,
   disabled,
+  unavailable = [],
 }: {
   value: string;
   options: JustOption[];
@@ -21,7 +23,10 @@ export function RulePicker({
   invalid?: boolean;
   onKeyDown?: (e: KeyboardEvent<HTMLInputElement>) => void;
   disabled?: boolean;
+  /** Options that exist but are switched off (derived rules): explained when typed. */
+  unavailable?: JustOption[];
 }) {
+  const { update } = useSettings();
   const id = useId();
   const listId = `${id}-list`;
   const [text, setText] = useState(value);
@@ -126,7 +131,27 @@ export function RulePicker({
       />
       {open && (
         <ul id={listId} ref={listRef} role="listbox" className="picker__list" aria-label={`${label} options`}>
-          {filtered.length === 0 && <li className="picker__empty">No rule matches “{text}”</li>}
+          {filtered.length === 0 && (() => {
+            const off = filterOptions(unavailable, text)[0];
+            return off && text.trim() ? (
+              <li className="picker__empty picker__empty--derived" role="presentation">
+                <span>
+                  <strong>{off.abbr}</strong> ({off.name}) is a derived rule, and derived rules are off.
+                </span>
+                <button
+                  type="button"
+                  className="btn btn--sm"
+                  onMouseDown={(e) => e.preventDefault()}
+                  onClick={() => update({ derivedRules: true })}
+                >
+                  Enable derived rules
+                </button>
+                <span className="subtle">You can change this any time in Settings.</span>
+              </li>
+            ) : (
+              <li className="picker__empty" role="presentation">No rule matches “{text}”</li>
+            );
+          })()}
           {filtered.map((o, i) => (
             <li
               key={o.key}

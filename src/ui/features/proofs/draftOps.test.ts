@@ -44,23 +44,34 @@ test('move swaps lines and their references', () => {
   expect(lines[5].refs).toEqual([1, 4]);
 });
 
-test('new lines go inside an open show box and outside a closed one', () => {
+test('new lines go inside an open show box; closing the last box adds no stray line', () => {
   const ls = base();
   expect(depthAfter(ls, 2)).toBe(1); // after "Show"
   expect(depthAfter(ls, 5)).toBe(1); // inside the open box
   const closed = closeAndContinue(ls, 2, 'CD', [6]);
-  const fresh = closed.lines[closed.lines.length - 1];
   expect(closed.lines[2].close).toEqual({ method: 'CD', refs: [6] });
-  expect(fresh.id).toBe(closed.focusId);
-  expect(fresh.depth).toBe(0);
+  expect(closed.lines).toHaveLength(6);
+  expect(closed.focusId).toBe('3');
 });
 
-test('closing reuses a trailing blank line inside the box', () => {
+test('closing the last box removes a trailing blank line inside it', () => {
   const ls = [...base(), L('b', 'step', '', 1)];
   const r = closeAndContinue(ls, 2, 'CD', [6]);
-  expect(r.lines).toHaveLength(7);
+  expect(r.lines).toHaveLength(6);
+});
+
+test('closing an inner box continues on a line at the outer depth', () => {
+  const ls: DraftLine[] = [
+    L('s0', 'show', 'P → (Q → P)', 0),
+    L('a0', 'assumption', 'P', 1, { assumption: 'CD' }),
+    L('s1', 'show', 'Q → P', 1),
+    L('a1', 'assumption', 'Q', 2, { assumption: 'CD' }),
+    L('r', 'step', 'P', 2, { rule: 'R', refs: [2] }),
+    L('b', 'step', '', 2),
+  ];
+  const r = closeAndContinue(ls, 2, 'CD', [5]);
   expect(r.focusId).toBe('b');
-  expect(r.lines[6].depth).toBe(0);
+  expect(r.lines[5].depth).toBe(1);
 });
 
 test('indent is bounded by the previous line', () => {

@@ -2,7 +2,29 @@ import { useEffect, useRef } from 'react';
 import { DERIVATION_EXERCISES } from '../../../learning';
 import { useDebounced } from '../../hooks/useDebounced';
 import { progressStore } from '../../learning/progress';
-import { proofIdFor, type ProofEditorState } from './useProofEditor';
+import { useFlushOnLeave } from '../../hooks/useFlushOnLeave';
+import { proofIdFor, type ProofDoc, type ProofEditorState } from './useProofEditor';
+
+function saveToList(doc: ProofDoc, complete: boolean) {
+  const worked = doc.lines.some((l) => (l.kind === 'step' || l.kind === 'assumption') && l.text.trim() !== '');
+  if (!worked) return;
+  try {
+    const store = progressStore();
+    const id = proofIdFor(doc.problem);
+    const prev = store.getProof(id);
+    // Skip identical re-saves (the flush often repeats the last debounced save).
+    if (prev && prev.status === (complete ? 'complete' : 'in-progress') && JSON.stringify(prev.draft.lines) === JSON.stringify(doc.lines)) return;
+    store.saveProof({
+      id,
+      title: doc.problem.title,
+      draft: { goal: doc.problem.goal, premises: doc.problem.premises, lines: doc.lines },
+      status: complete ? 'complete' : 'in-progress',
+      exerciseId: DERIVATION_EXERCISES.some((e) => e.id === doc.problem.id) ? doc.problem.id : undefined,
+    });
+  } catch {
+    /* storage problems never break the editor */
+  }
+}
 
 /**
  * Connects the Proofs page to the progress store: saves the proof (debounced,
@@ -18,24 +40,10 @@ export function useProofTracking(ed: ProofEditorState) {
   const complete = ed.check.ok && ed.check.value.complete;
   const hasWork = ed.lines.some((l) => (l.kind === 'step' || l.kind === 'assumption') && l.text.trim() !== '');
 
-  // Save the draft to the proof list.
+  // Save the draft to the proof list (debounced, and flushed when leaving the page).
   const saved = useDebounced(ed.doc, 800);
-  useEffect(() => {
-    const worked = saved.lines.some((l) => (l.kind === 'step' || l.kind === 'assumption') && l.text.trim() !== '');
-    if (!worked) return;
-    try {
-      progressStore().saveProof({
-        id: proofIdFor(saved.problem),
-        title: saved.problem.title,
-        draft: { goal: saved.problem.goal, premises: saved.problem.premises, lines: saved.lines },
-        status: complete ? 'complete' : 'in-progress',
-        exerciseId: DERIVATION_EXERCISES.some((e) => e.id === saved.problem.id) ? saved.problem.id : undefined,
-      });
-    } catch {
-      /* storage problems never break the editor */
-    }
-    // `complete` is read at save time; saving again when it flips is handled by the dependency.
-  }, [saved, complete]);
+  useEffect(() => saveToList(saved, complete), [saved, complete]);
+  useFlushOnLeave({ doc: ed.doc, complete }, (v) => saveToList(v.doc, v.complete));
 
   // Record a completed derivation once per problem load.
   useEffect(() => {

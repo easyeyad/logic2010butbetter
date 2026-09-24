@@ -1,5 +1,8 @@
 import { useState } from 'react';
 import { Button } from '../../components/Button';
+import { Notice } from '../../components/Notice';
+import { safeAtoms, safeParse, safeValidity } from '../../engine/safe';
+import { countermodelNarrative } from '../countermodels/narrative';
 import { FormulaInput } from '../../components/FormulaInput';
 import { FormulaText } from '../../components/FormulaText';
 import { DERIVATION_EXERCISES, type DerivationExercise } from '../../../learning';
@@ -17,16 +20,50 @@ function Sequent({ premises, goal }: { premises: string[]; goal: string }) {
   );
 }
 
+type Verdict = { kind: 'invalid'; text: string } | { kind: 'bad-input'; text: string } | null;
+
+/** Is the entered argument valid? (Invalid arguments have no derivation.) */
+function assess(premises: string[], goal: string): Verdict {
+  const fs = [];
+  for (const [i, p] of premises.entries()) {
+    const r = safeParse(p);
+    if (!r.ok) return null;
+    if (!r.value.ok) return { kind: 'bad-input', text: `Premise ${i + 1} isn't well-formed yet.` };
+    fs.push(r.value.formula);
+  }
+  const g = safeParse(goal);
+  if (!g.ok) return null;
+  if (!g.value.ok) return { kind: 'bad-input', text: "The conclusion isn't well-formed yet." };
+  const v = safeValidity(fs, g.value.formula);
+  if (!v.ok || v.value.valid || !v.value.counterexample) return null;
+  const atoms = safeAtoms([...fs, g.value.formula]);
+  const cm = v.value.counterexample;
+  const assignment = atoms.map((a) => `${a} = ${cm[a] ? 'True' : 'False'}`).join(', ');
+  return {
+    kind: 'invalid',
+    text: `Countermodel: ${assignment}. ${countermodelNarrative(atoms, cm, fs.length)} No derivation of this conclusion exists.`,
+  };
+}
+
 function CustomProblemForm({ onStart }: { onStart: (p: ProofProblem) => void }) {
   const [premises, setPremises] = useState<string[]>(['']);
   const [goal, setGoal] = useState('');
+  const [verdict, setVerdict] = useState<Verdict>(null);
+  const [confirmed, setConfirmed] = useState(false);
+  const start = () => onStart({ id: 'custom', title: 'Your problem', premises: premises.filter((p) => p.trim()), goal });
   return (
     <form
       className="stack stack--sm"
       onSubmit={(e) => {
         e.preventDefault();
         if (!goal.trim()) return;
-        onStart({ id: 'custom', title: 'Your problem', premises: premises.filter((p) => p.trim()), goal });
+        const v = assess(premises.filter((p) => p.trim()), goal);
+        if (v && !(v.kind === 'invalid' && confirmed)) {
+          setVerdict(v);
+          setConfirmed(v.kind === 'invalid');
+          return;
+        }
+        start();
       }}
     >
       {premises.map((p, i) => (
@@ -36,7 +73,11 @@ function CustomProblemForm({ onStart }: { onStart: (p: ProofProblem) => void }) 
             label={`Premise ${i + 1}`}
             value={p}
             toolbar={false}
-            onChange={(t) => setPremises((ps) => ps.map((x, j) => (j === i ? t : x)))}
+            onChange={(t) => {
+              setVerdict(null);
+              setConfirmed(false);
+              setPremises((ps) => ps.map((x, j) => (j === i ? t : x)));
+            }}
           />
           <Button
             variant="ghost"
@@ -52,9 +93,24 @@ function CustomProblemForm({ onStart }: { onStart: (p: ProofProblem) => void }) 
       <Button size="sm" variant="ghost" icon="plus" onClick={() => setPremises((ps) => [...ps, ''])}>
         Add premise
       </Button>
-      <FormulaInput label="Conclusion to show" value={goal} onChange={setGoal} placeholder="e.g. P -> R" />
-      <Button type="submit" variant="primary" icon="play" disabled={!goal.trim()}>
-        Start this proof
+      <FormulaInput
+        label="Conclusion to show"
+        value={goal}
+        onChange={(t) => {
+          setVerdict(null);
+          setConfirmed(false);
+          setGoal(t);
+        }}
+        placeholder="e.g. P -> R"
+      />
+      {verdict?.kind === 'invalid' && (
+        <Notice tone="err" role="alert" title="This argument is invalid — no derivation exists">
+          {verdict.text}
+        </Notice>
+      )}
+      {verdict?.kind === 'bad-input' && <Notice tone="warn" role="alert">{verdict.text}</Notice>}
+      <Button type="submit" variant={verdict?.kind === 'invalid' ? 'danger' : 'primary'} icon="play" disabled={!goal.trim() || verdict?.kind === 'bad-input'}>
+        {verdict?.kind === 'invalid' ? 'Start anyway' : 'Start this proof'}
       </Button>
     </form>
   );

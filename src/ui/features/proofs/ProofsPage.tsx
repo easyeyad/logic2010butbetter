@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { progressStore } from '../../learning/progress';
 import { useProofTracking } from './useProofTracking';
+import { visibleErrorCount } from './status';
 import { useFormulaFocus, useKeepFocusAboveBars } from './useFormulaFocus';
 import { PageHeader } from '../../app/PageHeader';
 import { BottomSheet } from '../../components/BottomSheet';
@@ -22,6 +23,9 @@ function ProofsWorkspace() {
   const target = useFormulaTarget();
   const wide = useMediaQuery(BP.wide);
   const desktop = useMediaQuery(BP.desktop);
+  // The problem gets its own column only on very wide screens; otherwise it is a
+  // collapsible card above the editor so the derivation keeps its width.
+  const huge = useMediaQuery('(min-width: 1600px)');
   const [tab, setTab] = useState<SideTab>('feedback');
   const [overlayOpen, setOverlayOpen] = useState(false);
   const tracking = useProofTracking(ed);
@@ -41,9 +45,7 @@ function ProofsWorkspace() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [openId]);
 
-  const errorCount = ed.check.ok
-    ? ed.check.value.lines.reduce((n, l) => n + l.issues.filter((i) => i.severity === 'error').length, 0)
-    : 0;
+  const errorCount = ed.check.ok ? visibleErrorCount(ed.lines, ed.check.value.lines) : 0;
 
   const load = (p: ProofProblem) => {
     ed.loadProblem(p);
@@ -77,7 +79,7 @@ function ProofsWorkspace() {
   useKeepFocusAboveBars('.proofs__editor', layout === 'one');
 
   return (
-    <div className={`proofs proofs--${layout}`}>
+    <div className={`proofs proofs--${layout} ${huge ? 'proofs--problem-col' : ''}`}>
       <PageHeader
         title="Proofs"
         description={layout === 'one' ? undefined : 'Build a Logic 2010-style derivation. Each line is checked as you type.'}
@@ -91,9 +93,9 @@ function ProofsWorkspace() {
         }
       />
       <div className="proofs__grid">
-        <aside className="proofs__problem" aria-label="Problem">
-          <ProblemPanel problem={ed.doc.problem} onLoad={load} collapsible={layout === 'one'} />
-        </aside>
+        <section className="proofs__problem" aria-label="Problem">
+          <ProblemPanel problem={ed.doc.problem} onLoad={load} collapsible={!huge} />
+        </section>
         <div className="proofs__editor">
           <ProofEditor ed={ed} inlineSymbolBar={layout !== 'one'} />
         </div>

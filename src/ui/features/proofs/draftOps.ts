@@ -261,6 +261,12 @@ export function closeAndContinue(
 ): { lines: DraftLine[]; focusId: string } {
   const show = lines[idx];
   let out = closeShow(lines, idx, method, refs);
+  // Nothing left to prove (no open Show line): don't leave a stray empty line behind.
+  if (!out.some((l) => l.kind === 'show' && !l.close)) {
+    let end = out.length;
+    while (end > idx + 1 && isBlank(out[end - 1])) end--;
+    return { lines: out.slice(0, end), focusId: show.id };
+  }
   let end = idx + 1;
   while (end < out.length && out[end].depth > show.depth) end++;
   if (end < out.length) return { lines: out, focusId: out[end].id };
@@ -272,4 +278,12 @@ export function closeAndContinue(
   }
   const fresh = blankLine(depth);
   return { lines: [...out, fresh], focusId: fresh.id };
+}
+
+/**
+ * A line the student hasn't written anything in yet (any kind but premise):
+ * its "missing formula / missing rule" issues are pending, not mistakes.
+ */
+export function isUntouched(line: DraftLine): boolean {
+  return line.kind !== 'premise' && line.text.trim() === '' && !line.rule && !(line.refs && line.refs.length) && !line.close;
 }

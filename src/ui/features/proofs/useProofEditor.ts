@@ -5,6 +5,7 @@ import { safeCheckDerivation, type Safe } from '../../engine/safe';
 import { useDebounced } from '../../hooks/useDebounced';
 import { readStored, writeStored } from '../../hooks/storage';
 import { useUndoable } from '../../hooks/useUndoable';
+import { useFlushOnLeave } from '../../hooks/useFlushOnLeave';
 import {
   applyJustKey,
   blankLine,
@@ -115,6 +116,9 @@ export function useProofEditor(opts: ProofEditorOptions = {}) {
   useEffect(() => {
     if (storageKey) writeStored(storageKey, saved);
   }, [saved, storageKey]);
+  useFlushOnLeave(doc, (d) => {
+    if (storageKey) writeStored(storageKey, d);
+  });
 
   // Live checking, debounced ~120ms.
   const checkedDraft = useDebounced(draft, 120);

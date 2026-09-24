@@ -2,7 +2,7 @@ import { memo } from 'react';
 import type { DraftLine, LineCheck } from '../../../proof';
 import { FormulaInput } from '../../components/FormulaInput';
 import { Icon } from '../../components/Icon';
-import { justKeyOf, type RailInfo } from './draftOps';
+import { isUntouched, justKeyOf, type RailInfo } from './draftOps';
 import type { JustOption } from './justification';
 import { LineMenu, type MenuAction } from './LineMenu';
 import { RefsInput } from './RefsInput';
@@ -24,18 +24,21 @@ interface Props {
   lc?: LineCheck;
   rails: RailInfo[];
   options: JustOption[];
+  /** Switched-off derived rules (explained if typed). */
+  unavailable?: JustOption[];
   focused: boolean;
   /** Line numbers of lines that cite this one incorrectly. */
   citedBadlyBy?: number[];
   handlers: LineRowHandlers;
 }
 
-export const ProofLineRow = memo(function ProofLineRow({ line, index, lc, rails, options, focused, citedBadlyBy, handlers }: Props) {
+export const ProofLineRow = memo(function ProofLineRow({ line, index, lc, rails, options, unavailable, focused, citedBadlyBy, handlers }: Props) {
   const n = index + 1;
   const status = lineStatus(line, lc);
   const meta = STATUS_META[status];
-  const issues = (lc?.issues ?? []).filter((i) => i.code !== 'parse-error' || !line.text.trim());
-  const errors = issues.filter((i) => i.severity === 'error');
+  const untouched = isUntouched(line);
+  // Parse errors are shown by the formula field itself (with the exact span); untouched lines are pending.
+  const issues = untouched ? [] : (lc?.issues ?? []).filter((i) => i.code !== 'parse-error' || !line.text.trim());
   const target = (t: string) => issues.some((i) => i.severity === 'error' && i.target === t);
   const inClosedBox = lc?.boxed ?? rails.some((r) => r.closed);
   const isShow = line.kind === 'show';
@@ -118,6 +121,7 @@ export const ProofLineRow = memo(function ProofLineRow({ line, index, lc, rails,
             <RulePicker
               value={justKeyOf(line)}
               options={options}
+              unavailable={unavailable}
               onChange={(k) => handlers.onJust(line.id, k)}
               label={`Line ${n} justification`}
               invalid={target('rule')}
@@ -168,7 +172,7 @@ export const ProofLineRow = memo(function ProofLineRow({ line, index, lc, rails,
                 deps: {lc.dependsOn.join(', ')}
               </span>
               {lc.justification && <span className="subtle">Justification: {lc.justification}</span>}
-              {errors.length === 0 && issues.length === 0 && <span className="subtle">No problems on this line.</span>}
+              {lc.ok && lc.issues.length === 0 && <span className="subtle">No problems on this line.</span>}
             </div>
           )}
         </div>

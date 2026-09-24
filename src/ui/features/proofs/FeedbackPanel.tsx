@@ -2,6 +2,7 @@ import type { DerivationCheck, DraftLine, LineIssue } from '../../../proof';
 import { Icon } from '../../components/Icon';
 import { EngineError, Notice } from '../../components/Notice';
 import type { Safe } from '../../engine/safe';
+import { isUntouched } from './draftOps';
 
 function IssueItem({ issue, lineNo, onGo }: { issue: LineIssue; lineNo?: number; onGo?: () => void }) {
   const icon = issue.severity === 'error' ? 'xCircle' : issue.severity === 'warning' ? 'alert' : 'info';
@@ -32,10 +33,11 @@ export function FeedbackPanel({ check, lines, onGoTo }: { check: Safe<Derivation
   const c = check.value;
   const lineIssues = c.lines.flatMap((lc) =>
     lc.issues
-      .filter((iss) => !(iss.code === 'parse-error' && lines[lc.number - 1] && lines[lc.number - 1].text.trim() === '' && lines[lc.number - 1].kind === 'step' && !lines[lc.number - 1].rule))
+      .filter(() => !(lines[lc.number - 1] && isUntouched(lines[lc.number - 1])))
       .map((iss, k) => ({ iss, lc, k })),
   );
   const errors = lineIssues.filter((x) => x.iss.severity === 'error').length;
+  const pending = c.lines.filter((lc) => lines[lc.number - 1] && isUntouched(lines[lc.number - 1])).length;
 
   return (
     <div className="stack">
@@ -44,7 +46,9 @@ export function FeedbackPanel({ check, lines, onGoTo }: { check: Safe<Derivation
       ) : errors > 0 ? (
         <Notice tone="err" title={`${errors} problem${errors === 1 ? '' : 's'} to fix`}>{c.summary}</Notice>
       ) : (
-        <Notice tone="info" title="No errors so far">{c.summary}</Notice>
+        <Notice tone="info" title="No mistakes so far">
+          {pending > 0 ? 'Keep going — fill in the empty line to continue.' : c.summary}
+        </Notice>
       )}
       {(c.globalIssues.length > 0 || lineIssues.length > 0) && (
         <ul className="issues">

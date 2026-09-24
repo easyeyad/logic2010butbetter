@@ -1,0 +1,46 @@
+/*
+ * Touch targets: at least 44×44px wherever a coarse pointer is likely
+ * (touch screens, and any viewport below 1024px). Where the visual size
+ * should stay compact, the hit area grows via padding instead.
+ */
+@media (pointer: coarse), (max-width: 1023px) {
+  .btn, .btn--sm { min-height: var(--touch); }
+  .btn--icon, .btn--sm.btn--icon { width: var(--touch); min-width: var(--touch); }
+  .line__iconbtn { width: var(--touch); height: var(--touch); }
+  .picker__input, .refs__input { min-height: var(--touch); }
+  .segmented button { min-height: var(--touch); min-width: var(--touch); }
+  .tabs__tab { min-height: var(--touch); }
+  .symbar__btn { min-width: var(--touch); height: var(--touch); }
+  .symbar--compact .symbar__btn { height: var(--touch); min-width: var(--touch); }
+  .chip, button.chip { min-height: var(--touch); }
+  .fi--compact .fi__input, .fi--compact textarea.fi__input { min-height: var(--touch); }
+  .fi--compact textarea.fi__input { padding-top: 11px; padding-bottom: 11px; }
+  .nav-link, .problem-item, .level__summary, .sym-item, .more-list__item { min-height: var(--touch); }
+  .toast__action, .toast__close { min-height: var(--touch); min-width: var(--touch); }
+  .dot { width: var(--touch); height: var(--touch); }
+  .charpick__c { min-height: var(--touch); min-width: 30px; }
+  .charpick__c--conn { min-width: var(--touch); }
+  .valtoggle__opt { min-height: var(--touch); }
+  .menu__item { min-height: var(--touch); }
+  .disclosure { min-height: var(--touch); }
+  .rule__more summary { min-height: var(--touch); }
+  .onboarding__link { min-height: var(--touch); }
+  /* Inline text links used as navigation get a taller hit area without changing layout much. */
+  .text-link { display: inline-flex; align-items: center; min-height: var(--touch); padding: 0 var(--sp-1); }
+  /* Settings switch: bigger track, whole label row is clickable. */
+  .switch input { width: 48px; height: 28px; margin-top: 8px; }
+  .switch input::after { width: 22px; height: 22px; }
+  .switch input:checked::after { transform: translateX(20px); }
+  .switch { min-height: var(--touch); }
+  .editor__tools .btn { min-height: var(--touch); }
+}
+
+/* Proof-line fields: the same clear 2–3px focus ring used elsewhere. */
+.fi--compact .fi__box:focus-within { box-shadow: 0 0 0 1px var(--c-surface), 0 0 0 3px var(--c-accent); }
+.fi--compact .fi__box.is-invalid:focus-within { box-shadow: 0 0 0 1px var(--c-surface), 0 0 0 3px var(--c-err); }
+.picker__input:focus-visible, .refs__input:focus-visible { box-shadow: 0 0 0 1px var(--c-surface), 0 0 0 3px var(--c-accent); }
+.line__iconbtn:focus-visible, .line__closebtn:focus-visible { box-shadow: var(--focus-ring); }
+
+@media (max-width: 767px) {
+  .rail--start::after { width: 5px; }
+}

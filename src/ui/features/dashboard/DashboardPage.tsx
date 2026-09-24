@@ -103,7 +103,7 @@ function ProgressSnapshot() {
       <section aria-labelledby="snap-h">
         <div className="row row--between">
           <h2 id="snap-h" className="section-h">Your progress</h2>
-          <Link to="/progress" className="subtle">See all progress →</Link>
+          <Link to="/progress" className="subtle text-link">See all progress →</Link>
         </div>
         <div className="stat-row stat-row--cards">
           <div className="stat card"><span className="stat__value">{v.streak.current}</span><span className="stat__label">Day streak{v.streak.practicedToday ? ' · practiced today' : ''}</span></div>
@@ -130,7 +130,7 @@ function ProgressSnapshot() {
         <section className="card stack" aria-labelledby="dash-proofs-h">
           <div className="row row--between">
             <h2 id="dash-proofs-h" className="continue__title">Recent proofs</h2>
-            <Link to="/proofs" className="subtle">Proof editor →</Link>
+            <Link to="/proofs" className="subtle text-link">Proof editor →</Link>
           </div>
           {proofs.ok && proofs.value.length > 0 ? (
             <ul className="saved-proofs saved-proofs--compact">

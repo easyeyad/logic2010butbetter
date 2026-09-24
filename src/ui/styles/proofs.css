@@ -1,8 +1,14 @@
 /* ---------- Proofs page layout ---------- */
 .proofs { max-width: 1600px; margin: 0 auto; min-width: 0; }
 .proofs__grid { display: grid; gap: var(--sp-5); align-items: start; min-width: 0; }
-.proofs--three .proofs__grid { grid-template-columns: 230px minmax(0, 1fr) 320px; }
-.proofs--two .proofs__grid { grid-template-columns: 220px minmax(0, 1fr); }
+.proofs__grid { grid-template-areas: "problem" "editor"; }
+.proofs__problem { grid-area: problem; }
+.proofs__editor { grid-area: editor; }
+.proofs__side { grid-area: side; }
+.proofs--three .proofs__grid { grid-template-columns: minmax(0, 1fr) 300px; grid-template-areas: "problem side" "editor side"; grid-template-rows: auto 1fr; }
+.proofs--three.proofs--problem-col .proofs__grid { grid-template-columns: 240px minmax(0, 1fr) 300px; grid-template-areas: "problem editor side"; grid-template-rows: auto; }
+.proofs--two .proofs__grid { grid-template-columns: minmax(0, 1fr); gap: var(--sp-3); }
+.proofs--three:not(.proofs--problem-col) .proofs__grid { row-gap: var(--sp-3); }
 .proofs--one .proofs__grid { grid-template-columns: minmax(0, 1fr); gap: var(--sp-3); }
 .proofs--one { padding-bottom: 80px; }
 .proofs__editor, .proofs__problem { min-width: 0; }
@@ -47,7 +53,7 @@
   font-size: var(--fs-lg); color: var(--c-text-3); text-align: left; gap: var(--sp-2);
 }
 .disclosure .panel-h { margin: 0; }
-.proofs--one .problem-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); }
+.problem--card .problem-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); }
 .row--top { align-items: flex-start; flex-wrap: nowrap; }
 .row__trail { margin-top: 28px; flex: none; }
 
@@ -211,7 +217,9 @@
     column-gap: var(--sp-1);
   }
   .line + .line { border-top: 1px solid color-mix(in srgb, var(--c-border) 60%, transparent); border-radius: 0; }
-  .line__num { width: 1.9rem; padding-right: 6px; }
+  .line__num { width: 1.6rem; padding-right: 5px; }
+  .line__show { font-size: 10px; padding: 3px 4px; letter-spacing: 0; }
+  .line__status { width: 20px; }
   .line__just { padding: 2px 0 2px var(--sp-2); width: auto; }
   .picker__list { left: 0; right: auto; }
   .line__msgs { padding-left: var(--sp-2); }
@@ -279,3 +287,4 @@
 .level__name { flex: 1; }
 .level__count { font-weight: 500; color: var(--c-text-3); font-size: var(--fs-xs); }
 .level .problem-list { padding: var(--sp-1) 0 var(--sp-2); }
+.picker__empty--derived { display: flex; flex-direction: column; align-items: flex-start; gap: var(--sp-2); color: var(--c-text); }

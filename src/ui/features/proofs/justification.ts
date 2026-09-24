@@ -88,3 +88,11 @@ export function exactMatch(options: JustOption[], query: string): JustOption | u
   if (!q) return undefined;
   return options.find((o) => o.abbr.toLowerCase().replace(/\s+/g, '') === q);
 }
+
+/** Derived rules that are switched off (for the picker's "enable in Settings" message). */
+export function disabledDerivedOptions(allowDerived: boolean): JustOption[] {
+  if (allowDerived) return [];
+  const all = justificationOptions(true);
+  const on = new Set(justificationOptions(false).map((o) => o.key));
+  return all.filter((o) => !on.has(o.key));
+}

@@ -80,7 +80,7 @@
   --sidebar-w: 240px;
   --rail-w: 72px;
   --tabbar-h: 60px;
-  --indent: 22px;
+  --indent: 18px;
 
   --dur: 160ms;
   --ease: cubic-bezier(0.2, 0.7, 0.2, 1);
@@ -91,7 +91,7 @@
 }
 
 @media (max-width: 767px) {
-  :root { --indent: 12px; }
+  :root { --indent: 10px; }
 }
 
 /* Dark theme values, applied in two places below. */
