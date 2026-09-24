@@ -134,12 +134,13 @@ const HINT_TIME_MS = 300;
  * hint-follower regress forever).
  */
 function continueProof(an: Analysis, t: number): { lines: DraftLine[]; origN: number } | null {
-  return continueBudget(an, t, 2500) ?? continueBudget(an, t, 12000);
+  const deadline = Date.now() + HINT_TIME_MS;
+  return continueBudget(an, t, 2500, deadline) ?? continueBudget(an, t, 12000, deadline);
 }
 
-function continueBudget(an: Analysis, t: number, budget: number): { lines: DraftLine[]; origN: number } | null {
-  const strict = continueWith(an, t, true, budget);
-  const lenient = continueWith(an, t, false, budget);
+function continueBudget(an: Analysis, t: number, budget: number, deadline: number): { lines: DraftLine[]; origN: number } | null {
+  const strict = continueWith(an, t, true, budget, deadline);
+  const lenient = continueWith(an, t, false, budget, deadline);
   if (!lenient) return strict;
   const first = lenient.lines[lenient.origN];
   const open = new Set<string>();
@@ -150,10 +151,12 @@ function continueBudget(an: Analysis, t: number, budget: number): { lines: Draft
   return lenient.lines.length < strict.lines.length ? lenient : strict;
 }
 
-function continueWith(an: Analysis, t: number, strict: boolean, budget: number): { lines: DraftLine[]; origN: number } | null {
+function continueWith(an: Analysis, t: number, strict: boolean, budget: number, deadline: number): { lines: DraftLine[]; origN: number } | null {
   const G = an.formulas[t]!;
   const n = an.lines.length;
-  const p = new Prover({ maxLines: budget, strictNesting: strict, timeBudgetMs: HINT_TIME_MS });
+  const remaining = deadline - Date.now();
+  if (remaining <= 0) return null;
+  const p = new Prover({ maxLines: budget, strictNesting: strict, timeBudgetMs: remaining });
   p.out = an.lines.map((l) => ({ ...l, refs: l.refs ? [...l.refs] : undefined, close: l.close ? { ...l.close, refs: [...l.close.refs] } : undefined }));
   p.outF = [...an.formulas];
   for (const a of accessibleFor(an, t)) p.addAvail(a.f, a.n);

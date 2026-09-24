@@ -238,6 +238,13 @@ describe('solve (monadic)', () => {
     [['∃xFx ∨ ∃xGx'], '∃x(Fx ∨ Gx)'],
     [['Fa', '∀x(Fx → Gx)'], 'Ga'],
     [['∀x(Fx → Gx)', '¬Ga'], '¬Fa'],
+    [['∀x(Fx → Gx)'], '∀xFx → ∀xGx'],
+    [['∃xFx → P'], '∀x(Fx → P)'],
+    [['∃x(Fx ∧ ¬Gx)', '∀x(Hx → Gx)'], '∃x(Fx ∧ ¬Hx)'],
+    [['¬∃x(Fx ∧ Gx)'], '∀x(Fx → ¬Gx)'],
+    [['∀x(Fx ↔ Gx)'], '∀xFx ↔ ∀xGx'],
+    [['∃x∀yRxy'], '∀y∃xRxy'],
+    [[], '∃x(Fx → ∀yFy)'],
   ];
   for (const [ps, g] of problems) {
     it(`${ps.join(', ')} ⊢ ${g}`, () => {
@@ -252,6 +259,7 @@ describe('solve (monadic)', () => {
     const t0 = performance.now();
     expect(solve([F('∃xFx')], F('∀xFx'))).toBeNull();
     expect(solve([F('∀x(Fx → Gx)'), F('∃xGx')], F('∃xFx'))).toBeNull();
+    expect(solve([F('∀x∃yRxy')], F('∃y∀xRxy'))).toBeNull();
     expect(performance.now() - t0).toBeLessThan(2000);
   });
 });
@@ -265,6 +273,14 @@ function apply(d: DerivationDraft, h: HintLine): DerivationDraft {
   else lines.push({ id, kind: 'step', text: h.text, depth: h.depth!, rule: h.rule as RuleId, refs: h.refs });
   return { ...d, lines };
 }
+
+describe('bounded search', () => {
+  it('never hangs: a hard time budget is respected', () => {
+    const t0 = performance.now();
+    solve([F('∀x∀y∀z((Rxy ∧ Ryz) → Rxz)'), F('∀x∃yRxy'), F('∀x¬Rxx')], F('∃x∃y∃z(Rxy ∧ (Ryz ∧ ¬Rzx))'), { timeBudgetMs: 300 });
+    expect(performance.now() - t0).toBeLessThan(3000);
+  });
+});
 
 describe('quantifier hints', () => {
   it('universal goal → UD strategy', () => {

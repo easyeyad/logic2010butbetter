@@ -643,7 +643,7 @@ export function analyze(draft: DerivationDraft): Analysis {
         );
       } else {
         const bad = udViolation({ lines, formulas, parent, closed }, s, inBox);
-        if (bad)
+        if (bad !== null)
           push(
             'close-ud-restriction',
             `Line ${num}: UD (Universal Derivation) can't generalize on ${g.variable} here: ${g.variable} occurs free in line ${bad + 1} (${fmt(formulas[bad]!)}), which is available above the Show line. That line says something special about ${g.variable}, so ${g.variable} isn't arbitrary.`,

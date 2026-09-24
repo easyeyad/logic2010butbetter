@@ -521,17 +521,26 @@ export class Prover {
     const x = op.variable;
     const target = Exists(x, Not(op.body));
     if (this.has(target) !== undefined) return false;
-    const r = this.showID(target, (show, asmOuter) => {
-      const u = this.box(Forall(x, op.body), 'UD', (s2) => {
+    /** ∀xφ by UD, from a line m that is ¬∃x¬φ. */
+    const universal = (m: number): number | null =>
+      this.box(Forall(x, op.body), 'UD', (s2) => {
         if (this.avail.some((a) => a.n < s2 && freeIn(a.f, x))) return null;
         const l = this.showID(op.body, (s3) => {
           const nb = this.getOrDN(Not(op.body));
           if (nb === undefined) return null;
           const e = this.step(target, 'EG', [nb]);
-          return [e, this.ensureIn(asmOuter, s3)];
+          return [e, this.ensureIn(m, s3)];
         });
         return l === null ? null : [this.ensureIn(l, s2)];
       });
+    const negTarget = this.has(Not(target));
+    if (negTarget !== undefined) {
+      // Already inside an ID box for ∃x¬φ: ∀xφ contradicts ¬∀xφ directly.
+      if (this.has(Forall(x, op.body)) !== undefined) return false;
+      return universal(negTarget) !== null;
+    }
+    const r = this.showID(target, (show, asmOuter) => {
+      const u = universal(asmOuter);
       return u === null ? null : [u, this.ensureIn(nNeg, show)];
     });
     return r !== null;
