@@ -385,3 +385,34 @@ describe('WFF diagnosis wording (review round 1)', () => {
       }
   });
 });
+
+describe('inference-rule drill: quantifier and identity rules (phase 4)', () => {
+  it('covers UI, EG, EI (level 3+) and LL, SM (level 4+), still with exactly one justifying rule', () => {
+    const seen = new Set<string>();
+    for (const d of [3, 4, 5] as Difficulty[])
+      for (let s = 0; s < 150; s++) {
+        const ex = generateInferenceRule(d, s, 'identify');
+        seen.add(ex.rule);
+        expect(rulesJustifying(ex.lines.map(parseOrThrow), parseOrThrow(ex.conclusion))).toEqual([ex.rule]);
+        if (['UI', 'EG', 'EI'].includes(ex.rule)) expect(ex.prompt).toMatch(/new to the derivation/);
+      }
+    for (const r of ['UI', 'EG', 'EI', 'LL', 'SM']) expect([r, seen.has(r)]).toEqual([r, true]);
+    for (let s = 0; s < 50; s++) expect(['UI', 'EG', 'EI', 'LL', 'SM', 'QN', 'AV']).not.toContain(generateInferenceRule(2, s, 'identify').rule);
+  });
+
+  it('EI apply: rejects names and reused variables, accepts a new variable', () => {
+    let ex;
+    for (let s = 0; s < 400 && !ex; s++) {
+      const e = generateInferenceRule(4, s, 'apply');
+      if (e.rule === 'EI') ex = e;
+    }
+    expect(ex).toBeDefined();
+    const cited = parseOrThrow(ex!.lines[0]);
+    if (cited.kind !== 'exists') throw new Error('expected ∃');
+    const v = cited.variable;
+    expect(checkAnswer(ex!, { kind: 'inference-rule', formula: ex!.conclusion }).correct).toBe(true);
+    const body = ex!.lines[0].slice(ex!.lines[0].indexOf(v) + 1).trim();
+    const withName = body.replace(new RegExp(`(?<![a-z])${v}(?![a-z])`, 'g'), 'c').replace(/^\((.*)\)$/, '$1');
+    expect(checkAnswer(ex!, { kind: 'inference-rule', formula: withName }).correct).toBe(false);
+  });
+});

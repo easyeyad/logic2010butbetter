@@ -360,3 +360,62 @@ describe('review round 3 fixes', () => {
     expect(h.join(' ')).toMatch(/MP/);
   });
 });
+
+describe('identity (phase 4)', () => {
+  const idItems = PREDICATE_SYMBOLIZATION_EXERCISES.filter((e) => e.tags.includes('identity'));
+
+  it('has at least 15 identity symbolization items at difficulty 3–5', () => {
+    expect(idItems.length).toBeGreaterThanOrEqual(15);
+    for (const e of idItems) expect(e.difficulty).toBeGreaterThanOrEqual(3);
+    for (const e of idItems) expect(parseOrThrow(e.answer)).toBeDefined();
+  });
+
+  it('diagnoses a missing x ≠ y in "at least two"', () => {
+    const fb = check('pid-07', '∃x∃y((Sx ∧ Px) ∧ (Sy ∧ Py))');
+    expect(fb.code).toBe('missing-distinctness');
+    expect(fb.explanation).toMatch(/DIFFERENT/);
+  });
+
+  it('diagnoses "only a" without the uniqueness clause', () => {
+    const fb = check('pid-05', 'Pa');
+    expect(fb.code).toBe('missing-uniqueness');
+    expect(fb.headline).toMatch(/Only Alice/);
+  });
+
+  it('diagnoses "exactly one" written as "at least one"', () => {
+    const fb = check('pid-09', '∃x(Sx ∧ Px)');
+    expect(fb.code).toBe('missing-uniqueness');
+    expect(fb.headline).toMatch(/Exactly one/);
+  });
+
+  it('accepts the ≠ spelling and equivalent forms', () => {
+    expect(check('pid-03', '∃x(Lax ∧ x ≠ a)').correct).toBe(true);
+    expect(check('pid-08', '¬∃x∃y(((Sx ∧ Px) ∧ (Sy ∧ Py)) ∧ x ≠ y)').correct).toBe(true);
+  });
+
+  it('identity derivations: at least 6, valid, proved by the prover when it can', () => {
+    const ids = QUANTIFIER_DERIVATION_EXERCISES.filter((e) => e.tags.includes('identity'));
+    expect(ids.length).toBeGreaterThanOrEqual(6);
+    for (const ex of ids) {
+      expect([ex.id, findModel(ex.premises.map(parseOrThrow), [parseOrThrow(ex.goal)], { maxDomain: 4 }).status]).toEqual([ex.id, 'none-up-to-limit']);
+      const lines = solve(ex.premises.map(parseOrThrow), parseOrThrow(ex.goal));
+      if (lines) expect([ex.id, checkDerivation({ goal: ex.goal, lines }).complete]).toEqual([ex.id, true]);
+    }
+  });
+
+  it('identity model and countermodel material', () => {
+    const forms = INVALID_PREDICATE_FORMS.filter((x) => /=/.test(x.conclusion + x.premises.join()));
+    expect(forms.length).toBeGreaterThanOrEqual(4);
+    let sawIdentity = false;
+    for (let s = 0; s < 60; s++) {
+      const ex = generateModelExercise(5, s);
+      if (ex.formula.includes('=') || ex.formula.includes('≠')) sawIdentity = true;
+    }
+    expect(sawIdentity).toBe(true);
+  });
+
+  it('identity terminology is in the bank', () => {
+    const ids = PREDICATE_TERMINOLOGY_EXERCISES.filter((e) => e.concept === 'identity');
+    expect(ids.length).toBeGreaterThanOrEqual(5);
+  });
+});

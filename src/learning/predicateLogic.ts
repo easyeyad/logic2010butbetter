@@ -690,8 +690,8 @@ const MODEL_TEMPLATES: Record<Difficulty, string[]> = {
   1: ['∀xFx', '∃xFx', '¬∃xFx', 'Fa', '∃x¬Fx', '¬∀xFx'],
   2: ['∀x(Fx → Gx)', '∃x(Fx ∧ Gx)', '∀x(Fx → ¬Gx)', '∃x(Fx ∧ ¬Gx)', 'Fa → ∀xGx', 'Fa ∧ ¬Ga'],
   3: ['∀x(Fx ∨ Gx)', '∃xFx → ∃xGx', '∀x(Fx → Gx) ∧ Fa', '¬∀x(Fx → Gx)', 'Rab', '∃xRax', '∀xRxb'],
-  4: ['∀x∃yRxy', '∃x∀yRxy', '∀xRxx', '∃x(Fx ∧ ∀yRxy)', '∀x(Fx → ∃yRxy)', '∃y∀xRxy'],
-  5: ['∀x∀y(Rxy → Ryx)', '∃x∃y(Rxy ∧ ¬Ryx)', '∀x(Fx → ∃y(Gy ∧ Rxy))', '∃y∀x(Fx → Rxy)', '∀x∃y(Rxy ∧ Fy)', '∀x(∃yRxy → Fx)'],
+  4: ['∀x∃yRxy', '∃x∀yRxy', '∀xRxx', '∃x(Fx ∧ ∀yRxy)', '∀x(Fx → ∃yRxy)', '∃y∀xRxy', 'a = b', '∃x(Fx ∧ ¬(x = a))', 'Fa ∧ ∀x(Fx → x = a)'],
+  5: ['∀x∀y(Rxy → Ryx)', '∃x∃y(Rxy ∧ ¬Ryx)', '∀x(Fx → ∃y(Gy ∧ Rxy))', '∃y∀x(Fx → Rxy)', '∀x∃y(Rxy ∧ Fy)', '∀x(∃yRxy → Fx)', '∃x∃y((Fx ∧ Fy) ∧ ¬(x = y))', '∃x(Fx ∧ ∀y(Fy → y = x))', '∀x∃y(Rxy ∧ ¬(x = y))'],
 };
 
 const MODEL_KEY: PredicateKeyEntry[] = [P('F', 1, 'x is red'), P('G', 1, 'x is round'), P('R', 2, 'x points to y'), Nm('a', 'Ann'), Nm('b', 'Ben')];
@@ -799,6 +799,12 @@ export const INVALID_PREDICATE_FORMS: PredicateArgumentForm[] = [
   { name: 'Serial to named loop', premises: ['∀x(Fx → ∃yRxy)', 'Fa'], conclusion: 'Raa', difficulty: 4, note: '{a} relates to something — not necessarily to itself.' },
   { name: 'Symmetry to reflexivity', premises: ['∀x∀y(Rxy → Ryx)', 'Rab'], conclusion: 'Raa', difficulty: 5, note: 'Symmetry gives {R}{b}{a}, not {R}{a}{a}.' },
   { name: 'One universal relater', premises: ['∃x∀yRxy'], conclusion: '∀xRxx', difficulty: 5, note: 'Only the special object must relate to itself.' },
+  // identity
+  { name: 'Distinct names', premises: ['Fa', 'Gb'], conclusion: '¬(a = b)', difficulty: 3, note: '{a} and {b} may name the same object.' },
+  { name: 'Some F, so only a', premises: ['Fa'], conclusion: '∀x(Fx → x = a)', difficulty: 3, note: 'Other things besides {a} may be {F} too.' },
+  { name: 'Two somes make two', premises: ['∃xFx', '∃xGx'], conclusion: '∃x∃y((Fx ∧ Gy) ∧ ¬(x = y))', difficulty: 4, note: 'The {F} and the {G} may be one and the same object.' },
+  { name: 'At least one to exactly one', premises: ['∃xFx'], conclusion: '∃x(Fx ∧ ∀y(Fy → y = x))', difficulty: 4, note: 'There may be two or more {F}s.' },
+  { name: 'Different, so unrelated', premises: ['¬(a = b)', 'Fa'], conclusion: '¬Fb', difficulty: 5, note: 'Different objects can share properties.' },
 ];
 
 /** Rename predicate letters and names throughout a formula. */

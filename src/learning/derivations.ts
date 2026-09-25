@@ -336,6 +336,15 @@ const QUANTIFIER_PROBLEMS: Problem[] = [
   { id: 'qder-16', title: 'Disjunction of universals', difficulty: 4, strategy: 'UD', premises: ['∀xFx ∨ ∀xGx'], goal: '∀x(Fx ∨ Gx)', tags: ['UD', 'ID'], hints: ['UD on the goal; inside, Show Fx ∨ Gx by ID, assuming ¬(Fx ∨ Gx).', 'Show ¬Fx and ¬Gx (each by ID with ADD). Then Show ¬∀xFx; MTP on the premise gives ∀xGx, whose instance Gx contradicts ¬Gx.'], solution: [] },
   { id: 'qder-17', title: 'Existential over ∨', difficulty: 4, strategy: 'ID', premises: ['∃x(Fx ∨ Gx)'], goal: '∃xFx ∨ ∃xGx', tags: ['EI', 'EG', 'ID'], hints: ['Assume the negation of the goal for ID, and EI the premise: Fy ∨ Gy (y new).', 'Show ¬∃xFx and ¬∃xGx (ID with ADD), then ¬Fy and ¬Gy (ID with EG); MTP on Fy ∨ Gy gives the contradiction.'], solution: [] },
   { id: 'qder-18', title: 'Not all, so some not', difficulty: 5, strategy: 'ID', premises: ['¬∀xFx'], goal: '∃x¬Fx', tags: ['ID', 'UD', 'EG'], hints: ['Assume ¬∃x¬Fx for ID and aim to derive ∀xFx.', 'Show ∀xFx by UD: Show Fx by ID — assuming ¬Fx gives ∃x¬Fx by EG.'], solution: [] },
+  // identity (rules Id, LL, SM)
+  { id: 'qder-19', title: "Leibniz's law", difficulty: 3, strategy: 'DD', premises: ['a = b', 'Fa'], goal: 'Fb', tags: ['identity', 'LL'], hints: ['Identicals share every property: substitute b for a in Fa.', 'LL with the identity a = b and Fa gives Fb.'], solution: [] },
+  { id: 'qder-20', title: 'Symmetry of identity', difficulty: 3, strategy: 'DD', premises: ['a = b'], goal: 'b = a', tags: ['identity', 'SM'], hints: ['Identity is symmetric.', 'SM turns a = b into b = a.'], solution: [] },
+  { id: 'qder-21', title: 'Transitivity of identity', difficulty: 4, strategy: 'DD', premises: ['a = b', 'b = c'], goal: 'a = c', tags: ['identity', 'LL'], hints: ['Use LL to substitute in one identity using the other.', 'In a = b, replace b by c using b = c (LL).'], solution: [] },
+  { id: 'qder-22', title: 'Different properties, different objects', difficulty: 4, strategy: 'ID', premises: ['Fa', '¬Fb'], goal: '¬(a = b)', tags: ['identity', 'ID', 'LL'], hints: ['The goal is a negation: assume a = b for ID.', 'With a = b, LL turns Fa into Fb, contradicting ¬Fb.'], solution: [] },
+  { id: 'qder-23', title: 'Everything is self-identical', difficulty: 4, strategy: 'UD', premises: [], goal: '∀x(x = x)', tags: ['identity', 'Id', 'UD'], hints: ['UD: Show x = x for arbitrary x.', 'Id gives x = x with no premises.'], solution: [] },
+  { id: 'qder-24', title: 'Naming a witness', difficulty: 4, strategy: 'DD', premises: ['Fa'], goal: '∃x(Fx ∧ x = a)', tags: ['identity', 'Id', 'EG'], hints: ['Build an instance Fa ∧ a = a and generalize.', 'Id gives a = a; ADJ gives Fa ∧ a = a; EG on the first a.'], solution: [] },
+  { id: 'qder-25', title: 'Only one thing', difficulty: 5, strategy: 'DD', premises: ['∀x(x = a)'], goal: 'b = c', tags: ['identity', 'UI', 'LL'], hints: ['Instantiate the premise to b and to c.', 'b = a and c = a; SM and LL give b = c.'], solution: [] },
+  { id: 'qder-26', title: 'Uniqueness', difficulty: 5, strategy: 'DD', premises: ['∃x(Fx ∧ ∀y(Fy → y = x))', 'Fa', 'Fb'], goal: 'a = b', tags: ['identity', 'EI', 'UI', 'LL'], hints: ['EI the premise to a new variable z: Fz ∧ ∀y(Fy → y = z).', 'UI to a and b gives a = z and b = z; combine them with SM and LL.'], solution: [] },
 ];
 
 function toExercise(p: Problem, topic: DerivationExercise['topic'] = 'derivation'): DerivationExercise {
@@ -405,6 +414,7 @@ const STRATEGY_HINT: Record<string, string> = {
   atom: 'Your goal is a sentence letter: see if MP, MTP or S can produce it directly from the premises; if not, try ID (assume its negation).',
   pred: 'Your goal is a single predication: instantiate the universal premises to its terms with UI, then use the sentential rules; if that stalls, try ID.',
   forall: 'Your goal is universal: use Universal Derivation (UD) — Show the formula for an arbitrary variable (one not free in any open assumption or premise) and close with UD.',
+  identity: 'Your goal is an identity: Id gives t = t outright; otherwise combine the identities you have with SM (symmetry) and LL (substitution of identicals).',
   exists: 'Your goal is existential: derive an instance of it (with a name or variable) and use EG. If a premise is existential, EI it first, to a new variable.',
 };
 
