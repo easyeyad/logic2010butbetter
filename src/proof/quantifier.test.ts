@@ -108,8 +108,12 @@ describe('quantifier rule feedback', () => {
   it('UI on a line whose main connective is not ∀', () => {
     const r = checkRuleApplication('UI', [F('∀xFx → P')], F('Fa → P'));
     expect(r.ok).toBe(false);
-    expect(r.message).toContain('main connective of the whole line');
-    expect(r.message).toContain('the main connective is →');
+    expect(r.message).toBe('Line 2: UI (Universal Instantiation) applies only when ∀ is the main connective of the whole line. In line 1 (∀x Fx → P) the main connective is →; the ∀ covers only part of the formula.');
+    expect(r.suggestion).toBe('To use this conditional, derive its antecedent ∀x Fx first and apply MP.');
+    const r2 = checkRuleApplication('UI', [F('P → ∀xFx')], F('P → Fa'));
+    expect(r2.suggestion).toContain('apply MP to get ∀x Fx on its own line; then apply UI');
+    const r3 = checkRuleApplication('UI', [F('¬∀xFx')], F('¬Fa'));
+    expect(r3.suggestion).toContain('QN');
   });
 
   it('UI vs EI confusion is named, with the alternative', () => {
@@ -124,7 +128,9 @@ describe('quantifier rule feedback', () => {
   it('EI to a name is a classic error', () => {
     const r = checkRuleApplication('EI', [F('∃xFx')], F('Fa'));
     expect(r.ok).toBe(false);
-    expect(r.message).toContain('new VARIABLE, not to the name a');
+    expect(r.message).toBe('Line 2: EI (Existential Instantiation) must instantiate to a new VARIABLE, not to the name a. From ∃x Fx you only know that something is F — not that it is a.');
+    const r2 = checkRuleApplication('EI', [F('∃x(Fx ∧ Gx)')], F('Fa ∧ Ga'));
+    expect(r2.message).toContain('something satisfies Fx ∧ Gx — not that it is a');
   });
 
   it('EG generalizes some occurrences; ∀ needs UD', () => {

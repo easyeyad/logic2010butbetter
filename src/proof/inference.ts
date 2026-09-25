@@ -743,6 +743,43 @@ function containsQuantifier(f: Formula, kind: 'forall' | 'exists'): boolean {
   }
 }
 
+/**
+ * How to say that a thing satisfies the open formula body (free variable v):
+ * "is F" for a simple one-place predication Fv, else "satisfies Fx ∧ Gx".
+ */
+export function describeOpen(body: Formula, v: string): string {
+  if (body.kind === 'pred' && body.args.length === 1 && body.args[0].kind === 'var' && body.args[0].name === v) return `is ${body.name}`;
+  if (body.kind === 'not' && body.operand.kind === 'pred' && body.operand.args.length === 1 && body.operand.args[0].kind === 'var' && body.operand.args[0].name === v)
+    return `is not ${body.operand.name}`;
+  return `satisfies ${F(body)}`;
+}
+
+/** Advice for using a line whose main connective is not the quantifier the rule needs. */
+function quantifierInsideAdvice(f: Formula, q: '∀' | '∃', rule: 'UI' | 'EI'): string {
+  const then = `then apply ${rule} to that line`;
+  switch (f.kind) {
+    case 'implies':
+      return containsQuantifier(f.left, q === '∀' ? 'forall' : 'exists') && !containsQuantifier(f.right, q === '∀' ? 'forall' : 'exists')
+        ? `To use this conditional, derive its antecedent ${F(f.left)} first and apply MP.`
+        : `To use this conditional, derive its antecedent ${F(f.left)} and apply MP to get ${F(f.right)} on its own line; ${then}.`;
+    case 'and':
+      return `Use S to get the quantified conjunct on its own line; ${then}.`;
+    case 'or':
+      return `A disjunction is used with MTP (with the negation of one disjunct), not by instantiating inside it.`;
+    case 'iff':
+      return `Take a conditional out with BC first.`;
+    case 'not':
+      return f.operand.kind === 'forall' || f.operand.kind === 'exists'
+        ? `A negated quantifier is not a quantifier. With derived rules on, QN turns ${F(f)} into ${F(f.operand.kind === 'forall' ? Exists(f.operand.variable, Not(f.operand.body)) : Forall(f.operand.variable, Not(f.operand.body)))}; otherwise use it in an ID proof.`
+        : `A negation can't be instantiated; use it in an ID proof or with MT/MTP.`;
+    case 'atom':
+    case 'pred':
+    case 'forall':
+    case 'exists':
+      return `Cite a line whose main connective is ${q}.`;
+  }
+}
+
 function diagInstantiation(rule: 'UI' | 'EI', n: number, [a]: RefF[], c: Formula): Diagnosis {
   const want = rule === 'UI' ? 'forall' : 'exists';
   const q = rule === 'UI' ? '∀' : '∃';
@@ -762,11 +799,9 @@ function diagInstantiation(rule: 'UI' | 'EI', n: number, [a]: RefF[], c: Formula
     const inside = containsQuantifier(a.f, want);
     return {
       message: inside
-        ? `Line ${n}: ${rule} works only when ${q} is the main connective of the whole line. In ${Ld(a)} the main connective is ${mainSymbol(a.f)}, and the ${q} covers only part of the formula.`
+        ? `Line ${n}: ${rule} applies only when ${q} is the main connective of the whole line. In ${Ld(a)} the main connective is ${mainSymbol(a.f)}; the ${q} covers only part of the formula.`
         : `Line ${n}: ${rule} applies to ${what}, but ${Ld(a)} is ${mainIs(a.f)}.`,
-      suggestion: inside
-        ? `Break line ${a.n} apart with the sentential rules first (e.g. MP, S) so the quantified part stands on its own line.`
-        : `Cite a line whose main connective is ${q}.`,
+      suggestion: inside ? quantifierInsideAdvice(a.f, q, rule) : `Cite a line whose main connective is ${q}.`,
       badRefs: [a.n],
       target: 'refs',
     };
@@ -775,7 +810,7 @@ function diagInstantiation(rule: 'UI' | 'EI', n: number, [a]: RefF[], c: Formula
   const t = instanceTerm(Q, c);
   if (rule === 'EI' && t !== null && t !== 'vacuous' && t.kind === 'name') {
     return {
-      message: `Line ${n}: EI must instantiate to a new VARIABLE, not to the name ${t.name}. From ${F(a.f)} you only know that something is ${F(Q.body)} — not that ${t.name} is.`,
+      message: `Line ${n}: EI must instantiate to a new VARIABLE, not to the name ${t.name}. From ${F(a.f)} you only know that something ${describeOpen(Q.body, Q.variable)} — not that it is ${t.name}.`,
       suggestion: 'Use a variable that occurs nowhere above (e.g. y or z) instead of a name.',
       target: 'formula',
     };
