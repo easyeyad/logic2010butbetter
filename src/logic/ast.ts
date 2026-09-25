@@ -13,6 +13,10 @@
  *  - Quantifiers: ∀x φ and ∃x φ. The quantifier binds the variable in the
  *    immediately following formula, exactly like ¬: ∀x Fx → Gx means
  *    (∀x Fx) → Gx; write ∀x(Fx → Gx) for the wide scope.
+ *  - Identity: t1 = t2 between two terms (Logic 2010's identity chapter).
+ *    It is atomic (like a predication) and has no extension to interpret:
+ *    it is true exactly when both terms denote the same object. `≠` is
+ *    notation for the negation: a ≠ b is ¬(a = b).
  *  - Formulas may contain free variables (open formulas) — Logic 2010
  *    derivations use them (EI instantiates to a new variable; UD
  *    generalizes on one). A SENTENCE is a formula with no free variables.
@@ -27,6 +31,7 @@ export type Term =
 export type Formula =
   | { kind: 'atom'; name: string }
   | { kind: 'pred'; name: string; args: Term[] }
+  | { kind: 'identity'; left: Term; right: Term }
   | { kind: 'not'; operand: Formula }
   | { kind: 'and'; left: Formula; right: Formula }
   | { kind: 'or'; left: Formula; right: Formula }
@@ -48,6 +53,7 @@ export const Iff = (left: Formula, right: Formula): Formula => ({ kind: 'iff', l
 export const Var = (name: string): Term => ({ kind: 'var', name });
 export const Name = (name: string): Term => ({ kind: 'name', name });
 export const Pred = (name: string, ...args: Term[]): Formula => ({ kind: 'pred', name, args });
+export const Identity = (left: Term, right: Term): Formula => ({ kind: 'identity', left, right });
 export const Forall = (variable: string, body: Formula): Formula => ({ kind: 'forall', variable, body });
 export const Exists = (variable: string, body: Formula): Formula => ({ kind: 'exists', variable, body });
 
@@ -60,12 +66,15 @@ export const SYMBOL = {
   iff: '↔',
   forall: '∀',
   exists: '∃',
+  identity: '=',
+  nonIdentity: '≠',
 } as const;
 
 /** Human names used in feedback text. */
 export const CONNECTIVE_NAME: Record<Formula['kind'], string> = {
   atom: 'sentence letter',
   pred: 'atomic predication',
+  identity: 'identity statement',
   not: 'negation',
   and: 'conjunction',
   or: 'disjunction',
@@ -93,6 +102,7 @@ export function isPredicateFormula(f: Formula): boolean {
     case 'atom':
       return false;
     case 'pred':
+    case 'identity':
     case 'forall':
     case 'exists':
       return true;
@@ -120,6 +130,10 @@ export function equals(a: Formula, b: Formula): boolean {
     case 'pred': {
       const bb = b as typeof a;
       return a.name === bb.name && a.args.length === bb.args.length && a.args.every((t, i) => termEquals(t, bb.args[i]));
+    }
+    case 'identity': {
+      const bb = b as typeof a;
+      return termEquals(a.left, bb.left) && termEquals(a.right, bb.right);
     }
     case 'not':
       return equals(a.operand, (b as typeof a).operand);
