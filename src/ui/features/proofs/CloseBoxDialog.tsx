@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import type { CloseMethod, DerivationDraft } from '../../../proof';
 import { Button } from '../../components/Button';
 import { Dialog } from '../../components/Dialog';
@@ -11,11 +11,33 @@ const METHODS: { m: CloseMethod; name: string; fallback: string }[] = [
   { m: 'DD', name: 'Direct derivation', fallback: 'The formula you are showing appears on an earlier line inside the box.' },
   { m: 'CD', name: 'Conditional derivation', fallback: 'You assumed the antecedent (ASS CD) and derived the consequent inside the box.' },
   { m: 'ID', name: 'Indirect derivation', fallback: 'You assumed the opposite (ASS ID) and derived a formula and its negation inside the box.' },
-  { m: 'UD', name: 'Universal derivation', fallback: 'To show ∀x φ: derive φ for a variable that is not free in any line the box depends on, then close with UD.' },
+  { m: 'UD', name: 'Universal derivation', fallback: 'To show ∀x φ: derive φ (with x free) inside the box, where x is not free in any line above the Show line that is still available; then close with UD.' },
 ];
 
-/** Choose DD/CD/ID and the cited lines to close a show line's box. */
-export function CloseBoxDialog({
+/** Choose DD/CD/ID/UD and the cited lines to close a show line's box. */
+export function CloseBoxDialog(props: {
+  open: boolean;
+  index: number;
+  draft: DerivationDraft;
+  onCancel: () => void;
+  onConfirm: (method: CloseMethod, refs: number[]) => void;
+}) {
+  // Mount fresh on every open so the suggested method is selected (and focused) from the start.
+  if (!props.open || !props.draft.lines[props.index]) return null;
+  return <CloseBoxForm key={`${props.index}-${props.draft.lines[props.index].id}`} {...props} />;
+}
+
+function initialChoice(draft: DerivationDraft, index: number): { method: CloseMethod; refs: string; suggested: boolean } {
+  const s = safeSuggestClose(draft);
+  if (s && s.showLine === index + 1) return { method: s.method, refs: formatRefs(s.refs), suggested: true };
+  const line = draft.lines[index];
+  const first = draft.lines[index + 1];
+  if (first?.kind === 'assumption') return { method: first.assumption ?? 'CD', refs: '', suggested: false };
+  if (/^\s*[∀@]/.test(line.text)) return { method: 'UD', refs: '', suggested: false };
+  return { method: 'DD', refs: '', suggested: false };
+}
+
+function CloseBoxForm({
   open,
   index,
   draft,
@@ -29,26 +51,10 @@ export function CloseBoxDialog({
   onConfirm: (method: CloseMethod, refs: number[]) => void;
 }) {
   const line = draft.lines[index];
-  const [method, setMethod] = useState<CloseMethod>('DD');
-  const [refsText, setRefsText] = useState('');
-  const [suggested, setSuggested] = useState(false);
-
-  useEffect(() => {
-    if (!open || !line) return;
-    const s = safeSuggestClose(draft);
-    if (s && s.showLine === index + 1) {
-      setMethod(s.method);
-      setRefsText(formatRefs(s.refs));
-      setSuggested(true);
-    } else {
-      // Sensible default from the box's first line.
-      const first = draft.lines[index + 1];
-      setMethod(first?.kind === 'assumption' ? (first.assumption ?? 'CD') : 'DD');
-      setRefsText('');
-      setSuggested(false);
-    }
-    // Only when the dialog opens.
-  }, [open, index]);
+  const [init] = useState(() => initialChoice(draft, index));
+  const [method, setMethod] = useState<CloseMethod>(init.method);
+  const [refsText, setRefsText] = useState(init.refs);
+  const suggested = init.suggested;
 
   if (!line) return null;
   const refs = parseRefs(refsText);
@@ -116,7 +122,7 @@ export function CloseBoxDialog({
                 : method === 'CD'
                   ? 'Cite the line where you derived the consequent.'
                   : method === 'UD'
-                    ? 'Cite the line with the instance φ (for a new variable) that you generalize.'
+                    ? 'Cite the line with the instance φ you generalize; its variable must not be free in any still-available line above the Show line.'
                   : 'Cite the line where you derived the formula.'}
           </span>
         </div>

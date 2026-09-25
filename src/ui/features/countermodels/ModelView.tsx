@@ -45,14 +45,14 @@ export function ModelView({ model }: { model: Interpretation }) {
   return (
     <div className="model">
       <section className="model__sec">
-        <h4 className="panel-h">Domain</h4>
+        <h3 className="panel-h">Domain</h3>
         <DomainChips size={n} names={model.names} />
         {names.length > 0 && (
           <p className="model__names">
             {names.map(([k, v], i) => (
               <span key={k}>
                 {i > 0 && ' · '}
-                <span className="math">{k}</span> names object {obj(v)}
+                <span className="math">{k}</span> names {obj(v)}
               </span>
             ))}
           </p>
@@ -60,10 +60,10 @@ export function ModelView({ model }: { model: Interpretation }) {
       </section>
       {preds.map(([name, p]) => (
         <section key={name} className="model__sec">
-          <h4 className="panel-h">
+          <h3 className="panel-h">
             <span className="math model__pname">{name}</span>
             {p.arity === 0 ? ' (sentence letter)' : p.arity === 1 ? ' (property)' : p.arity === 2 ? ' (relation)' : ` (${p.arity}-place)`}
-          </h4>
+          </h3>
           {p.arity === 0 && 'value' in p ? (
             <span className={`truth-pill truth-pill--${p.value ? 't' : 'f'}`}>
               <Icon name={p.value ? 'check' : 'x'} size={14} />

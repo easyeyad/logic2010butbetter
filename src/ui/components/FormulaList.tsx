@@ -13,12 +13,15 @@ export function FormulaList({
   labelFor,
   addLabel = 'Add formula',
   min = 1,
+  invalidRows,
 }: {
   values: string[];
   onChange: (v: string[]) => void;
   labelFor: (i: number) => string;
   addLabel?: string;
   min?: number;
+  /** Rows flagged by a whole-argument check (e.g. inconsistent predicate arity). */
+  invalidRows?: Set<number>;
 }) {
   const refs = useRef<(FormulaInputHandle | null)[]>([]);
   const [focusRow, setFocusRow] = useState<number | null>(null);
@@ -52,6 +55,7 @@ export function FormulaList({
             className="grow"
             label={labelFor(i)}
             value={v}
+            invalid={invalidRows?.has(i)}
             onChange={(t) => setAt(i, t)}
             toolbar={i === values.length - 1}
           />

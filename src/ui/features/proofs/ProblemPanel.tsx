@@ -1,7 +1,8 @@
 import { useState } from 'react';
 import { Button } from '../../components/Button';
 import { Notice } from '../../components/Notice';
-import { safeAtoms, safeParse, safeValidity } from '../../engine/safe';
+import { isPredicateInput, safeAtoms, safeParse, safeValidity } from '../../engine/safe';
+import { checkPredicateArgument, describeModelInWords } from '../../engine/predicateCheck';
 import { countermodelNarrative } from '../countermodels/narrative';
 import { FormulaInput } from '../../components/FormulaInput';
 import { FormulaText } from '../../components/FormulaText';
@@ -35,6 +36,15 @@ function assess(premises: string[], goal: string): Verdict {
   const g = safeParse(goal);
   if (!g.ok) return null;
   if (!g.value.ok) return { kind: 'bad-input', text: "The conclusion isn't well-formed yet." };
+  if (isPredicateInput([...fs, g.value.formula])) {
+    const r = checkPredicateArgument(fs, g.value.formula, 4);
+    if (r.kind === 'input-problems') return { kind: 'bad-input', text: r.problems.map((p) => p.message).join(' ') };
+    if (r.kind !== 'invalid') return null;
+    return {
+      kind: 'invalid',
+      text: `Countermodel: ${describeModelInWords(r.model).join(' ')} In this world every premise is true and the conclusion is false, so no derivation of this conclusion exists.`,
+    };
+  }
   const v = safeValidity(fs, g.value.formula);
   if (!v.ok || v.value.valid || !v.value.counterexample) return null;
   const atoms = safeAtoms([...fs, g.value.formula]);

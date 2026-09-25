@@ -1,5 +1,6 @@
 import type { Interpretation } from '../../../../logic';
 import { Icon } from '../../../components/Icon';
+import { RadioButtons } from '../../../components/RadioButtons';
 
 type Ext = Record<string, number[][] | boolean>;
 
@@ -65,26 +66,28 @@ export function ModelBuilder({
     <div className="builder">
       <div className="field">
         <span className="field__label" id="dom-size">Domain size</span>
-        <div className="segmented" role="radiogroup" aria-labelledby="dom-size">
-          {Array.from({ length: maxSize }, (_, i) => i + 1).map((k) => (
-            <button key={k} type="button" role="radio" aria-checked={n === k} onClick={() => onChange({ ...state, size: k })}>
-              {k} object{k === 1 ? '' : 's'}
-            </button>
-          ))}
-        </div>
+        <RadioButtons<number>
+          labelledBy="dom-size"
+          value={n}
+          onChange={(k) => onChange({ ...state, size: k })}
+          options={Array.from({ length: maxSize }, (_, i) => ({ value: i + 1, label: `${i + 1} object${i ? 's' : ''}` }))}
+        />
       </div>
 
       {Object.keys(state.names).length > 0 && (
         <div className="builder__sec">
           <div className="field__label">Names</div>
           {Object.keys(state.names).sort().map((nm) => (
-            <div key={nm} className="builder__row" role="radiogroup" aria-label={`${nm} names object…`}>
-              <span className="builder__sym math">{nm} =</span>
-              {objs.map((i) => (
-                <button key={i} type="button" role="radio" aria-checked={Math.min(state.names[nm], n - 1) === i} className="objbtn" onClick={() => onChange({ ...state, names: { ...state.names, [nm]: i } })}>
-                  {obj(i)}
-                </button>
-              ))}
+            <div key={nm} className="builder__row">
+              <span className="builder__sym math" aria-hidden="true">{nm} =</span>
+              <RadioButtons<number>
+                className="builder__row"
+                buttonClassName="objbtn"
+                label={`${nm} names object`}
+                value={Math.min(state.names[nm], n - 1)}
+                onChange={(i) => onChange({ ...state, names: { ...state.names, [nm]: i } })}
+                options={objs.map((i) => ({ value: i, label: obj(i), ariaLabel: `object ${obj(i)}` }))}
+              />
             </div>
           ))}
         </div>
@@ -97,13 +100,21 @@ export function ModelBuilder({
             {p.arity === 0 ? '(sentence letter)' : p.arity === 1 ? '— tap the objects that are ' + p.name : '— tap the pairs ⟨x, y⟩ in the relation'}
           </div>
           {p.arity === 0 ? (
-            <div className="builder__row" role="radiogroup" aria-label={`${p.name} is`}>
-              {[true, false].map((b) => (
-                <button key={String(b)} type="button" role="radio" aria-checked={Boolean(state.ext[p.name]) === b} className={`valtoggle__opt valtoggle__opt--${b ? 't' : 'f'}`} onClick={() => onChange({ ...state, ext: { ...state.ext, [p.name]: b } })}>
-                  <Icon name={b ? 'check' : 'x'} size={14} /> {b ? 'True' : 'False'}
-                </button>
-              ))}
-            </div>
+            <RadioButtons<boolean>
+              className="builder__row"
+              label={`${p.name} is`}
+              value={Boolean(state.ext[p.name])}
+              onChange={(b) => onChange({ ...state, ext: { ...state.ext, [p.name]: b } })}
+              options={[true, false].map((b) => ({
+                value: b,
+                className: `valtoggle__opt valtoggle__opt--${b ? 't' : 'f'}`,
+                label: (
+                  <>
+                    <Icon name={b ? 'check' : 'x'} size={14} /> {b ? 'True' : 'False'}
+                  </>
+                ),
+              }))}
+            />
           ) : p.arity === 1 ? (
             <div className="builder__row">
               {objs.map((i) => {

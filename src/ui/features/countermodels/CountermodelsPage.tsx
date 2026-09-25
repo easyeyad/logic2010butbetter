@@ -1,5 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
-import type { Formula, PredicateValidityResult, ValidityResult } from '../../../logic';
+import type { Formula, ValidityResult } from '../../../logic';
+import { useSearchParams } from 'react-router-dom';
+import { checkPredicateArgument, type PredicateCheck } from '../../engine/predicateCheck';
 import { PageHeader } from '../../app/PageHeader';
 import { useSettings } from '../../app/settings';
 import { Button } from '../../components/Button';
@@ -8,13 +10,13 @@ import { FormulaInput } from '../../components/FormulaInput';
 import { FormulaList } from '../../components/FormulaList';
 import { Icon } from '../../components/Icon';
 import { EngineError, Notice } from '../../components/Notice';
-import { isPredicateInput, safeAtoms, safeParse, safePredicateValidity, safeValidity } from '../../engine/safe';
+import { isPredicateInput, safeAtoms, safeParse, safeValidity } from '../../engine/safe';
 import { PredicateVerdict } from './PredicateVerdict';
 import { useLocalStorage } from '../../hooks/useLocalStorage';
 import { CounterexampleTable, CountermodelView } from './CountermodelView';
 
 type Outcome =
-  | { kind: 'predicate'; result: PredicateValidityResult; premises: Formula[]; conclusion: Formula }
+  | { kind: 'predicate'; result: PredicateCheck; premises: Formula[]; conclusion: Formula }
   | { kind: 'invalid-input'; message: string }
   | { kind: 'engine'; error: string }
   | { kind: 'done'; result: ValidityResult; premises: Formula[]; conclusion: Formula; atoms: string[] };
@@ -39,6 +41,22 @@ export default function CountermodelsPage() {
   const [outcome, setOutcome] = useState<Outcome | null>(null);
   const [showAll, setShowAll] = useState(false);
   const verdictRef = useRef<HTMLElement>(null);
+  // Fields at fault (arity conflicts, free variables): premise row indexes, and the conclusion.
+  const [bad, setBad] = useState<{ rows: Set<number>; conclusion: boolean }>({ rows: new Set(), conclusion: false });
+  const clearBad = () => setBad((b) => (b.rows.size || b.conclusion ? { rows: new Set(), conclusion: false } : b));
+
+  // ?conclusion=… (e.g. from Truth Tables): test that sentence on its own.
+  const [params, setParams] = useSearchParams();
+  const fromParam = params.get('conclusion');
+  useEffect(() => {
+    if (!fromParam) return;
+    const ps = (params.get('premises') ?? '').split('\n').filter((x) => x.trim());
+    setPremises(ps.length ? ps : ['']);
+    setConclusion(fromParam);
+    setParams({}, { replace: true });
+    setTimeout(() => run(ps, fromParam), 0);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [fromParam]);
 
   // On stacked layouts, bring the verdict into view after checking.
   useEffect(() => {
@@ -47,7 +65,10 @@ export default function CountermodelsPage() {
 
   const run = (ps = premises, c = conclusion) => {
     setShowAll(false);
-    const texts = ps.map((p) => p.trim()).filter(Boolean);
+    clearBad();
+    const rowsOf: number[] = [];
+    ps.forEach((p, i) => p.trim() && rowsOf.push(i));
+    const texts = rowsOf.map((i) => ps[i].trim());
     const parsed: Formula[] = [];
     for (const [i, t] of texts.entries()) {
       const r = safeParse(t);
@@ -60,9 +81,12 @@ export default function CountermodelsPage() {
     if (!rc.ok) return setOutcome({ kind: 'engine', error: rc.error });
     if (!rc.value.ok) return setOutcome({ kind: 'invalid-input', message: `The conclusion isn't well-formed: ${rc.value.error.message}` });
     if (isPredicateInput([...parsed, rc.value.formula])) {
-      const pr = safePredicateValidity(parsed, rc.value.formula, 4);
-      if (!pr.ok) return setOutcome({ kind: 'engine', error: pr.error });
-      return setOutcome({ kind: 'predicate', result: pr.value, premises: parsed, conclusion: rc.value.formula });
+      const pr = checkPredicateArgument(parsed, rc.value.formula, 4);
+      if (pr.kind === 'input-problems') {
+        const idx = pr.problems.flatMap((p) => p.inputs);
+        setBad({ rows: new Set(idx.filter((i) => i < parsed.length).map((i) => rowsOf[i])), conclusion: idx.includes(parsed.length) });
+      }
+      return setOutcome({ kind: 'predicate', result: pr, premises: parsed, conclusion: rc.value.formula });
     }
     const res = safeValidity(parsed, rc.value.formula);
     if (!res.ok) return setOutcome({ kind: 'engine', error: res.error });
@@ -87,11 +111,26 @@ export default function CountermodelsPage() {
           >
             <fieldset className="plain-fieldset">
               <legend className="field__label">Premises</legend>
-              <FormulaList values={premises} onChange={setPremises} labelFor={(i) => `Premise ${i + 1}`} addLabel="Add premise" min={0} />
+              <FormulaList
+                values={premises}
+                onChange={(v) => {
+                  clearBad();
+                  setPremises(v);
+                }}
+                invalidRows={bad.rows} labelFor={(i) => `Premise ${i + 1}`} addLabel="Add premise" min={0} />
             </fieldset>
             <div className="concl">
               <span className="concl__therefore" aria-hidden="true">∴</span>
-              <FormulaInput className="grow" label="Conclusion" value={conclusion} onChange={setConclusion} />
+              <FormulaInput
+                className="grow"
+                label="Conclusion"
+                value={conclusion}
+                invalid={bad.conclusion}
+                onChange={(t) => {
+                  clearBad();
+                  setConclusion(t);
+                }}
+              />
             </div>
             <Button type="submit" variant="primary" icon="scale">Check validity</Button>
           </form>
@@ -132,7 +171,7 @@ export default function CountermodelsPage() {
           )}
           {outcome?.kind === 'done' && outcome.result.valid && (
             <div className="verdict-card verdict-card--valid">
-              <div className="verdict-card__title"><Icon name="checkCircle" size={28} /> Valid</div>
+              <h2 className="verdict-card__title"><Icon name="checkCircle" size={28} /> Valid</h2>
               <p>
                 No row makes all the premises true and the conclusion false; checked {outcome.result.rowsChecked} row
                 {outcome.result.rowsChecked === 1 ? '' : 's'}.
@@ -146,7 +185,7 @@ export default function CountermodelsPage() {
           )}
           {outcome?.kind === 'done' && !outcome.result.valid && outcome.result.counterexample && (
             <div className="verdict-card verdict-card--invalid">
-              <div className="verdict-card__title"><Icon name="xCircle" size={28} /> Invalid</div>
+              <h2 className="verdict-card__title"><Icon name="xCircle" size={28} /> Invalid</h2>
               <p className="subtle">
                 {outcome.result.counterexamples.length} of {outcome.result.rowsChecked} rows {outcome.result.counterexamples.length === 1 ? 'is a counterexample' : 'are counterexamples'}. Here is one:
               </p>

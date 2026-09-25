@@ -1,9 +1,10 @@
 import { Link } from 'react-router-dom';
-import type { Formula, PredicateValidityResult } from '../../../logic';
+import type { Formula } from '../../../logic';
 import { FormulaText } from '../../components/FormulaText';
 import { Icon } from '../../components/Icon';
-import { Notice } from '../../components/Notice';
-import { safeDescribeInterpretation, safeEvaluateIn, safeFormat } from '../../engine/safe';
+import { EngineError, Notice } from '../../components/Notice';
+import { describeModelInWords, type PredicateCheck } from '../../engine/predicateCheck';
+import { safeEvaluateIn, safeFormat } from '../../engine/safe';
 import { ModelView } from './ModelView';
 
 /**
@@ -18,23 +19,40 @@ export function PredicateVerdict({
   conclusion,
   ascii,
 }: {
-  result: PredicateValidityResult;
+  result: PredicateCheck;
   premises: Formula[];
   conclusion: Formula;
   ascii: boolean;
 }) {
-  if (result.status === 'valid') {
+  if (result.kind === 'engine') return <EngineError error={result.error} />;
+  if (result.kind === 'input-problems') {
     return (
-      <div className="verdict-card verdict-card--valid">
-        <div className="verdict-card__title"><Icon name="checkCircle" size={28} /> Valid</div>
-        <p>{result.explanation}</p>
+      <Notice tone="err" role="alert" title="Fix the argument before checking it">
+        <ul className="problem-msgs">
+          {result.problems.map((p, i) => (
+            <li key={i}>{p.message}</li>
+          ))}
+        </ul>
+      </Notice>
+    );
+  }
+  if (result.kind === 'too-large') {
+    return (
+      <div className="verdict-card verdict-card--unknown" role="status">
+        <h2 className="verdict-card__title"><Icon name="alert" size={26} /> No conclusion</h2>
+        <p>
+          The search was too large to finish
+          {result.searchedUpTo >= 1 ? ` (it fully searched worlds of up to ${result.searchedUpTo} object${result.searchedUpTo === 1 ? '' : 's'})` : ''}. That
+          says nothing either way about whether the argument is valid.
+        </p>
+        <p className="subtle">Try a simpler version, or look for a derivation in the proof editor.</p>
       </div>
     );
   }
-  if (result.status === 'no-countermodel-found' || !result.countermodel) {
+  if (result.kind === 'none-found') {
     return (
       <div className="verdict-card verdict-card--unknown" role="status">
-        <div className="verdict-card__title"><Icon name="search" size={26} /> No countermodel found</div>
+        <h2 className="verdict-card__title"><Icon name="search" size={26} /> No countermodel found</h2>
         <p>
           There is no countermodel with up to {result.searchedUpTo} object{result.searchedUpTo === 1 ? '' : 's'}. That suggests the
           argument is valid — but with quantifiers a search can't prove it. To be sure, prove it with a derivation.
@@ -50,15 +68,15 @@ export function PredicateVerdict({
       </div>
     );
   }
-  const m = result.countermodel;
+  const m = result.model;
   const val = (f: Formula) => {
     const r = safeEvaluateIn(f, m);
     return r.ok ? r.value : null;
   };
-  const desc = safeDescribeInterpretation(m);
+  const desc = describeModelInWords(m);
   return (
     <div className="verdict-card verdict-card--invalid">
-      <div className="verdict-card__title"><Icon name="xCircle" size={28} /> Invalid</div>
+      <h2 className="verdict-card__title"><Icon name="xCircle" size={28} /> Invalid</h2>
       <p className="subtle">
         Here is a countermodel with {m.domainSize} object{m.domainSize === 1 ? '' : 's'}: every premise is true in it and the conclusion is
         false.
@@ -84,13 +102,15 @@ export function PredicateVerdict({
           </li>
         </ul>
       </div>
-      <p className="narrative">{result.explanation}</p>
+      <p className="narrative">
+        Invalid: in this world of {m.domainSize} object{m.domainSize === 1 ? '' : 's'} every premise is true and the conclusion is false.
+      </p>
       {desc.length > 0 && (
         <details className="rule__more">
           <summary>The model in words</summary>
           <ul className="model__desc">
             {desc.map((d, i) => (
-              <li key={i} className="math">{d}</li>
+              <li key={i}>{d}</li>
             ))}
           </ul>
         </details>
