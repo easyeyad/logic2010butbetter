@@ -3,6 +3,7 @@ import type { Difficulty, PredicateSymbolizationExercise, SymbolizationExercise 
 import { EXERCISE_BANK, generateExercise, generateSymbolization, SYMBOLIZATION_EXERCISES } from '../../../learning';
 import { PageHeader } from '../../app/PageHeader';
 import { Button } from '../../components/Button';
+import { RadioButtons } from '../../components/RadioButtons';
 import { EmptyState } from '../../components/EmptyState';
 import { Icon } from '../../components/Icon';
 import { EngineError } from '../../components/Notice';
@@ -62,13 +63,21 @@ export default function SymbolizationPage() {
 
   return (
     <div className="page page--wide">
-      <PageHeader title="Symbolization" description="Translate English into sentential logic using a symbol key. Answers are checked for meaning, not exact wording." />
+      <PageHeader title="Symbolization" description="Translate English into sentential or predicate logic using a symbol key. Answers are checked for meaning, not exact wording." />
       <div className="sym-layout">
         <section className="card stack sym-browser" aria-label="Choose a sentence">
-          <div className="segmented" role="radiogroup" aria-label="Logic">
-            <button type="button" role="radio" aria-checked={logic === 'sentential'} onClick={() => { setLogic('sentential'); setCategory(''); }}>Sentential</button>
-            <button type="button" role="radio" aria-checked={logic === 'predicate'} onClick={() => { setLogic('predicate'); setCategory(''); }}>Predicate (∀ ∃)</button>
-          </div>
+          <RadioButtons<Logic>
+            label="Logic"
+            value={logic}
+            onChange={(l) => {
+              setLogic(l);
+              setCategory('');
+            }}
+            options={[
+              { value: 'sentential', label: 'Sentential' },
+              { value: 'predicate', label: 'Predicate (∀ ∃)' },
+            ]}
+          />
           <div className="segmented" role="tablist" aria-label="Source">
             <button type="button" role="tab" aria-selected={mode === 'bank'} onClick={() => setMode('bank')}>Exercise bank</button>
             <button type="button" role="tab" aria-selected={mode === 'generate'} onClick={() => setMode('generate')}>Generate new</button>
@@ -76,12 +85,12 @@ export default function SymbolizationPage() {
           {mode === 'bank' ? (
             <>
               <div className="row">
-                <div className="segmented" role="radiogroup" aria-label="Difficulty">
-                  <button type="button" role="radio" aria-checked={level === 0} onClick={() => setLevel(0)}>All</button>
-                  {LEVELS.map((l) => (
-                    <button key={l} type="button" role="radio" aria-checked={level === l} aria-label={`Level ${l}`} onClick={() => setLevel(l)}>{l}</button>
-                  ))}
-                </div>
+                <RadioButtons<Difficulty | 0>
+                  label="Difficulty"
+                  value={level}
+                  onChange={setLevel}
+                  options={[{ value: 0, label: 'All' }, ...LEVELS.map((l) => ({ value: l, label: String(l), ariaLabel: `Level ${l}` }))]}
+                />
                 <label className="visually-hidden" htmlFor="sym-cat">Category</label>
                 <select id="sym-cat" className="select sym-cat" value={category} onChange={(e) => setCategory(e.target.value)}>
                   <option value="">All categories</option>

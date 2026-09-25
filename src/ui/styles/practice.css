@@ -221,3 +221,4 @@
 .cellbtn[aria-pressed="true"] { color: var(--c-ok); }
 .topic-group + .topic-group { margin-top: var(--sp-3); }
 .topic-group__h { font-size: var(--fs-sm); font-weight: 700; color: var(--c-text-2); margin: 0 0 var(--sp-2); }
+.valtoggle__group { display: flex; gap: 4px; }

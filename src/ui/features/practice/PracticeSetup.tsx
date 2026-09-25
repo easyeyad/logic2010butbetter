@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { TOPIC_INFO, type Difficulty } from '../../../learning';
 import { Button } from '../../components/Button';
+import { RadioButtons } from '../../components/RadioButtons';
 import { Icon } from '../../components/Icon';
 import { useProgress } from '../../learning/progress';
 import { attempt } from '../../engine/safe';
@@ -74,26 +75,24 @@ export function PracticeSetup({ onStart }: { onStart: (c: SetupChoice) => void }
         <div className="setup-row">
           <div className="field">
             <span className="field__label" id="diff-label">Difficulty</span>
-            <div className="segmented" role="radiogroup" aria-labelledby="diff-label">
-              <button type="button" role="radio" aria-checked={difficulty === null} onClick={() => setDifficulty(null)}>
-                Adaptive{adaptiveLevel && adaptiveLevel.ok ? ` (${adaptiveLevel.value})` : ''}
-              </button>
-              {([1, 2, 3, 4, 5] as Difficulty[]).map((d) => (
-                <button key={d} type="button" role="radio" aria-checked={difficulty === d} aria-label={`Level ${d}`} onClick={() => setDifficulty(d)}>
-                  {d}
-                </button>
-              ))}
-            </div>
+            <RadioButtons<Difficulty | 0>
+              labelledBy="diff-label"
+              value={difficulty ?? 0}
+              onChange={(d) => setDifficulty(d === 0 ? null : d)}
+              options={[
+                { value: 0, label: `Adaptive${adaptiveLevel && adaptiveLevel.ok ? ` (${adaptiveLevel.value})` : ''}` },
+                ...([1, 2, 3, 4, 5] as Difficulty[]).map((d) => ({ value: d, label: String(d), ariaLabel: `Level ${d}` })),
+              ]}
+            />
           </div>
           <div className="field">
             <span className="field__label" id="len-label">Number of exercises</span>
-            <div className="segmented" role="radiogroup" aria-labelledby="len-label">
-              {LENGTHS.map((n) => (
-                <button key={n} type="button" role="radio" aria-checked={count === n} aria-label={`${n} exercises`} onClick={() => setCount(n)}>
-                  {n}
-                </button>
-              ))}
-            </div>
+            <RadioButtons<number>
+              labelledBy="len-label"
+              value={count}
+              onChange={setCount}
+              options={LENGTHS.map((n) => ({ value: n, label: String(n), ariaLabel: `${n} exercises` }))}
+            />
           </div>
         </div>
         <div>

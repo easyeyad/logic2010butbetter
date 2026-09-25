@@ -1,5 +1,6 @@
 import type { Valuation } from '../../../../logic';
 import { Icon } from '../../../components/Icon';
+import { RadioButtons } from '../../../components/RadioButtons';
 
 /** One True/False switch pair per sentence letter. `value[letter]` undefined = not chosen yet. */
 export function ValuationToggles({
@@ -20,21 +21,24 @@ export function ValuationToggles({
       <legend className="field__label">{label}</legend>
       <div className="valtoggles__grid">
         {atoms.map((a) => (
-          <div key={a} className="valtoggle" role="radiogroup" aria-label={`${a} is`}>
-            <span className="valtoggle__letter math">{a}</span>
-            {[true, false].map((b) => (
-              <button
-                key={String(b)}
-                type="button"
-                role="radio"
-                aria-checked={value[a] === b}
-                className={`valtoggle__opt valtoggle__opt--${b ? 't' : 'f'}`}
-                onClick={() => onChange({ ...value, [a]: b })}
-              >
-                <Icon name={b ? 'check' : 'x'} size={14} />
-                {b ? 'True' : 'False'}
-              </button>
-            ))}
+          <div key={a} className="valtoggle">
+            <span className="valtoggle__letter math" aria-hidden="true">{a}</span>
+            <RadioButtons<boolean>
+              className="valtoggle__group"
+              label={`${a} is`}
+              value={value[a]}
+              onChange={(b) => onChange({ ...value, [a]: b })}
+              options={[true, false].map((b) => ({
+                value: b,
+                className: `valtoggle__opt valtoggle__opt--${b ? 't' : 'f'}`,
+                label: (
+                  <>
+                    <Icon name={b ? 'check' : 'x'} size={14} />
+                    {b ? 'True' : 'False'}
+                  </>
+                ),
+              }))}
+            />
           </div>
         ))}
       </div>

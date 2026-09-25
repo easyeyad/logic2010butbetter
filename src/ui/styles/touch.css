@@ -45,8 +45,15 @@
   .rail--start::after { width: 5px; }
 }
 
-/* Keep the 7 symbol buttons on one row on phones (44px tall, ≥40px wide). */
+/*
+ * Phones: symbol buttons are at least 44×44. They sit in a grid that fills
+ * the available width and wraps as needed (7 per row on a full-width bar,
+ * fewer inside cards), never shrinking below 44px.
+ */
 @media (max-width: 480px) {
-  .symbar { flex-wrap: nowrap; gap: 3px; }
-  .symbar__btn, .symbar--compact .symbar__btn { flex: 1 1 0; min-width: 40px; padding: 0; }
+  .symbar, .symbar--pred, .actionbar .symbar {
+    display: grid; grid-template-columns: repeat(auto-fill, minmax(44px, 1fr)); gap: 3px;
+  }
+  .symbar__row, .symbar--pred .symbar__row { display: contents; }
+  .symbar__btn, .symbar--compact .symbar__btn, .symbar--pred .symbar__btn, .actionbar .symbar__btn { min-width: 44px; width: 100%; padding: 0; }
 }

@@ -43,6 +43,7 @@ export function ExerciseRunner({ exercise, initialAnswer, initialHints = 0, sess
   const [solution, setSolution] = useState<Solution | null>(null);
   const [confirmSolution, setConfirmSolution] = useState(false);
   const [solved, setSolved] = useState(false);
+  const [checkedKey, setCheckedKey] = useState<string | null>(null);
   const started = useRef(Date.now());
   const hints = useRef<string[] | null>(null);
   const rootRef = useRef<HTMLElement>(null);
@@ -73,7 +74,8 @@ export function ExerciseRunner({ exercise, initialAnswer, initialHints = 0, sess
     });
 
   const check = () => {
-    if (!answer) return;
+    if (!answer || !canCheck) return;
+    setCheckedKey(JSON.stringify(answer));
     const r = safeCheckAnswer(exercise, answer);
     if (!r.ok) {
       setError(r.error);
@@ -155,7 +157,9 @@ export function ExerciseRunner({ exercise, initialAnswer, initialHints = 0, sess
   const hintList = hints.current ?? (hintsShown > 0 ? allHints() : []);
   const totalHints = allHints().length;
   const info = TOPIC_INFO[exercise.topic];
-  const canCheck = Boolean(answer) && !solved;
+  // Check is available whenever the current answer hasn't been checked yet —
+  // including after a correct answer, if the student edits it.
+  const canCheck = Boolean(answer) && JSON.stringify(answer) !== checkedKey;
 
   return (
     <article ref={rootRef} className="exercise" aria-labelledby={`ex-title-${exercise.id}`} data-kind={exercise.kind}>
@@ -175,7 +179,7 @@ export function ExerciseRunner({ exercise, initialAnswer, initialHints = 0, sess
 
       <div className="exercise__actions">
         <Button variant="primary" icon="check" onClick={check} disabled={!canCheck} title="Check (Enter)">
-          {feedback && !feedback.correct ? 'Check again' : 'Check'}
+          {feedback && canCheck ? 'Check again' : 'Check'}
         </Button>
         <Button icon="lightbulb" onClick={hint} disabled={hintsShown >= totalHints} title="Hint (H)">
           {totalHints === 0 ? 'No hints' : hintsShown >= totalHints ? 'No more hints' : hintsShown === 0 ? 'Hint' : `Hint ${hintsShown + 1} of ${totalHints}`}

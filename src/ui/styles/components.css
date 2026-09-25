@@ -141,3 +141,6 @@
 .switch__title { font-weight: 600; }
 .switch__desc { font-size: var(--fs-sm); color: var(--c-text-3); }
 .drawer .sheet__head { padding-top: var(--sp-4); }
+/* When a docked action bar is showing (phones/tablets), keep toasts above it. */
+body:has(.actionbar) .toasts { bottom: calc(var(--tabbar-h) + 150px + env(safe-area-inset-bottom)); }
+@media (min-width: 768px) { body:has(.actionbar) .toasts { bottom: 130px; } }

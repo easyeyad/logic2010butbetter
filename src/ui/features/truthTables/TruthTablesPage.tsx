@@ -81,7 +81,10 @@ export default function TruthTablesPage() {
               tone="info"
               title="Truth tables are for sentential logic"
               actions={
-                <Link to="/countermodels" className="btn btn--primary">
+                <Link
+                  to={`/countermodels?${new URLSearchParams({ conclusion: debounced.map((t) => t.trim()).filter(Boolean)[0] ?? '' }).toString()}`}
+                  className="btn btn--primary"
+                >
                   Test it with models
                 </Link>
               }

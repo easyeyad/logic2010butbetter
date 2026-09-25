@@ -7,7 +7,7 @@ import { SymbolBar } from '../../components/SymbolBar';
 import { useFormulaTarget } from '../../components/FormulaTarget';
 import { useToast } from '../../components/Toast';
 import { CloseBoxDialog } from './CloseBoxDialog';
-import { containingOpenShow, layoutRails, maxDepthAt } from './draftOps';
+import { containingOpenShow, isUntouched, layoutRails, maxDepthAt } from './draftOps';
 import { disabledDerivedOptions, justificationOptions } from './justification';
 import type { MenuAction } from './LineMenu';
 import { ProofLineRow, type LineRowHandlers } from './ProofLineRow';
@@ -138,7 +138,7 @@ export function ProofEditor({ ed, inlineSymbolBar = true }: { ed: ProofEditorSta
         break;
       case 'insertShow':
         e.preventDefault();
-        ops.insertShowAfter(index);
+        showAt(index);
         break;
       case 'insertAssumption':
         e.preventDefault();
@@ -181,6 +181,15 @@ export function ProofEditor({ ed, inlineSymbolBar = true }: { ed: ProofEditorSta
     }
   };
 
+  /** New Show line: an untouched empty line becomes the Show line; otherwise insert one below. */
+  const showAt = (index: number) => {
+    const line = lines[index];
+    if (line && line.kind === 'step' && isUntouched(line)) {
+      ops.toggleShow(line.id);
+      ed.focusLine(line.id, 'formula');
+    } else ops.insertShowAfter(index);
+  };
+
   const focusedIndex = lines.findIndex((l) => l.id === ed.focusedId);
   const insertionPoint = focusedIndex >= 0 ? focusedIndex : lines.length - 1;
 
@@ -195,7 +204,7 @@ export function ProofEditor({ ed, inlineSymbolBar = true }: { ed: ProofEditorSta
           <Button size="sm" icon="plus" onClick={() => ops.insertAfter(insertionPoint)} title={`Insert line (${SHORTCUT_LABEL.insertBelow})`}>
             Line
           </Button>
-          <Button size="sm" icon="show" onClick={() => ops.insertShowAfter(insertionPoint)} title={`New Show line (${SHORTCUT_LABEL.insertShow})`}>
+          <Button size="sm" icon="show" onClick={() => showAt(insertionPoint)} title={`New Show line (${SHORTCUT_LABEL.insertShow})`}>
             Show
           </Button>
           <Button size="sm" icon="assume" onClick={() => ops.insertAssumptionAfter(insertionPoint)} title={`Add assumption (${SHORTCUT_LABEL.insertAssumption})`}>

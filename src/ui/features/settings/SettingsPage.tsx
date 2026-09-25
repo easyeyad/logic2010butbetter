@@ -2,6 +2,7 @@ import { useState, type ReactNode } from 'react';
 import { PageHeader } from '../../app/PageHeader';
 import { useSettings, type MotionPref, type ThemePref } from '../../app/settings';
 import { Button } from '../../components/Button';
+import { RadioButtons } from '../../components/RadioButtons';
 import { ConfirmDialog } from '../../components/Dialog';
 import { Icon, type IconName } from '../../components/Icon';
 import { useToast } from '../../components/Toast';
@@ -32,16 +33,20 @@ function Choice<T extends string>({
   return (
     <div className="field">
       <span className="field__label" id={`lbl-${label}`}>{label}</span>
-      <div className="segmented" role="radiogroup" aria-labelledby={`lbl-${label}`}>
-        {options.map((o) => (
-          <button key={o.v} type="button" role="radio" aria-checked={value === o.v} onClick={() => onChange(o.v)}>
+      <RadioButtons<T>
+        labelledBy={`lbl-${label}`}
+        value={value}
+        onChange={onChange}
+        options={options.map((o) => ({
+          value: o.v,
+          label: (
             <span className="row" style={{ gap: 6, flexWrap: 'nowrap' }}>
               {o.icon && <Icon name={o.icon} size={16} />}
               {o.label}
             </span>
-          </button>
-        ))}
-      </div>
+          ),
+        }))}
+      />
     </div>
   );
 }
@@ -108,7 +113,7 @@ export default function SettingsPage() {
         <Section title="Proofs">
           <Switch
             title="Allow derived rules"
-            desc="Enable Logic 2010’s derived rules (DM, NC, NB, CDJ, SC) in the proof editor. Your instructor may want these off early on."
+            desc="Enable Logic 2010’s derived rules (DM, NC, NB, CDJ, SC, and for quantifiers QN and AV) in the proof editor and in practice derivations. Your instructor may want these off early on."
             checked={settings.derivedRules}
             onChange={(derivedRules) => update({ derivedRules })}
           />
