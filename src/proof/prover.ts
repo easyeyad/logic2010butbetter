@@ -20,7 +20,7 @@
 import type { Formula, Term } from '../logic/ast';
 import { And, Exists, Forall, Iff, Implies, Name, Not, Or, Var, isPredicateFormula } from '../logic/ast';
 import { freeVariables, freshVariable, isGeneralizationOf, namesOf, substitute } from '../logic/index';
-import { replaceFree } from './inference';
+import { replaceSome } from './inference';
 import type { CloseMethod, DraftLine, LineKind, RuleId } from './types';
 import { entails, equals as eq, fmt } from './util';
 
@@ -54,7 +54,7 @@ const subst = (f: Formula, v: string, t: Term): Formula | null => tryOr(() => su
 const freeIn = (f: Formula, v: string): boolean => tryOr(() => freeVariables(f).includes(v), false);
 const MAX_UNIVERSE = 8;
 const MAX_EI = 8;
-const MAX_LL = 60;
+const MAX_LL = 120;
 
 export class Prover {
   out: DraftLine[] = [];
@@ -380,8 +380,9 @@ export class Prover {
               const g = this.avail[j];
               const core = g.f.kind === 'not' ? g.f.operand : g.f;
               if (g.n === n || (core.kind !== 'pred' && core.kind !== 'identity')) continue;
-              const r = replaceFree(g.f, f.left, f.right);
-              if (r && this.has(r) === undefined) {
+              for (const r of replaceSome(g.f, f.left, f.right)) {
+                if (this.llCount >= MAX_LL) break;
+                if (this.has(r) !== undefined) continue;
                 this.llCount++;
                 this.step(r, 'LL', [g.n, n]);
                 changed = true;

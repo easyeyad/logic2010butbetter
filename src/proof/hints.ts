@@ -122,6 +122,9 @@ const RULE_NUDGE: Record<string, string> = {
   EG: 'You have an instance of what you need — generalize it with ∃.',
   QN: 'A negated quantifier can be pushed inside (the quantifier flips).',
   AV: 'Rename a bound variable to match what you need.',
+  Id: 'Anything is identical to itself: t = t needs no justification.',
+  LL: 'You have an identity — use it to substitute one term for the other (LL).',
+  SM: 'An identity can be flipped around with SM, which lets LL substitute in the other direction.',
 };
 
 /** Hard time budget for computing one hint. */

@@ -6,7 +6,7 @@ import { suggestNextStep } from './hints';
 import { checkRuleApplication } from './ruleCheck';
 import { solve } from './solver';
 import { draft } from './testUtil';
-import type { DerivationCheck } from './types';
+import type { DerivationCheck, DerivationDraft, RuleId } from './types';
 
 const F = parseOrThrow;
 const codesOf = (c: DerivationCheck, line: number) => c.lines[line - 1].issues.map((i) => i.code);
@@ -127,6 +127,7 @@ describe('identity solve and hints', () => {
     [['∀x(x = a → Fx)'], 'Fa'],
     [['Fa', '¬Fb'], 'a ≠ b'],
     [['∀x Fx'], '∀x(x = a → Fa)'],
+    [['a = b', 'Rab'], 'Rba'],
   ];
   for (const [ps, g] of problems) {
     it(`${ps.join(', ')} ⊢ ${g}`, () => {
@@ -135,6 +136,54 @@ describe('identity solve and hints', () => {
       expectComplete(checkDerivation({ goal: g, lines: lines!, premises: ps }));
     });
   }
+
+  it('level-3 hints complete a = b, Rab ⊢ Rba using identity rewrites', () => {
+    let d: DerivationDraft = {
+      goal: 'Rba',
+      premises: ['a = b', 'Rab'],
+      lines: [
+        { id: 'p1', kind: 'premise', text: 'a = b', depth: 0 },
+        { id: 'p2', kind: 'premise', text: 'Rab', depth: 0 },
+      ],
+    };
+    const used = new Set<string>();
+    for (let step = 0; step < 20; step++) {
+      const c = checkDerivation(d);
+      expect(c.valid).toBe(true);
+      if (c.complete) break;
+      const h = suggestNextStep(d, 3)!;
+      expect(h.message).not.toMatch(/Nothing gives/);
+      const l = h.line!;
+      expect(l, h.message).toBeDefined();
+      if (l.rule) used.add(l.rule);
+      const lines = d.lines.map((x) => ({ ...x }));
+      if (l.kind === 'close') lines[l.closeLine! - 1].close = { method: l.rule as 'DD', refs: l.refs! };
+      else if (l.kind === 'show') lines.push({ id: `h${step}`, kind: 'show', text: l.text, depth: l.depth! });
+      else if (l.kind === 'assumption') lines.push({ id: `h${step}`, kind: 'assumption', text: l.text, depth: l.depth!, assumption: l.rule === 'ASS CD' ? 'CD' : 'ID' });
+      else lines.push({ id: `h${step}`, kind: 'step', text: l.text, depth: l.depth!, rule: l.rule as RuleId, refs: l.refs });
+      d = { ...d, lines };
+    }
+    expect(checkDerivation(d).complete).toBe(true);
+    expect(used.has('LL')).toBe(true);
+    expect(d.lines.length).toBeLessThanOrEqual(7);
+  });
+
+  it('level-1 hint for a = b, Rab ⊢ Rba mentions working forward, not "nothing"', () => {
+    const d = draft(`
+a = b    | PR
+Rab      | PR
+Show Rba |
+`);
+    const h = suggestNextStep(d, 1)!;
+    expect(h.message).not.toMatch(/Nothing gives/);
+    const d2 = draft(`
+a = b    | PR
+Rab      | PR
+Show Rba |
+  b = a  | SM 1
+`);
+    expect(suggestNextStep(d2, 1)!.message).toContain('substitute one term for the other (LL)');
+  });
 
   it('hint for a t = t goal points to Id', () => {
     const d = draft(`

@@ -134,6 +134,84 @@ const ONE_PREMISE_TRANSFORM = new Set<RuleId>(['R', 'DN', 'S', 'BC', 'DM', 'NC',
 const termEq = (a: Term, b: Term) => a.kind === b.kind && a.name === b.name;
 const termText = (t: Term) => t.name;
 
+/**
+ * Every formula obtainable from f by replacing a non-empty subset of the free
+ * occurrences of t1 by t2 (t2 not captured) — what LL can produce. With more
+ * than `maxOcc` occurrences only the replace-all variant is returned.
+ */
+export function replaceSome(f: Formula, t1: Term, t2: Term, maxOcc = 4): Formula[] {
+  // Count replaceable occurrences first.
+  let k = 0;
+  const countT = (t: Term, bound: Set<string>) => {
+    if (termEq(t, t1) && !(t.kind === 'var' && bound.has(t.name)) && !(t2.kind === 'var' && bound.has(t2.name))) k++;
+  };
+  const count = (g: Formula, bound: Set<string>): void => {
+    switch (g.kind) {
+      case 'atom':
+        return;
+      case 'identity':
+        countT(g.left, bound);
+        countT(g.right, bound);
+        return;
+      case 'pred':
+        g.args.forEach((t) => countT(t, bound));
+        return;
+      case 'not':
+        return count(g.operand, bound);
+      case 'forall':
+      case 'exists':
+        return count(g.body, new Set([...bound, g.variable]));
+      case 'and':
+      case 'or':
+      case 'implies':
+      case 'iff':
+        count(g.left, bound);
+        count(g.right, bound);
+        return;
+    }
+  };
+  count(f, new Set());
+  if (k === 0) return [];
+  if (k > maxOcc) {
+    const all = replaceFree(f, t1, t2);
+    return all ? [all] : [];
+  }
+  const out: Formula[] = [];
+  for (let mask = 1; mask < 1 << k; mask++) {
+    let idx = 0;
+    const term = (t: Term, bound: Set<string>): Term => {
+      if (!termEq(t, t1) || (t.kind === 'var' && bound.has(t.name)) || (t2.kind === 'var' && bound.has(t2.name))) return t;
+      return mask & (1 << idx++) ? t2 : t;
+    };
+    const go = (g: Formula, bound: Set<string>): Formula => {
+      switch (g.kind) {
+        case 'atom':
+          return g;
+        case 'identity': {
+          const left = term(g.left, bound);
+          return { kind: 'identity', left, right: term(g.right, bound) };
+        }
+        case 'pred':
+          return { kind: 'pred', name: g.name, args: g.args.map((t) => term(t, bound)) };
+        case 'not':
+          return Not(go(g.operand, bound));
+        case 'forall':
+        case 'exists':
+          return { kind: g.kind, variable: g.variable, body: go(g.body, new Set([...bound, g.variable])) };
+        case 'and':
+        case 'or':
+        case 'implies':
+        case 'iff': {
+          const left = go(g.left, bound);
+          return { kind: g.kind, left, right: go(g.right, bound) };
+        }
+      }
+    };
+    out.push(go(f, new Set()));
+  }
+  return out;
+}
+
 /** Replace every FREE occurrence of t1 in f by t2; null if t2 would be captured or nothing changes. */
 export function replaceFree(f: Formula, t1: Term, t2: Term): Formula | null {
   let changed = false;
