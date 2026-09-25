@@ -448,12 +448,12 @@ export function analyze(draft: DerivationDraft): Analysis {
       continue;
     }
     if (!isRuleId(rule)) {
-      issues[i].push(err('unknown-rule', `Line ${num}: "${rule}" is not a rule of this system.`, { target: 'rule', suggestion: 'Pick one of MP, MT, DN, R, S, ADJ, ADD, MTP, BC, CB, UI, EG, EI (or a derived rule, if enabled).' }));
+      issues[i].push(err('unknown-rule', `Line ${num}: "${rule}" is not a rule of this system.`, { target: 'rule', suggestion: 'Pick one of MP, MT, DN, R, S, ADJ, ADD, MTP, BC, CB, UI, EG, EI, Id, LL, SM (or a derived rule, if enabled).' }));
       continue;
     }
     const f = formulas[i];
     const got = citedCount(line.refs);
-    if (got === 0) {
+    if (got === 0 && !RULE_ARITY[rule].includes(0)) {
       issues[i].push(
         err('missing-refs', `Line ${num}: ${ruleLabel(rule)} needs to cite ${RULE_ARITY[rule][0]} line${RULE_ARITY[rule][0] === 1 ? '' : 's'} — which lines does it use?`, {
           target: 'refs',

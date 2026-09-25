@@ -30,7 +30,10 @@ export type RuleId =
   // generalization, existential instantiation (new variable).
   | 'UI' | 'EG' | 'EI'
   // Derived quantifier rules: quantifier negation, alphabetic variance.
-  | 'QN' | 'AV';
+  | 'QN' | 'AV'
+  // Identity rules (primitive in Logic 2010's identity chapter): identity
+  // (t = t, no lines cited), Leibniz's law (substitution), symmetry.
+  | 'Id' | 'LL' | 'SM';
 
 /** DD/CD/ID, plus UD (universal derivation) for "Show ∀xφ" boxes. */
 export type CloseMethod = 'DD' | 'CD' | 'ID' | 'UD';

@@ -46,6 +46,7 @@ export function contradictory(a: Formula, b: Formula): boolean {
 export function stripDN(f: Formula): Formula {
   switch (f.kind) {
     case 'atom':
+    case 'identity':
     case 'pred':
       return f;
     case 'not':

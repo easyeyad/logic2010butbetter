@@ -27,7 +27,7 @@ export function draft(src: string, extra: Partial<DerivationDraft> = {}): Deriva
     if (right === 'PR') return { id, kind: 'premise', text: left, depth };
     const asm = right.match(/^ASS\s*(CD|ID)?$/);
     if (asm) return { id, kind: 'assumption', text: left, depth, ...(asm[1] ? { assumption: asm[1] as 'CD' } : {}) };
-    const m = right.match(/^([A-Z]+)\s*(.*)$/);
+    const m = right.match(/^([A-Z][A-Za-z]*)\s*(.*)$/);
     return { id, kind: 'step', text: left, depth, ...(m ? { rule: m[1] as RuleId, refs: nums(m[2]) } : {}) };
   });
   return { lines, ...extra };

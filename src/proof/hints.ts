@@ -237,6 +237,10 @@ function goalStrategy(G: Formula, t: number, method: CloseMethod | undefined): s
       return method === 'ID'
         ? `Your goal on ${L} is an existential. If no instance is easy to get, try Indirect Derivation (ID): assume ${fmt({ kind: 'not', operand: G })} and look for a contradiction.`
         : `Your goal on ${L} is an existential — derive one instance of ${fmt(G.body)} and use EG.`;
+    case 'identity':
+      return G.left.kind === G.right.kind && G.left.name === G.right.name
+        ? `Your goal on ${L} is ${fmt(G)} — Id (Identity) gives it directly, citing no lines.`
+        : `Your goal on ${L} is an identity — look for identities you can combine with LL (Leibniz's Law) or flip with SM (Symmetry).`;
     case 'atom':
     case 'pred':
       return method === 'ID'

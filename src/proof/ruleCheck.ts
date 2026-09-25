@@ -83,7 +83,7 @@ export function checkRuleApplication(
       ok: false,
       code: 'unknown-rule',
       message: `Line ${num}: "${rule}" is not a rule of this system.`,
-      suggestion: 'Pick one of MP, MT, DN, R, S, ADJ, ADD, MTP, BC, CB, UI, EG, EI (or a derived rule, if enabled).',
+      suggestion: 'Pick one of MP, MT, DN, R, S, ADJ, ADD, MTP, BC, CB, UI, EG, EI, Id, LL, SM (or a derived rule, if enabled).',
       target: 'rule',
       alternativeRules: [],
     };
@@ -121,7 +121,7 @@ export function checkRuleApplication(
     }
   }
   if (applies) return { ok: true, alternativeRules: alts };
-  if (cited.length === 0) {
+  if (cited.length === 0 && !RULE_ARITY[rule].includes(0)) {
     const k = RULE_ARITY[rule][0];
     return {
       ok: false,

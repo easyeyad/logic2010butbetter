@@ -25,6 +25,7 @@ export const RULE_ARITY: Record<RuleId, number[]> = {
   MP: [2], MT: [2], DN: [1], R: [1], S: [1], ADJ: [2], ADD: [1], MTP: [2], BC: [1], CB: [2],
   DM: [1], NC: [1], NB: [1], CDJ: [1], SC: [3, 2],
   UI: [1], EG: [1], EI: [1], QN: [1], AV: [1],
+  Id: [0], LL: [2], SM: [1],
 };
 
 /** What the cited lines must be, for "cites exactly N lines (...)". */
@@ -49,6 +50,9 @@ export const NEEDS: Record<RuleId, string> = {
   EI: 'the existential ∃xφ to instantiate',
   QN: 'the one line to rewrite',
   AV: 'the one line to rename',
+  Id: 'no lines at all',
+  LL: 'the line to rewrite and the identity t1 = t2',
+  SM: 'the identity to flip',
 };
 
 // ------------------------------------------------------------------ transforms
@@ -92,6 +96,11 @@ export function transforms(rule: RuleId, f: Formula): Formula[] {
       if (f.kind === 'iff' && f.right.kind === 'not') out.push(Not(Iff(f.left, f.right.operand)));
       if (f.kind === 'iff' && f.left.kind === 'not') out.push(Not(Iff(f.left.operand, f.right)));
       break;
+    case 'SM':
+      if (f.kind === 'identity') out.push({ kind: 'identity', left: f.right, right: f.left });
+      if (f.kind === 'not' && f.operand.kind === 'identity')
+        out.push(Not({ kind: 'identity', left: f.operand.right, right: f.operand.left }));
+      break;
     case 'QN':
       if (f.kind === 'not' && f.operand.kind === 'forall') out.push(Exists(f.operand.variable, Not(f.operand.body)));
       if (f.kind === 'not' && f.operand.kind === 'exists') out.push(Forall(f.operand.variable, Not(f.operand.body)));
@@ -120,7 +129,126 @@ export function transforms(rule: RuleId, f: Formula): Formula[] {
   return out;
 }
 
-const ONE_PREMISE_TRANSFORM = new Set<RuleId>(['R', 'DN', 'S', 'BC', 'DM', 'NC', 'NB', 'CDJ', 'QN']);
+const ONE_PREMISE_TRANSFORM = new Set<RuleId>(['R', 'DN', 'S', 'BC', 'DM', 'NC', 'NB', 'CDJ', 'QN', 'SM']);
+
+const termEq = (a: Term, b: Term) => a.kind === b.kind && a.name === b.name;
+const termText = (t: Term) => t.name;
+
+/** Replace every FREE occurrence of t1 in f by t2; null if t2 would be captured or nothing changes. */
+export function replaceFree(f: Formula, t1: Term, t2: Term): Formula | null {
+  let changed = false;
+  let captured = false;
+  const term = (t: Term, bound: Set<string>): Term => {
+    if (!termEq(t, t1) || (t.kind === 'var' && bound.has(t.name))) return t;
+    if (t2.kind === 'var' && bound.has(t2.name)) {
+      captured = true;
+      return t;
+    }
+    changed = true;
+    return t2;
+  };
+  const go = (g: Formula, bound: Set<string>): Formula => {
+    switch (g.kind) {
+      case 'atom':
+        return g;
+      case 'identity':
+        return { kind: 'identity', left: term(g.left, bound), right: term(g.right, bound) };
+      case 'pred':
+        return { kind: 'pred', name: g.name, args: g.args.map((t) => term(t, bound)) };
+      case 'not':
+        return Not(go(g.operand, bound));
+      case 'forall':
+      case 'exists':
+        return { kind: g.kind, variable: g.variable, body: go(g.body, new Set([...bound, g.variable])) };
+      case 'and':
+      case 'or':
+      case 'implies':
+      case 'iff':
+        return { kind: g.kind, left: go(g.left, bound), right: go(g.right, bound) };
+    }
+  };
+  const out = go(f, new Set());
+  return changed && !captured ? out : null;
+}
+
+export type LLResult =
+  | { ok: true; replaced: number }
+  | { ok: false; why: 'shape' | 'none' | 'reversed' | 'wrong-term' | 'bound' | 'capture'; detail?: string };
+
+/**
+ * Is `to` obtained from `from` by replacing one or more FREE occurrences of
+ * t1 by t2 (t2 not captured)? Reports why not, for feedback.
+ */
+export function llCompare(from: Formula, to: Formula, t1: Term, t2: Term): LLResult {
+  let replaced = 0;
+  let reversed = 0;
+  let problem: LLResult | null = null;
+  const pair = (x: Term, y: Term, bound: Set<string>): boolean => {
+    if (termEq(x, y)) return true;
+    if (termEq(x, t1) && termEq(y, t2)) {
+      if (x.kind === 'var' && bound.has(x.name)) {
+        problem ??= { ok: false, why: 'bound', detail: x.name };
+        return false;
+      }
+      if (y.kind === 'var' && bound.has(y.name)) {
+        problem ??= { ok: false, why: 'capture', detail: y.name };
+        return false;
+      }
+      replaced++;
+      return true;
+    }
+    if (termEq(x, t2) && termEq(y, t1)) {
+      reversed++;
+      return false;
+    }
+    problem ??= { ok: false, why: 'wrong-term', detail: `${termText(x)}→${termText(y)}` };
+    return false;
+  };
+  const walk = (a: Formula, b: Formula, bound: Set<string>): boolean => {
+    if (a.kind !== b.kind) return false;
+    switch (a.kind) {
+      case 'atom':
+        return a.name === (b as typeof a).name;
+      case 'identity': {
+        const bb = b as typeof a;
+        const l = pair(a.left, bb.left, bound);
+        const r = pair(a.right, bb.right, bound);
+        return l && r;
+      }
+      case 'pred': {
+        const bb = b as typeof a;
+        if (a.name !== bb.name || a.args.length !== bb.args.length) return false;
+        let ok = true;
+        a.args.forEach((t, i) => {
+          if (!pair(t, bb.args[i], bound)) ok = false;
+        });
+        return ok;
+      }
+      case 'not':
+        return walk(a.operand, (b as typeof a).operand, bound);
+      case 'forall':
+      case 'exists': {
+        const bb = b as typeof a;
+        return a.variable === bb.variable && walk(a.body, bb.body, new Set([...bound, a.variable]));
+      }
+      case 'and':
+      case 'or':
+      case 'implies':
+      case 'iff': {
+        const bb = b as typeof a;
+        const l = walk(a.left, bb.left, bound);
+        const r = walk(a.right, bb.right, bound);
+        return l && r;
+      }
+    }
+  };
+  const same = walk(from, to, new Set());
+  if (same && replaced > 0) return { ok: true, replaced };
+  if (same) return { ok: false, why: 'none' };
+  if (problem) return problem;
+  if (reversed > 0) return { ok: false, why: 'reversed' };
+  return { ok: false, why: 'shape' };
+}
 
 /**
  * If c is an instance of the quantified formula q (every free occurrence of
@@ -179,6 +307,10 @@ function matchOrdered(rule: RuleId, fs: Formula[], c: Formula): boolean {
         c.kind === 'iff' &&
         ((eq(c.left, a.left) && eq(c.right, a.right)) || (eq(c.left, a.right) && eq(c.right, a.left)))
       );
+    case 'Id':
+      return fs.length === 0 && c.kind === 'identity' && termEq(c.left, c.right);
+    case 'LL':
+      return b.kind === 'identity' && llCompare(a, c, b.left, b.right).ok;
     case 'UI':
       return a.kind === 'forall' && instanceTerm(a, c) !== null;
     case 'EI': {
@@ -700,7 +832,7 @@ function sampleInstance(q: Extract<Formula, { variable: string }>, c: Formula): 
 }
 
 function mainIs(f: Formula): string {
-  return f.kind === 'atom' || f.kind === 'pred' ? `${aKind(f)}` : `${aKind(f)} (main connective ${mainSymbol(f)})`;
+  return f.kind === 'atom' || f.kind === 'pred' || f.kind === 'identity' ? `${aKind(f)}` : `${aKind(f)} (main connective ${mainSymbol(f)})`;
 }
 
 function mainSymbol(f: Formula): string {
@@ -720,6 +852,7 @@ function mainSymbol(f: Formula): string {
     case 'exists':
       return '∃';
     case 'atom':
+    case 'identity':
     case 'pred':
       return '';
   }
@@ -728,6 +861,7 @@ function mainSymbol(f: Formula): string {
 function containsQuantifier(f: Formula, kind: 'forall' | 'exists'): boolean {
   switch (f.kind) {
     case 'atom':
+    case 'identity':
     case 'pred':
       return false;
     case 'not':
@@ -773,6 +907,7 @@ function quantifierInsideAdvice(f: Formula, q: '∀' | '∃', rule: 'UI' | 'EI')
         ? `A negated quantifier is not a quantifier. With derived rules on, QN turns ${F(f)} into ${F(f.operand.kind === 'forall' ? Exists(f.operand.variable, Not(f.operand.body)) : Forall(f.operand.variable, Not(f.operand.body)))}; otherwise use it in an ID proof.`
         : `A negation can't be instantiated; use it in an ID proof or with MT/MTP.`;
     case 'atom':
+    case 'identity':
     case 'pred':
     case 'forall':
     case 'exists':
@@ -841,6 +976,17 @@ function termsAt(body: Formula, v: string, c: Formula): Set<string> | null {
     switch (b.kind) {
       case 'atom':
         return b.name === (x as typeof b).name;
+      case 'identity': {
+        const xi = x as typeof b;
+        return [b.left, b.right].every((t, i) => {
+          const xt = i === 0 ? xi.left : xi.right;
+          if (t.kind === 'var' && t.name === v && !bound.has(v)) {
+            found.add(`${xt.kind}:${xt.name}`);
+            return true;
+          }
+          return t.kind === xt.kind && t.name === xt.name;
+        });
+      }
       case 'pred': {
         const xa = (x as typeof b).args;
         if (b.name !== (x as typeof b).name || b.args.length !== xa.length) return false;
@@ -892,6 +1038,97 @@ function diagEG(n: number, [a]: RefF[], c: Formula): Diagnosis {
     suggestion: free.includes(c.variable)
       ? `Put ${c.variable} exactly where one term (a name or variable) occurs in line ${a.n}, and leave the rest of the formula unchanged.`
       : `${F(c)} doesn't use ${c.variable} at all inside — generalize by replacing a term of line ${a.n} with ${c.variable}.`,
+    target: 'formula',
+  };
+}
+
+function diagId(n: number, c: Formula): Diagnosis {
+  if (c.kind === 'identity')
+    return {
+      message: `Line ${n}: Id (Identity) only gives a statement with the same term on both sides, like ${c.left.name} = ${c.left.name}; ${F(c)} relates two different terms.`,
+      suggestion: 'An identity between different terms has to come from premises — combine identities with LL, or flip one with SM.',
+      target: 'rule',
+    };
+  return {
+    message: `Line ${n}: Id (Identity) only gives lines of the form t = t, but ${F(c)} is ${aKind(c)}.`,
+    suggestion: 'Pick the rule that actually produces this line.',
+    target: 'rule',
+  };
+}
+
+function diagLL(n: number, [a, b]: RefF[], c: Formula): Diagnosis {
+  const ids = [a, b].filter((r) => r.f.kind === 'identity');
+  if (ids.length === 0)
+    return {
+      message: `Line ${n}: LL (Leibniz's Law) needs an identity t1 = t2 among the cited lines, but neither ${Ld(a)} nor ${Ld(b)} is an identity.`,
+      suggestion: 'Cite the identity that licenses the substitution together with the line you rewrite.',
+      badRefs: [a.n, b.n],
+      target: 'refs',
+    };
+  // Prefer the reading that comes closest to working.
+  const readings = ids.map((idr) => {
+    const other = idr === a ? b : a;
+    const id = idr.f as Extract<Formula, { kind: 'identity' }>;
+    return { idr, other, id, res: llCompare(other.f, c, id.left, id.right) };
+  });
+  const rank = (w: LLResult) => (w.ok ? 0 : w.why === 'reversed' ? 1 : w.why === 'bound' || w.why === 'capture' ? 2 : w.why === 'none' ? 3 : 4);
+  readings.sort((x, y) => rank(x.res) - rank(y.res));
+  const { idr, other, id, res } = readings[0];
+  const t1 = id.left.name;
+  const t2 = id.right.name;
+  if (res.ok) return { message: `Line ${n}: LL (Leibniz's Law) applies.`, target: 'formula' };
+  switch (res.why) {
+    case 'reversed':
+      return {
+        message: `Line ${n}: LL (Leibniz's Law) with ${Ld(idr)} replaces ${t1} by ${t2} — but you replaced ${t2} by ${t1} in ${Ld(other)}.`,
+        suggestion: `Use SM on line ${idr.n} to get ${t2} = ${t1} first, then cite that with LL.`,
+        target: 'refs',
+      };
+    case 'bound':
+      return {
+        message: `Line ${n}: LL (Leibniz's Law) only replaces FREE occurrences of ${t1}, but in ${Ld(other)} the ${res.detail} you replaced is bound by a quantifier.`,
+        suggestion: 'Leave bound variables alone; instantiate the quantifier (UI/EI) first if you need that occurrence.',
+        target: 'formula',
+      };
+    case 'capture':
+      return {
+        message: `Line ${n}: LL (Leibniz's Law) would put ${t2} where a quantifier binds ${res.detail}, changing what the formula says.`,
+        suggestion: 'Only substitute where the new term stays free.',
+        target: 'formula',
+      };
+    case 'none':
+      return {
+        message: `Line ${n}: LL (Leibniz's Law) with ${Ld(idr)} must replace at least one ${t1} by ${t2}, but ${F(c)} is unchanged from ${Ld(other)}.`,
+        suggestion: `Replace one or more free occurrences of ${t1} by ${t2} (to copy a line unchanged, use R).`,
+        target: 'formula',
+      };
+    case 'wrong-term':
+      return {
+        message: `Line ${n}: LL (Leibniz's Law) with ${Ld(idr)} may only replace ${t1} by ${t2}, but ${F(c)} differs from ${Ld(other)} in another way (${res.detail?.replace('→', ' became ')}).`,
+        suggestion: `Change only occurrences of ${t1}, and only into ${t2}; everything else must stay exactly as in line ${other.n}.`,
+        target: 'formula',
+      };
+    case 'shape':
+      return {
+        message: `Line ${n}: LL (Leibniz's Law) only swaps terms; ${F(c)} is not ${Ld(other)} with some ${t1} replaced by ${t2}.`,
+        suggestion: `Keep the formula of line ${other.n} exactly, changing only occurrences of ${t1} into ${t2}.`,
+        target: 'formula',
+      };
+  }
+}
+
+function diagSM(n: number, [a]: RefF[], c: Formula): Diagnosis {
+  const isId = a.f.kind === 'identity' || (a.f.kind === 'not' && a.f.operand.kind === 'identity');
+  if (!isId)
+    return {
+      message: `Line ${n}: SM (Symmetry) applies only to an identity t1 = t2 (or t1 ≠ t2), but ${Ld(a)} is ${aKind(a.f)}.${a.f.kind === 'pred' && a.f.args.length === 2 ? ` Swapping the terms of a relation like ${F(a.f)} is not valid in general.` : ''}`,
+      suggestion: 'SM only swaps the two sides of an identity.',
+      badRefs: [a.n],
+      target: 'refs',
+    };
+  return {
+    message: `Line ${n}: SM (Symmetry) from ${Ld(a)} gives ${transforms('SM', a.f).map(F).join(' or ')}, but you wrote ${F(c)}.`,
+    suggestion: 'SM swaps the two terms and changes nothing else.',
     target: 'formula',
   };
 }
@@ -993,6 +1230,12 @@ function diagnoseRaw(rule: RuleId, n: number, refs: RefF[], c: Formula, ctx: Dia
       return diagEG(n, refs, c);
     case 'AV':
       return diagAV(n, refs, c);
+    case 'Id':
+      return diagId(n, c);
+    case 'LL':
+      return diagLL(n, refs, c);
+    case 'SM':
+      return diagSM(n, refs, c);
     default:
       return diagTransform(rule, n, refs, c);
   }
@@ -1001,6 +1244,8 @@ function diagnoseRaw(rule: RuleId, n: number, refs: RefF[], c: Formula, ctx: Dia
 /** Message for a wrong number of cited lines. */
 export function refCountMessage(rule: RuleId, n: number, got: number): string {
   const arity = RULE_ARITY[rule];
+  if (arity.length === 1 && arity[0] === 0)
+    return `Line ${n}: ${ruleLabel(rule)} cites no lines — t = t needs no justification — but you cited ${got}.`;
   const want = arity.length > 1 ? `${arity.join(' or ')}` : `exactly ${arity[0]}`;
   const noun = arity[0] === 1 && arity.length === 1 ? 'line' : 'lines';
   return `Line ${n}: ${ruleLabel(rule)} cites ${want} ${noun} (${NEEDS[rule]}), but you cited ${got}.`;

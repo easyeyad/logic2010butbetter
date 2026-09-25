@@ -405,6 +405,58 @@ const LIST: RuleInfo[] = [
     requirements: ['Cite exactly one line.', 'Only bound variables may be renamed, consistently, without capturing anything.'],
     pitfalls: ['Renaming a free variable (that changes the meaning).', 'Derived rule: only available when derived rules are enabled.'],
   },
+  // ----------------------------------------------------------------- identity
+  {
+    id: 'Id',
+    name: 'Identity',
+    abbreviation: 'Id',
+    derived: false,
+    category: 'primitive',
+    premisesCount: 0,
+    schema: { from: [], to: 't = t' },
+    example: { from: [], to: 'a = a' },
+    explanation: 'Everything is identical to itself. You may write t = t, for any name or variable t, on any line — no lines are cited.',
+    requirements: ['Cite no lines.', 'The line must be t = t with the SAME term on both sides.'],
+    pitfalls: [
+      'Using Id for a = b with different terms — that needs premises (and LL or SM).',
+      'Citing lines: Id stands on its own.',
+    ],
+  },
+  {
+    id: 'LL',
+    name: "Leibniz's Law",
+    abbreviation: 'LL',
+    derived: false,
+    category: 'primitive',
+    premisesCount: 2,
+    schema: { from: ['φ', 't1 = t2'], to: 'φ with some free occurrences of t1 replaced by t2' },
+    example: { from: ['Fa ∧ Ga', 'a = b'], to: 'Fb ∧ Ga' },
+    explanation:
+      'Identicals are interchangeable: if t1 = t2, whatever is true of t1 is true of t2. From a line φ and an identity t1 = t2 you may replace some (one or more) free occurrences of t1 in φ by t2. The substitution goes from the LEFT term of the identity to the RIGHT one; to go the other way, flip the identity with SM first.',
+    requirements: [
+      'Cite exactly two lines: the line to rewrite and the identity t1 = t2 (either order).',
+      'Replace at least one occurrence of t1 by t2; everything else stays exactly the same.',
+      'Only free occurrences may be replaced, and t2 must not be captured by a quantifier.',
+    ],
+    pitfalls: [
+      'Forgetting to cite the identity line.',
+      'Replacing in the wrong direction: a = b lets you put b for a. For the reverse, use SM to get b = a first.',
+      'Replacing a bound variable inside a quantifier: in ∀x Fx, the x is not a term you can substitute for.',
+    ],
+  },
+  {
+    id: 'SM',
+    name: 'Symmetry',
+    abbreviation: 'SM',
+    derived: false,
+    category: 'primitive',
+    premisesCount: 1,
+    schema: { from: ['t1 = t2'], to: 't2 = t1   (also t1 ≠ t2 ⊢ t2 ≠ t1)' },
+    example: { from: ['a = b'], to: 'b = a' },
+    explanation: 'Identity goes both ways: from t1 = t2 you may write t2 = t1 (and likewise for ≠).',
+    requirements: ['Cite exactly one identity (or negated identity) line.', 'Swap the two terms; change nothing else.'],
+    pitfalls: ['Applying SM to something that is not an identity (e.g. Rab ⊢ Rba is NOT valid).'],
+  },
   // ---------------------------------------------------------- closing methods
   {
     id: 'DD',
@@ -536,9 +588,10 @@ export function getRule(id: string): RuleInfo | undefined {
 
 /** Inference rules (things a 'step' line can use), in reference order. */
 export const INFERENCE_RULE_IDS: RuleId[] = [
-  'MP', 'MT', 'DN', 'R', 'S', 'ADJ', 'ADD', 'MTP', 'BC', 'CB', 'UI', 'EG', 'EI',
+  'MP', 'MT', 'DN', 'R', 'S', 'ADJ', 'ADD', 'MTP', 'BC', 'CB', 'UI', 'EG', 'EI', 'Id', 'LL', 'SM',
   'DM', 'NC', 'NB', 'CDJ', 'SC', 'QN', 'AV',
 ];
+export const IDENTITY_RULE_IDS: RuleId[] = ['Id', 'LL', 'SM'];
 export const DERIVED_RULE_IDS: RuleId[] = ['DM', 'NC', 'NB', 'CDJ', 'SC', 'QN', 'AV'];
 export const QUANTIFIER_RULE_IDS: RuleId[] = ['UI', 'EG', 'EI', 'QN', 'AV'];
 

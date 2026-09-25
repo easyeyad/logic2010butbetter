@@ -20,6 +20,7 @@
 import type { Formula, Term } from '../logic/ast';
 import { And, Exists, Forall, Iff, Implies, Name, Not, Or, Var, isPredicateFormula } from '../logic/ast';
 import { freeVariables, freshVariable, isGeneralizationOf, namesOf, substitute } from '../logic/index';
+import { replaceFree } from './inference';
 import type { CloseMethod, DraftLine, LineKind, RuleId } from './types';
 import { entails, equals as eq, fmt } from './util';
 
@@ -53,6 +54,7 @@ const subst = (f: Formula, v: string, t: Term): Formula | null => tryOr(() => su
 const freeIn = (f: Formula, v: string): boolean => tryOr(() => freeVariables(f).includes(v), false);
 const MAX_UNIVERSE = 8;
 const MAX_EI = 8;
+const MAX_LL = 60;
 
 export class Prover {
   out: DraftLine[] = [];
@@ -77,6 +79,7 @@ export class Prover {
   /** Quantifier machinery switches on once a predicate formula is seen. */
   private quant = false;
   private eiCount = 0;
+  private llCount = 0;
   private eiInstance = new Map<string, Formula>();
   private defaultTerm: Term | undefined;
 
@@ -301,7 +304,11 @@ export class Prover {
             break;
           case 'implies': {
             if (this.has(f.right) === undefined) {
-              const a = this.getOrDN(f.left) ?? (f.left.kind === 'and' || f.left.kind === 'or' || f.left.kind === 'iff' ? this.obtainInline(f.left, 2) ?? undefined : undefined);
+              const a =
+                this.getOrDN(f.left) ??
+                (f.left.kind === 'and' || f.left.kind === 'or' || f.left.kind === 'iff' || f.left.kind === 'identity'
+                  ? this.obtainInline(f.left, 2) ?? undefined
+                  : undefined);
               if (a !== undefined) {
                 this.step(f.right, 'MP', [n, a]);
                 changed = true;
@@ -362,6 +369,23 @@ export class Prover {
               this.eiInstance.set(key, inst);
               this.step(inst, 'EI', [n]);
               changed = true;
+            }
+            break;
+          }
+          case 'identity': {
+            if (f.left.kind === f.right.kind && f.left.name === f.right.name) break;
+            if (this.add({ kind: 'identity', left: f.right, right: f.left }, 'SM', [n])) changed = true;
+            // Leibniz's law: rewrite small (atomic or negated atomic) lines.
+            for (let j = 0; j < this.avail.length && this.llCount < MAX_LL; j++) {
+              const g = this.avail[j];
+              const core = g.f.kind === 'not' ? g.f.operand : g.f;
+              if (g.n === n || (core.kind !== 'pred' && core.kind !== 'identity')) continue;
+              const r = replaceFree(g.f, f.left, f.right);
+              if (r && this.has(r) === undefined) {
+                this.llCount++;
+                this.step(r, 'LL', [g.n, n]);
+                changed = true;
+              }
             }
             break;
           }
@@ -573,6 +597,8 @@ export class Prover {
     } else if (G.kind === 'or') {
       const a = this.obtainInline(G.left, depth - 1) ?? this.obtainInline(G.right, depth - 1);
       if (a !== null) r = this.step(G, 'ADD', [a]);
+    } else if (G.kind === 'identity' && G.left.kind === G.right.kind && G.left.name === G.right.name) {
+      r = this.step(G, 'Id', []);
     } else if (G.kind === 'exists' && this.quant) {
       for (const a of this.avail) {
         if (tryOr(() => isGeneralizationOf(G, a.f), false)) {
@@ -625,6 +651,7 @@ export class Prover {
         out.push({ method: 'UD', body: (show) => this.bodyUD(G, show) });
         break;
       case 'atom':
+      case 'identity':
       case 'pred':
       case 'not':
       case 'exists':
