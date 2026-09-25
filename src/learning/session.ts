@@ -4,7 +4,7 @@
  *
  * OWNER: Learning System.
  */
-import { exerciseLabel, generateExercise } from './exercises';
+import { exerciseFamily, exerciseLabel, generateExercise } from './exercises';
 import type { Difficulty, Exercise, Feedback, Topic } from './types';
 import { SENTENTIAL_TOPICS, TOPICS, clampDifficulty } from './types';
 import { hash, makeRng, pick, shuffle } from './util';
@@ -36,6 +36,8 @@ export function createPracticeSession(config: PracticeSessionConfig): PracticeSe
   const pool = config.topic === 'mixed' ? (config.topics?.length ? config.topics : [...SENTENTIAL_TOPICS]) : [config.topic];
   const exercises: Exercise[] = [];
   const used = new Set<string>();
+  const families = new Set<string>();
+  const usedForms = new Set<string>();
   // For mixed sessions, cycle through a shuffled topic order so topics are spread evenly.
   let order: Topic[] = [];
   for (let i = 0; i < count; i++) {
@@ -44,14 +46,23 @@ export function createPracticeSession(config: PracticeSessionConfig): PracticeSe
     const base = config.difficultyByTopic?.[topic] ?? config.difficulty;
     const ramp = config.ramp && count > 1 ? Math.round(-1 + (2 * i) / (count - 1)) : 0;
     const difficulty = clampDifficulty(base + ramp);
+    // Prefer an exercise that is new both by id and by underlying form; fall back to new-by-id.
     let ex: Exercise | null = null;
-    for (let tries = 0; tries < 8; tries++) {
-      const cand = generateExercise(topic, difficulty, Math.floor(rng() * 0x7fffffff), { exclude: used });
-      ex = cand;
-      if (!used.has(cand.id)) break;
+    let fallback: Exercise | null = null;
+    for (let tries = 0; tries < 12; tries++) {
+      const cand = generateExercise(topic, difficulty, Math.floor(rng() * 0x7fffffff), { exclude: used, excludeForms: usedForms });
+      if (used.has(cand.id)) continue;
+      fallback ??= cand;
+      if (!families.has(exerciseFamily(cand))) {
+        ex = cand;
+        break;
+      }
     }
-    used.add(ex!.id);
-    exercises.push(ex!);
+    ex ??= fallback ?? generateExercise(topic, difficulty, Math.floor(rng() * 0x7fffffff), { exclude: used });
+    used.add(ex.id);
+    families.add(exerciseFamily(ex));
+    if ('form' in ex && ex.form) usedForms.add(ex.form);
+    exercises.push(ex);
   }
   return { id: `session-${hash(JSON.stringify({ ...config, count }))}`, config: { ...config, count }, exercises };
 }

@@ -286,7 +286,10 @@ export interface PredicateCountermodelExercise extends ExerciseBase<'predicate-c
   names: string[];
   /** A countermodel exists with at most this many objects (a hint for the domain-size control). */
   maxDomain: number;
+  /** Name of the underlying invalid form (sessions avoid repeating it). */
   form?: string;
+  /** Why the form fails, in this exercise's own symbols (used by hints). */
+  formNote?: string;
 }
 
 export type Exercise =

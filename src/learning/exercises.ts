@@ -65,6 +65,8 @@ export interface GenerateOptions {
   bankRatio?: number;
   /** Exercise ids to avoid (e.g. already in this session). */
   exclude?: ReadonlySet<string>;
+  /** Underlying argument forms to avoid (predicate countermodels; see exerciseFamily). */
+  excludeForms?: ReadonlySet<string>;
 }
 
 /** Bank items at the difficulty, falling back to the nearest available difficulty. */
@@ -107,7 +109,7 @@ export function generateExercise(topic: Topic, difficulty: Difficulty, seed: num
     case 'model':
       return generateModelExercise(difficulty, s);
     case 'predicate-countermodel':
-      return generatePredicateCountermodel(difficulty, s);
+      return generatePredicateCountermodel(difficulty, s, { excludeForms: opts.excludeForms });
     case 'quantifier-derivation': {
       const bank = bankAt(QUANTIFIER_DERIVATION_EXERCISES, difficulty, opts.exclude);
       return bank.length ? pick(rng, bank) : pick(rng, bankAt(QUANTIFIER_DERIVATION_EXERCISES, difficulty));
@@ -248,5 +250,23 @@ export function exerciseLabel(ex: Exercise): string {
       return `${ex.formula} (in a world with ${ex.model.domainSize} object${ex.model.domainSize === 1 ? '' : 's'})`;
     case 'predicate-countermodel':
       return arg(ex.premises, ex.conclusion);
+  }
+}
+
+/**
+ * What makes two exercises "the same problem in disguise": the underlying
+ * argument form for validity/countermodel exercises, the sentence template for
+ * model exercises, otherwise the id. Sessions avoid repeating a family.
+ */
+export function exerciseFamily(ex: Exercise): string {
+  switch (ex.kind) {
+    case 'validity':
+    case 'countermodel':
+    case 'predicate-countermodel':
+      return ex.form ? `${ex.kind}:${ex.form}` : ex.id;
+    case 'model':
+      return `model:${ex.formula}`;
+    default:
+      return ex.id;
   }
 }

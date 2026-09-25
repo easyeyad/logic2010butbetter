@@ -37,7 +37,7 @@ import type {
   PredicateSymbolizationExercise,
   Solution,
 } from './types';
-import { f, hash, joinList, makeRng, pick, sample, shuffle, type Rng } from './util';
+import { f, hash, joinList, makeRng, pick, shuffle, type Rng } from './util';
 
 // ---------------------------------------------------------------------------
 // Keys
@@ -717,21 +717,21 @@ export interface PredicateArgumentForm {
 }
 
 export const INVALID_PREDICATE_FORMS: PredicateArgumentForm[] = [
-  { name: 'Affirming the consequent (quantified)', premises: ['∀x(Fx → Gx)', 'Ga'], conclusion: 'Fa', difficulty: 1, note: 'a can be G without being F.' },
-  { name: 'Denying the antecedent (quantified)', premises: ['∀x(Fx → Gx)', '¬Fa'], conclusion: '¬Ga', difficulty: 1, note: 'a can be G for some other reason.' },
-  { name: 'Some to all', premises: ['∃xFx'], conclusion: '∀xFx', difficulty: 1, note: 'One F does not make everything F.' },
-  { name: 'Not all to none', premises: ['¬∀xFx'], conclusion: '∀x¬Fx', difficulty: 2, note: 'Some things may still be F.' },
-  { name: 'Two somes', premises: ['∃xFx', '∃xGx'], conclusion: '∃x(Fx ∧ Gx)', difficulty: 2, note: 'The F and the G may be different things.' },
-  { name: 'Converting "all"', premises: ['∀x(Fx → Gx)'], conclusion: '∀x(Gx → Fx)', difficulty: 2, note: 'All F are G does not make all G F.' },
-  { name: 'Some G, so some F', premises: ['∀x(Fx → Gx)', '∃xGx'], conclusion: '∃xFx', difficulty: 2, note: 'The G might not be F — and there may be no F at all.' },
-  { name: 'Distributing ∀ over ∨', premises: ['∀x(Fx ∨ Gx)'], conclusion: '∀xFx ∨ ∀xGx', difficulty: 3, note: 'Each thing is F or G, but not all need be the same one.' },
-  { name: 'Existential antecedent', premises: ['∃xFx → ∃xGx'], conclusion: '∀x(Fx → Gx)', difficulty: 3, note: 'Some G exists, but it need not be each F.' },
+  { name: 'Affirming the consequent (quantified)', premises: ['∀x(Fx → Gx)', 'Ga'], conclusion: 'Fa', difficulty: 1, note: '{a} can be {G} without being {F}.' },
+  { name: 'Denying the antecedent (quantified)', premises: ['∀x(Fx → Gx)', '¬Fa'], conclusion: '¬Ga', difficulty: 1, note: '{a} can be {G} for some other reason.' },
+  { name: 'Some to all', premises: ['∃xFx'], conclusion: '∀xFx', difficulty: 1, note: 'One {F} does not make everything {F}.' },
+  { name: 'Not all to none', premises: ['¬∀xFx'], conclusion: '∀x¬Fx', difficulty: 2, note: 'Some things may still be {F}.' },
+  { name: 'Two somes', premises: ['∃xFx', '∃xGx'], conclusion: '∃x(Fx ∧ Gx)', difficulty: 2, note: 'The {F} and the {G} may be different things.' },
+  { name: 'Converting "all"', premises: ['∀x(Fx → Gx)'], conclusion: '∀x(Gx → Fx)', difficulty: 2, note: '"All {F} are {G}" does not make all {G} {F}.' },
+  { name: 'Some G, so some F', premises: ['∀x(Fx → Gx)', '∃xGx'], conclusion: '∃xFx', difficulty: 2, note: 'The {G} might not be {F} — and there may be no {F} at all.' },
+  { name: 'Distributing ∀ over ∨', premises: ['∀x(Fx ∨ Gx)'], conclusion: '∀xFx ∨ ∀xGx', difficulty: 3, note: 'Each thing is {F} or {G}, but not all need be the same one.' },
+  { name: 'Existential antecedent', premises: ['∃xFx → ∃xGx'], conclusion: '∀x(Fx → Gx)', difficulty: 3, note: 'Some {G} exists, but that does not make every {F} a {G}.' },
   { name: 'Undistributed middle', premises: ['∃x(Fx ∧ Gx)', '∃x(Gx ∧ Hx)'], conclusion: '∃x(Fx ∧ Hx)', difficulty: 3, note: 'Different things may be the witnesses.' },
   { name: 'Quantifier shift', premises: ['∀x∃yRxy'], conclusion: '∃y∀xRxy', difficulty: 4, note: 'Each thing relating to something does not mean one thing everything relates to.' },
   { name: 'Reflexive from serial', premises: ['∀x∃yRxy'], conclusion: '∃xRxx', difficulty: 4, note: 'Everything may relate only to something else.' },
   { name: 'Diagonal to all pairs', premises: ['∀xRxx'], conclusion: '∀x∀yRxy', difficulty: 4, note: 'Relating to oneself says nothing about relating to others.' },
-  { name: 'Serial to named loop', premises: ['∀x(Fx → ∃yRxy)', 'Fa'], conclusion: 'Raa', difficulty: 4, note: 'a relates to something — not necessarily itself.' },
-  { name: 'Symmetry to reflexivity', premises: ['∀x∀y(Rxy → Ryx)', 'Rab'], conclusion: 'Raa', difficulty: 5, note: 'Symmetry gives Rba, not Raa.' },
+  { name: 'Serial to named loop', premises: ['∀x(Fx → ∃yRxy)', 'Fa'], conclusion: 'Raa', difficulty: 4, note: '{a} relates to something — not necessarily to itself.' },
+  { name: 'Symmetry to reflexivity', premises: ['∀x∀y(Rxy → Ryx)', 'Rab'], conclusion: 'Raa', difficulty: 5, note: 'Symmetry gives {R}{b}{a}, not {R}{a}{a}.' },
   { name: 'One universal relater', premises: ['∃x∀yRxy'], conclusion: '∀xRxx', difficulty: 5, note: 'Only the special object must relate to itself.' },
 ];
 
@@ -753,36 +753,54 @@ export function renameSymbols(g: Formula, preds: Record<string, string>, names: 
   }
 }
 
-export function generatePredicateCountermodel(difficulty: Difficulty, seed: number): PredicateCountermodelExercise {
+/** Fill {F}, {G}, {R}, {a}, {b} placeholders in a form note with the exercise's own symbols. */
+function fillNote(note: string, preds: Record<string, string>, names: Record<string, string>): string {
+  return note.replace(/\{([A-Za-z])\}/g, (_, c: string) => preds[c] ?? names[c] ?? c);
+}
+
+export function generatePredicateCountermodel(difficulty: Difficulty, seed: number, opts: { excludeForms?: ReadonlySet<string> } = {}): PredicateCountermodelExercise {
   const rng = makeRng(seed);
   let pool = INVALID_PREDICATE_FORMS.filter((x) => x.difficulty === difficulty);
   if (!pool.length) pool = INVALID_PREDICATE_FORMS;
-  const form = pick(rng, pool);
-  // Rename letters for variety (monadic among F G H J K; relations among R L S).
-  const mon = shuffle(rng, ['F', 'G', 'H', 'J', 'K']);
-  const rel = pick(rng, ['R', 'L', 'S']);
-  const nm = sample(rng, ['a', 'b', 'c', 'd'], 1)[0];
-  const predMap: Record<string, string> = { F: mon[0], G: mon[1], H: mon[2], R: rel };
-  const ren = (t: string) => format(renameSymbols(f(t), predMap, { a: nm }));
-  const premises = form.premises.map(ren);
-  const conclusion = ren(form.conclusion);
-  const all = [...premises, conclusion].map(f);
-  return {
-    id: `pcm-gen-${hash(`${premises.join(';')}⊢${conclusion}`)}`,
-    kind: 'predicate-countermodel',
-    topic: 'predicate-countermodel',
-    difficulty,
-    title: 'Build a countermodel',
-    prompt: 'This argument is invalid. Describe a small world (domain, what each name refers to, and which objects each predicate is true of) where every premise is true and the conclusion is false.',
-    tags: [],
-    source: 'generated',
-    premises,
-    conclusion,
-    predicates: predicatesOf(...all),
-    names: namesOf(...all),
-    maxDomain: 3,
-    form: form.name,
-  };
+  const fresh = pool.filter((x) => !opts.excludeForms?.has(x.name));
+  if (fresh.length) pool = fresh;
+  for (let attempt = 0; ; attempt++) {
+    const form = pick(rng, pool);
+    const src = [...form.premises, form.conclusion].map(f);
+    // Rename symbols injectively (a bijection), so distinct symbols stay distinct.
+    const mon = shuffle(rng, ['F', 'G', 'H', 'J', 'K']);
+    const rels = shuffle(rng, ['R', 'L', 'S', 'T']);
+    const nms = shuffle(rng, ['a', 'b', 'c', 'd', 'e']);
+    const predMap: Record<string, string> = {};
+    let mi = 0;
+    let ri = 0;
+    for (const p of predicatesOf(...src)) predMap[p.name] = p.arity === 1 ? mon[mi++] : rels[ri++];
+    const nameMap: Record<string, string> = {};
+    namesOf(...src).forEach((n, k) => (nameMap[n] = nms[k]));
+    const premises = src.slice(0, -1).map((g) => format(renameSymbols(g, predMap, nameMap)));
+    const conclusion = format(renameSymbols(src[src.length - 1], predMap, nameMap));
+    const all = [...premises, conclusion].map(f);
+    // Safety net: only ever present arguments that really have a small countermodel.
+    const check = findModel(all.slice(0, -1), [all[all.length - 1]], { maxDomain: 3 });
+    if (check.status !== 'found' && attempt < 30) continue;
+    return {
+      id: `pcm-gen-${hash(`${premises.join(';')}⊢${conclusion}`)}`,
+      kind: 'predicate-countermodel',
+      topic: 'predicate-countermodel',
+      difficulty,
+      title: 'Build a countermodel',
+      prompt: 'This argument is invalid. Describe a small world (domain, what each name refers to, and which objects each predicate is true of) where every premise is true and the conclusion is false.',
+      tags: [],
+      source: 'generated',
+      premises,
+      conclusion,
+      predicates: predicatesOf(...all),
+      names: namesOf(...all),
+      maxDomain: 3,
+      form: form.name,
+      formNote: fillNote(form.note, predMap, nameMap),
+    };
+  }
 }
 
 /** Problems with a proposed interpretation (missing symbols, wrong arities, objects outside the domain). */
@@ -831,11 +849,10 @@ export function checkPredicateCountermodel(ex: PredicateCountermodelExercise, m:
 }
 
 export function predicateCountermodelHints(ex: PredicateCountermodelExercise): string[] {
-  const form = INVALID_PREDICATE_FORMS.find((x) => x.name === ex.form);
   return [
     `Make the conclusion ${ex.conclusion} false first. ${f(ex.conclusion).kind === 'forall' ? 'A universal is false if ONE object fails it.' : f(ex.conclusion).kind === 'exists' ? 'An existential is false only if NO object satisfies it.' : ''}`.trim(),
     'Then make each premise true, adding objects if needed. Small worlds (2 or 3 objects) are enough here.',
-    ...(form ? [`Why it fails: ${form.note}`] : []),
+    ...(ex.formNote ? [`Why it fails: ${ex.formNote}`] : []),
   ];
 }
 

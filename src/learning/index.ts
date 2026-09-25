@@ -78,7 +78,7 @@
  */
 export * from './types';
 
-export { checkAnswer, getHints, getSolution, generateExercise, getExerciseById, exerciseLabel, EXERCISE_BANK } from './exercises';
+export { checkAnswer, getHints, getSolution, generateExercise, getExerciseById, exerciseLabel, exerciseFamily, EXERCISE_BANK } from './exercises';
 export type { GenerateOptions } from './exercises';
 
 export {
