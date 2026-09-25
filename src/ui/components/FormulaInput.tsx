@@ -7,7 +7,7 @@ import React, {
   useLayoutEffect,
   useMemo,
   useRef,
-  useState,
+  useSyncExternalStore,
   type FocusEvent,
   type InputHTMLAttributes,
   type KeyboardEvent,
@@ -52,6 +52,20 @@ export interface FormulaInputProps
   wrap?: boolean;
 }
 
+// Most recently focused FormulaInput (phones show only that field's symbol bar).
+let activeField: string | null = null;
+const activeListeners = new Set<() => void>();
+const subscribeActive = (cb: () => void) => {
+  activeListeners.add(cb);
+  return () => activeListeners.delete(cb);
+};
+const getActive = () => activeField;
+function setActive(id: string) {
+  if (activeField === id) return;
+  activeField = id;
+  activeListeners.forEach((l) => l());
+}
+
 export interface FormulaInputHandle {
   focus: (caret?: 'start' | 'end') => void;
   input: HTMLInputElement | HTMLTextAreaElement | null;
@@ -93,7 +107,11 @@ export const FormulaInput = forwardRef<FormulaInputHandle, FormulaInputProps>(fu
   const lastSel = useRef<{ start: number; end: number }>({ start: value.length, end: value.length });
   const target = useFormulaTarget();
   const isPhone = useMediaQuery(BP.mobile);
-  const [within, setWithin] = useState(false);
+  // Which field shows its bar on phones: the most recently focused one. It stays
+  // until ANOTHER formula field takes focus, so tapping a button below doesn't
+  // collapse the bar and shift the page under the finger.
+  const activeId = useSyncExternalStore(subscribeActive, getActive, getActive);
+  const within = activeId === id;
 
   useImperativeHandle(ref, () => ({
     focus: (caret) => {
@@ -202,10 +220,7 @@ export const FormulaInput = forwardRef<FormulaInputHandle, FormulaInputProps>(fu
   return (
     <div
       className={`fi ${compact ? 'fi--compact' : ''} ${className ?? ''}`}
-      onFocus={() => setWithin(true)}
-      onBlur={(e) => {
-        if (!e.currentTarget.contains(e.relatedTarget as Node | null)) setWithin(false);
-      }}
+      onFocus={() => setActive(id)}
     >
       <label htmlFor={id} className={hideLabel ? 'visually-hidden' : 'field__label'}>
         {label}
