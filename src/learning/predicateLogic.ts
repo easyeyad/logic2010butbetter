@@ -828,7 +828,7 @@ export const INVALID_PREDICATE_FORMS: PredicateArgumentForm[] = [
   { name: 'Some-not to none', premises: ['∃x¬Fx'], conclusion: '∀x¬Fx', difficulty: 2, note: 'Some things may be {F} and others not.' },
   { name: 'Complement', premises: ['∀x(Fx → ¬Gx)'], conclusion: '∀x(¬Fx → Gx)', difficulty: 2, note: 'Not being {F} does not make something {G}.' },
   { name: 'Common consequent', premises: ['∀x(Fx → Gx)', '∀x(Hx → Gx)'], conclusion: '∀x(Fx → Hx)', difficulty: 3, note: 'Sharing {G} does not connect {F} and {H}.' },
-  { name: 'Symmetry to transitivity', premises: ['∀x∀y(Rxy → Ryx)'], conclusion: '∀x∀y∀z((Rxy ∧ Ryz) → Rxz)', difficulty: 5, note: 'A symmetric relation need not be transitive.' },
+  { name: 'Symmetry to transitivity', premises: ['∀x∀y(Rxy → Ryx)'], conclusion: '∀x∀y∀z((Rxy ∧ Ryz) → Rxz)', difficulty: 5, note: 'Symmetry does not give transitivity.' },
   { name: 'Serial both ways to a loop', premises: ['∀x∃yRxy', '∀x∃yRyx'], conclusion: '∃xRxx', difficulty: 5, note: 'Two objects can relate only to each other.' },
   { name: 'Universally related-to, so relates to another', premises: ['∃x∀yRyx'], conclusion: '∀x∃y(Rxy ∧ ¬(x = y))', difficulty: 5, note: 'The world may contain just one object.' },
   // identity

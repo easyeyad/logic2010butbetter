@@ -419,3 +419,39 @@ describe('identity (phase 4)', () => {
     expect(ids.length).toBeGreaterThanOrEqual(5);
   });
 });
+
+describe('review round 4 fixes', () => {
+  it('1: "except" with the conditional reversed is diagnosed as a converse, not a missing uniqueness clause', () => {
+    const fb = check('pid-06', '∀x(Px → ¬(x = b))');
+    expect(fb.code).toBe('converse');
+    expect(fb.details?.some((d) => /leaves out the rest/.test(d))).toBe(true);
+    // a genuine missing uniqueness clause is still named
+    expect(check('pid-05', 'Pa').code).toBe('missing-uniqueness');
+  });
+
+  it('2: one quantifier for "at least two" is "only at least one"; two quantifiers without ≠ is "forgot different"', () => {
+    const one = check('pid-07', '∃x(Sx ∧ Px)');
+    expect(one.code).toBe('at-least-one');
+    expect(one.headline).toMatch(/at least one/);
+    expect(check('pid-07', '∃x∃y((Sx ∧ Px) ∧ (Sy ∧ Py))').code).toBe('missing-distinctness');
+  });
+
+  it('3: every level has at least 6 countermodel forms, all genuinely invalid', () => {
+    for (const d of DS) {
+      const forms = INVALID_PREDICATE_FORMS.filter((x) => x.difficulty === d);
+      expect([d, forms.length >= 6]).toEqual([d, true]);
+      for (const f of forms) expect([f.name, findModel(f.premises.map(parseOrThrow), [parseOrThrow(f.conclusion)], { maxDomain: 3 }).status]).toEqual([f.name, 'found']);
+    }
+  });
+
+  it('3: long sessions cycle through forms and never repeat a form twice in a row', () => {
+    for (const d of DS)
+      for (const seed of [1, 2, 3, 4, 5]) {
+        const n = INVALID_PREDICATE_FORMS.filter((x) => x.difficulty === d).length;
+        const s = createPracticeSession({ topic: 'predicate-countermodel', difficulty: d, count: 2 * n + 1, seed });
+        const forms = s.exercises.map((e) => (e.kind === 'predicate-countermodel' ? e.form! : ''));
+        for (let i = 1; i < forms.length; i++) expect([d, seed, i, forms[i] === forms[i - 1]]).toEqual([d, seed, i, false]);
+        expect(new Set(forms.slice(0, n)).size).toBe(n); // first cycle uses every form once
+      }
+  });
+});

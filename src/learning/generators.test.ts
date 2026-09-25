@@ -1,4 +1,4 @@
-import { buildTruthTable, checkValidity, classify, parse, parseOrThrow } from '../logic';
+import { buildTruthTable, checkValidity, classify, equals, parse, parseOrThrow } from '../logic';
 import {
   ARGUMENT_FORMS,
   TERMINOLOGY_EXERCISES,
@@ -414,5 +414,19 @@ describe('inference-rule drill: quantifier and identity rules (phase 4)', () => 
     const body = ex!.lines[0].slice(ex!.lines[0].indexOf(v) + 1).trim();
     const withName = body.replace(new RegExp(`(?<![a-z])${v}(?![a-z])`, 'g'), 'c').replace(/^\((.*)\)$/, '$1');
     expect(checkAnswer(ex!, { kind: 'inference-rule', formula: withName }).correct).toBe(false);
+  });
+});
+
+describe('inference-rule drill: no degenerate items (review round 4)', () => {
+  it('conclusion never equals a cited line and cited lines are never duplicates (4000 items)', () => {
+    for (const d of DS)
+      for (let s = 0; s < 400; s++)
+        for (const mode of ['identify', 'apply'] as const) {
+          const ex = generateInferenceRule(d, s, mode);
+          const cited = ex.lines.map(parseOrThrow);
+          const concl = parseOrThrow(ex.conclusion);
+          expect([ex.lines.join(', ') + ' ⊢ ' + ex.conclusion, cited.some((c) => equals(c, concl))]).toEqual([ex.lines.join(', ') + ' ⊢ ' + ex.conclusion, false]);
+          expect(new Set(ex.lines).size).toBe(ex.lines.length);
+        }
   });
 });
