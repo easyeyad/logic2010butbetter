@@ -21,12 +21,13 @@ A modern, responsive replacement for UCLA's Logic 2010, covering both sentential
 - **Practice**: eight exercise types, difficulty from 1 to 5 or adaptive, hints before solutions, retry, and a first-try session score.
 - **Progress / Dashboard**: accuracy, streak, weak areas, recommended practice and saved proofs.
 - **Reference**: every rule, with its schema, an example, requirements and common pitfalls. It is also available inside the proof editor, as a side panel on desktop and a bottom sheet on mobile.
-- **Formula input**: typing `~ & | -> <->` gives `¬ ∧ ∨ → ↔`, and `@`/`$` give `∀`/`∃`. Syntax errors highlight the exact spot with an explanation.
-- **Predicate logic** (Logic 2010's quantifier chapters):
-  - Syntax: predicates such as `Fa` and `Rxy`, names a–t, and variables u, w, x, y, z.
-  - Proof rules UI, EG, EI (to a new variable) and the UD closing method, each with its restriction checked, plus the derived rules QN and AV.
-  - 44 predicate symbolization sentences, where a wrong answer is shown alongside a small world that tells it apart from the correct one.
-  - Model-checking exercises, a countermodel builder and 18 quantifier derivation problems.
+- **Formula input**: typing `~ & | -> <->` gives `¬ ∧ ∨ → ↔`, `@`/`$` give `∀`/`∃`, and `!=` gives `≠`. A plain `=` means identity, not ↔. Syntax errors highlight the exact spot with an explanation.
+- **Predicate logic and identity** (Logic 2010's quantifier and identity chapters):
+  - Syntax: predicates such as `Fa` and `Rxy`, identity `a = b` and `a ≠ b`, names a–t, and variables u, w, x, y, z.
+  - Proof rules UI, EG, EI (to a new variable) and the UD closing method, each with its restriction checked, the identity rules Id, LL and SM, and the derived rules QN and AV.
+  - 62 predicate symbolization sentences (including "only", "at least two" and "exactly one"), where a wrong answer is shown alongside a small world that tells it apart from the correct one.
+  - Model-checking exercises, a countermodel builder and 26 quantifier and identity derivation problems.
+  - The inference-rule drill covers the quantifier and identity rules at higher levels.
 
 See [ARCHITECTURE.md](ARCHITECTURE.md) for how the modules fit together.
 
@@ -43,4 +44,4 @@ npm run e2e        # Playwright: 7 viewports, axe accessibility, keyboard, reduc
 
 ## Scope
 
-Identity (`=`) and function symbols are not supported yet. The shared `Formula` AST in `src/logic/ast.ts` is the place to extend it. Predicates with three or more places parse and check, but the practice model builder only handles one- and two-place predicates.
+Function symbols and definite descriptions are not supported yet. The shared `Formula` AST in `src/logic/ast.ts` is the place to extend it. Predicates with three or more places parse and check, but the practice model builder only handles one- and two-place predicates.
