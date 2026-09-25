@@ -248,7 +248,7 @@ export const FormulaInput = forwardRef<FormulaInputHandle, FormulaInputProps>(fu
             onKeyUp={rememberSel}
             onKeyDown={handleKeyDown}
             onFocus={(e: FocusEvent<HTMLTextAreaElement>) => {
-              target?.register((d) => insertRef.current(d));
+              target?.register((d) => insertRef.current(d), label);
               onFocus?.(e as unknown as FocusEvent<HTMLInputElement>);
             }}
             onBlur={(e: FocusEvent<HTMLTextAreaElement>) => {
@@ -278,7 +278,7 @@ export const FormulaInput = forwardRef<FormulaInputHandle, FormulaInputProps>(fu
             onKeyUp={rememberSel}
             onKeyDown={handleKeyDown}
             onFocus={(e: FocusEvent<HTMLInputElement>) => {
-              target?.register((d) => insertRef.current(d));
+              target?.register((d) => insertRef.current(d), label);
               onFocus?.(e);
             }}
             onBlur={(e: FocusEvent<HTMLInputElement>) => {

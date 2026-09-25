@@ -1,13 +1,37 @@
 import { useEffect, useRef, useState } from 'react';
 import { Button } from './Button';
 import { FormulaInput, type FormulaInputHandle } from './FormulaInput';
+import { FormulaTargetProvider, useFormulaTarget } from './FormulaTarget';
+import { SymbolBar } from './SymbolBar';
 
 /**
  * Several formulas, one per row. Typing or pasting a comma splits the text
  * into separate rows and moves the caret to the end of the last new row, so
  * "P -> Q, ~Q -> ~P" typed straight through lands in two rows.
  */
-export function FormulaList({
+/** Several formulas sharing one symbol bar that inserts into whichever row was focused last. */
+export function FormulaList(props: Parameters<typeof FormulaListInner>[0]) {
+  return (
+    <FormulaTargetProvider>
+      <FormulaListInner {...props} />
+    </FormulaTargetProvider>
+  );
+}
+
+function SharedBar({ fallbackLabel, onFallback }: { fallbackLabel: string; onFallback: () => void }) {
+  const target = useFormulaTarget();
+  const label = target?.activeLabel ?? fallbackLabel;
+  return (
+    <SymbolBar
+      label={`Insert symbol into ${label}`}
+      onInsert={(d) => {
+        if (!target?.insert(d)) onFallback();
+      }}
+    />
+  );
+}
+
+function FormulaListInner({
   values,
   onChange,
   labelFor,
@@ -57,7 +81,7 @@ export function FormulaList({
             value={v}
             invalid={invalidRows?.has(i)}
             onChange={(t) => setAt(i, t)}
-            toolbar={i === values.length - 1}
+            toolbar={false}
           />
           {values.length > min && (
             <Button
@@ -72,6 +96,10 @@ export function FormulaList({
           )}
         </div>
       ))}
+      <SharedBar
+        fallbackLabel={labelFor(0)}
+        onFallback={() => refs.current[0]?.focus('end')}
+      />
       <div>
         <Button
           size="sm"

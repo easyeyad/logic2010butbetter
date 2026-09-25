@@ -130,7 +130,15 @@ export function RulePicker({
         onKeyDown={handleKey}
       />
       {open && (
-        <ul id={listId} ref={listRef} role="listbox" className="picker__list" aria-label={`${label} options`}>
+        <ul
+          id={listId}
+          ref={listRef}
+          role="listbox"
+          className="picker__list"
+          aria-label={`${label} options`}
+          // Chrome makes scrollable elements keyboard-focusable; keep Tab moving on to the cited-lines field.
+          tabIndex={-1}
+        >
           {filtered.length === 0 && (() => {
             const off = filterOptions(unavailable, text)[0];
             return off && text.trim() ? (
@@ -164,7 +172,8 @@ export function RulePicker({
               className={`picker__opt ${o.key === value ? 'is-current' : ''}`}
               onMouseDown={(e) => e.preventDefault()}
               onClick={() => choose(o)}
-              onMouseEnter={() => setActive(i)}
+              // Only real pointer movement changes the highlight — a resting pointer must not override typing.
+              onPointerMove={() => i !== active && setActive(i)}
             >
               <span className="picker__abbr">{o.abbr}</span>
               <span className="picker__name">{o.name}</span>
