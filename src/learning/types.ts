@@ -185,6 +185,8 @@ export interface DerivationExercise extends Omit<ExerciseBase<'derivation'>, 'to
   allowDerivedRules: boolean;
   /** Problem-specific hints, progressive. */
   hints: string[];
+  /** Replaces the generic goal-shape strategy hint when that would mislead. */
+  strategyHint?: string;
   /**
    * Model solution in the compact script format understood by
    * `parseProofScript` (see derivations.ts). Revealed only by getSolution.

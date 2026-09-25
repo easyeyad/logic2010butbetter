@@ -292,3 +292,71 @@ describe('alpha-equivalence sanity (contract)', () => {
     expect(alphaEquals(parseOrThrow('∀x∃yLxy'), parseOrThrow('∀z∃wLzw'))).toBe(true);
   });
 });
+
+describe('review round 3 fixes', () => {
+  it('M1: 500 generated countermodel exercises are all genuinely invalid, and hints use only their own symbols', () => {
+    for (const d of DS)
+      for (let s = 0; s < 100; s++) {
+        const ex = generatePredicateCountermodel(d, s * 7 + 1);
+        const r = findModel(ex.premises.map(parseOrThrow), [parseOrThrow(ex.conclusion)], { maxDomain: 3 });
+        expect([ex.premises.join(', ') + ' ⊢ ' + ex.conclusion, r.status]).toEqual([ex.premises.join(', ') + ' ⊢ ' + ex.conclusion, 'found']);
+        const preds = new Set(ex.predicates.map((p) => p.name));
+        const names = new Set(ex.names);
+        for (const h of getHints(ex)) {
+          // formula-like tokens: a capital letter followed only by names (a–e) / variables (u–z)
+          for (const m of h.matchAll(/(?<![A-Za-z])([A-Z])([a-eu-z]{1,3})(?![A-Za-z])/g)) {
+            expect([h, preds.has(m[1])]).toEqual([h, true]);
+            for (const c of m[2]) if (c < 'u') expect([h, names.has(c)]).toEqual([h, true]);
+          }
+          if (h.startsWith('Why it fails')) {
+            for (const m of h.matchAll(/(?<![A-Za-z])([A-Z])(?![A-Za-z])/g)) expect([h, preds.has(m[1])]).toEqual([h, true]);
+            for (const m of h.matchAll(/(?<![A-Za-z])([a-z])(?![A-Za-z])/g)) expect([h, names.has(m[1])]).toEqual([h, true]);
+          }
+        }
+      }
+  });
+
+  it('M1: renaming is injective (distinct names/predicates stay distinct)', () => {
+    for (let s = 0; s < 200; s++) {
+      const ex = generatePredicateCountermodel(5, s);
+      if (ex.form === 'Symmetry to reflexivity') expect(ex.names).toHaveLength(2);
+    }
+  });
+
+  it('minor 2: a session does not repeat an underlying form while alternatives remain', () => {
+    for (const d of DS) {
+      const forms = new Set(INVALID_PREDICATE_FORMS.filter((x) => x.difficulty === d).map((x) => x.name));
+      const s = createPracticeSession({ topic: 'predicate-countermodel', difficulty: d, count: forms.size, seed: 11 + d });
+      const used = s.exercises.map((e) => (e.kind === 'predicate-countermodel' ? e.form : ''));
+      expect(new Set(used).size).toBe(forms.size);
+    }
+    const v = createPracticeSession({ topic: 'validity', difficulty: 1, count: 5, seed: 3 });
+    const fs = v.exercises.map((e) => (e.kind === 'validity' ? e.form ?? e.id : ''));
+    expect(new Set(fs).size).toBe(fs.length);
+  });
+
+  it('minor 8: moving a negation is not diagnosed as "reversed a conditional"', () => {
+    const fb = check('psym-03', '∀x(¬Fx → Mx)');
+    expect(fb.correct).toBe(false);
+    expect(fb.code).not.toBe('converse');
+    expect(fb.details?.[0]).toMatch(/^In a world with/);
+    // a genuine converse is still named
+    expect(check('psym-11', '∀x(Cx → Vx)').code).toBe('converse');
+  });
+
+  it('minor 9: every bank key is contingent (neither logically true nor logically false) up to 3 objects', () => {
+    for (const ex of PREDICATE_SYMBOLIZATION_EXERCISES) {
+      const k = parseOrThrow(ex.answer);
+      expect([ex.id, findModel([k], [], { maxDomain: 3 }).status]).toEqual([ex.id, 'found']);
+      expect([ex.id, findModel([], [k], { maxDomain: 3 }).status]).toEqual([ex.id, 'found']);
+    }
+    expect(check('psym-16', 'Sa → Sa').correct).toBe(false);
+  });
+
+  it('polish: qder-12 strategy hint does not send the student to EG', () => {
+    const ex = QUANTIFIER_DERIVATION_EXERCISES.find((e) => e.id === 'qder-12')!;
+    const h = getHints(ex);
+    expect(h[0]).toMatch(/do not need EG/);
+    expect(h.join(' ')).toMatch(/MP/);
+  });
+});

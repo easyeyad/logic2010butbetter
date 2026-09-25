@@ -31,6 +31,8 @@ interface Problem {
   solution: string[];
   derived?: boolean;
   tags?: string[];
+  /** Overrides the generic goal-shape strategy hint when it would mislead. */
+  strategyHint?: string;
 }
 
 const PROBLEMS: Problem[] = [
@@ -319,20 +321,20 @@ const QUANTIFIER_PROBLEMS: Problem[] = [
   { id: 'qder-01', title: 'Universal instantiation', difficulty: 1, strategy: 'DD', premises: ['∀x(Fx → Gx)', 'Fa'], goal: 'Ga', tags: ['UI', 'MP'], hints: ['Instantiate the universal premise to the name a with UI.', 'UI on line 1 gives Fa → Ga; then MP.'], solution: [] },
   { id: 'qder-02', title: 'Chain of universals', difficulty: 1, strategy: 'DD', premises: ['∀x(Fx → Gx)', '∀x(Gx → Hx)', 'Fa'], goal: 'Ha', tags: ['UI', 'MP'], hints: ['Instantiate both universals to a.', 'Then MP twice.'], solution: [] },
   { id: 'qder-03', title: 'Existential generalization', difficulty: 1, strategy: 'DD', premises: ['Fa'], goal: '∃xFx', tags: ['EG'], hints: ['EG: from an instance, infer the existential.', 'From Fa you may write ∃xFx.'], solution: [] },
-  { id: 'qder-04', title: 'All to some', difficulty: 2, strategy: 'DD', premises: ['∀xFx'], goal: '∃xFx', tags: ['UI', 'EG'], hints: ['Instantiate the universal to any term, then generalize existentially.', 'UI gives Fx (or Fa); EG gives ∃xFx.'], solution: [] },
+  { id: 'qder-04', title: 'All to some', difficulty: 2, strategy: 'DD', premises: ['∀xFx'], goal: '∃xFx', tags: ['UI', 'EG'], hints: ['Instantiate the universal to any term, then generalize existentially.', 'UI gives an instance such as Fy; EG then gives ∃xFx.'], solution: [] },
   { id: 'qder-05', title: 'Universal derivation', difficulty: 2, strategy: 'UD', premises: ['∀x(Fx ∧ Gx)'], goal: '∀xFx', tags: ['UI', 'UD', 'S'], hints: ['The goal is universal: Show Fx for an arbitrary x, then close with UD.', 'UI gives Fx ∧ Gx; S gives Fx.'], solution: [] },
   { id: 'qder-06', title: 'Distributing over →', difficulty: 2, strategy: 'UD', premises: ['∀x(Fx → Gx)', '∀xFx'], goal: '∀xGx', tags: ['UI', 'UD', 'MP'], hints: ['Show Gx for arbitrary x and close with UD.', 'Instantiate both premises to x, then MP.'], solution: [] },
   { id: 'qder-07', title: 'Existential instantiation', difficulty: 2, strategy: 'DD', premises: ['∃x(Fx ∧ Gx)'], goal: '∃xFx', tags: ['EI', 'EG', 'S'], hints: ['EI: instantiate the existential to a NEW variable.', 'EI gives Fy ∧ Gy (y new); S gives Fy; EG gives ∃xFx.'], solution: [] },
-  { id: 'qder-08', title: 'Some F, so some G', difficulty: 3, strategy: 'DD', premises: ['∀x(Fx → Gx)', '∃xFx'], goal: '∃xGx', tags: ['EI', 'UI', 'EG'], hints: ['Do EI first, to a new variable — UI can then use that same variable.', 'EI: Fy; UI: Fy → Gy; MP: Gy; EG: ∃xGx.'], solution: [] },
+  { id: 'qder-08', title: 'Some F, so some G', difficulty: 3, strategy: 'DD', premises: ['∀x(Fx → Gx)', '∃xFx'], goal: '∃xGx', tags: ['EI', 'UI', 'EG'], hints: ['Do EI first, to a new variable — UI can then use that same variable.', 'EI gives Fz (z new); UI to z gives Fz → Gz; MP gives Gz; EG gives ∃xGx.'], solution: [] },
   { id: 'qder-09', title: 'Universal syllogism', difficulty: 3, strategy: 'UD', premises: ['∀x(Fx → Gx)', '∀x(Gx → Hx)'], goal: '∀x(Fx → Hx)', tags: ['UD', 'CD', 'UI'], hints: ['Show Fx → Hx for arbitrary x (UD), inside it use CD.', 'Instantiate both premises to x and chain them.'], solution: [] },
   { id: 'qder-10', title: 'Contraposition under ∀', difficulty: 3, strategy: 'UD', premises: ['∀x(Fx → Gx)'], goal: '∀x(¬Gx → ¬Fx)', tags: ['UD', 'CD', 'MT'], hints: ['UD on the goal; CD inside.', 'Assume ¬Gx; UI gives Fx → Gx; MT.'], solution: [] },
   { id: 'qder-11', title: 'Diagonal', difficulty: 3, strategy: 'UD', premises: ['∀x∀yRxy'], goal: '∀xRxx', tags: ['UI', 'UD'], hints: ['UI can instantiate both quantifiers to the same variable.', 'UI twice gives Rxx; close with UD.'], solution: [] },
-  { id: 'qder-12', title: 'Instantiating to a name', difficulty: 3, strategy: 'DD', premises: ['∀x(Fx → ∃yRxy)', 'Fa'], goal: '∃yRay', tags: ['UI', 'MP'], hints: ['UI to the name a.', 'MP gives ∃yRay directly.'], solution: [] },
+  { id: 'qder-12', title: 'Instantiating to a name', difficulty: 3, strategy: 'DD', premises: ['∀x(Fx → ∃yRxy)', 'Fa'], goal: '∃yRay', tags: ['UI', 'MP'], strategyHint: 'Your goal ∃yRay is existential, but you do not need EG here: it is the consequent of an instance of premise 1.', hints: ['UI to the name a: Fa → ∃yRay.', 'MP with premise 2 gives ∃yRay directly.'], solution: [] },
   { id: 'qder-13', title: 'Nothing is F, so everything is not F', difficulty: 3, strategy: 'UD', premises: ['¬∃xFx'], goal: '∀x¬Fx', tags: ['UD', 'ID', 'EG'], hints: ['Show ¬Fx for arbitrary x (UD), by ID.', 'Assume Fx; EG gives ∃xFx, contradicting the premise.'], solution: [] },
-  { id: 'qder-14', title: 'Everything is not F, so nothing is F', difficulty: 3, strategy: 'ID', premises: ['∀x¬Fx'], goal: '¬∃xFx', tags: ['ID', 'EI', 'UI'], hints: ['Goal is a negation: assume ∃xFx for ID.', 'EI gives Fy; UI gives ¬Fy.'], solution: [] },
-  { id: 'qder-15', title: 'Exists-forall to forall-exists', difficulty: 4, strategy: 'UD', premises: ['∃x∀yRxy'], goal: '∀y∃xRxy', tags: ['EI', 'UI', 'EG', 'UD'], hints: ['EI first (new variable), then Show ∃xRxy for arbitrary y by UD.', 'EI: ∀yRzy; UI: Rzy; EG: ∃xRxy.'], solution: [] },
-  { id: 'qder-16', title: 'Disjunction of universals', difficulty: 4, strategy: 'UD', premises: ['∀xFx ∨ ∀xGx'], goal: '∀x(Fx ∨ Gx)', tags: ['UD', 'ID'], hints: ['UD on the goal; inside, get Fx ∨ Gx by ID (or cases).', 'Assume ¬(Fx ∨ Gx); show ¬∀xFx and ¬∀xGx, contradicting the premise via MTP.'], solution: [] },
-  { id: 'qder-17', title: 'Existential over ∨', difficulty: 4, strategy: 'ID', premises: ['∃x(Fx ∨ Gx)'], goal: '∃xFx ∨ ∃xGx', tags: ['EI', 'EG', 'ID'], hints: ['EI first: Fy ∨ Gy.', 'Then assume the negation of the goal and use EG + ADD on each case.'], solution: [] },
+  { id: 'qder-14', title: 'Everything is not F, so nothing is F', difficulty: 3, strategy: 'ID', premises: ['∀x¬Fx'], goal: '¬∃xFx', tags: ['ID', 'EI', 'UI'], hints: ['Goal is a negation: assume ∃xFx for ID.', 'EI gives Fz (z new); UI to z gives ¬Fz — a contradiction.'], solution: [] },
+  { id: 'qder-15', title: 'Exists-forall to forall-exists', difficulty: 4, strategy: 'UD', premises: ['∃x∀yRxy'], goal: '∀y∃xRxy', tags: ['EI', 'UI', 'EG', 'UD'], hints: ['EI first (to a new variable), then Show ∃xRxy for arbitrary y and close with UD.', 'EI gives ∀yRzy (z new); UI to y gives Rzy; EG gives ∃xRxy.'], solution: [] },
+  { id: 'qder-16', title: 'Disjunction of universals', difficulty: 4, strategy: 'UD', premises: ['∀xFx ∨ ∀xGx'], goal: '∀x(Fx ∨ Gx)', tags: ['UD', 'ID'], hints: ['UD on the goal; inside, Show Fx ∨ Gx by ID, assuming ¬(Fx ∨ Gx).', 'Show ¬Fx and ¬Gx (each by ID with ADD). Then Show ¬∀xFx; MTP on the premise gives ∀xGx, whose instance Gx contradicts ¬Gx.'], solution: [] },
+  { id: 'qder-17', title: 'Existential over ∨', difficulty: 4, strategy: 'ID', premises: ['∃x(Fx ∨ Gx)'], goal: '∃xFx ∨ ∃xGx', tags: ['EI', 'EG', 'ID'], hints: ['Assume the negation of the goal for ID, and EI the premise: Fy ∨ Gy (y new).', 'Show ¬∃xFx and ¬∃xGx (ID with ADD), then ¬Fy and ¬Gy (ID with EG); MTP on Fy ∨ Gy gives the contradiction.'], solution: [] },
   { id: 'qder-18', title: 'Not all, so some not', difficulty: 5, strategy: 'ID', premises: ['¬∀xFx'], goal: '∃x¬Fx', tags: ['ID', 'UD', 'EG'], hints: ['Assume ¬∃x¬Fx for ID and aim to derive ∀xFx.', 'Show ∀xFx by UD: Show Fx by ID — assuming ¬Fx gives ∃x¬Fx by EG.'], solution: [] },
 ];
 
@@ -352,6 +354,7 @@ function toExercise(p: Problem, topic: DerivationExercise['topic'] = 'derivation
     strategy: p.strategy,
     allowDerivedRules: p.derived ?? false,
     hints: [...p.hints],
+    ...(p.strategyHint ? { strategyHint: p.strategyHint } : {}),
     solution: [...p.solution],
   };
 }
@@ -407,7 +410,7 @@ const STRATEGY_HINT: Record<string, string> = {
 
 export function derivationHints(ex: DerivationExercise): string[] {
   const goal = f(ex.goal);
-  const hints = [STRATEGY_HINT[goal.kind], ...ex.hints];
+  const hints = [ex.strategyHint ?? STRATEGY_HINT[goal.kind], ...ex.hints];
   const model = derivationSolutionDraft(ex);
   if (!model) return hints;
   const outline = model.lines

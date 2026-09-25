@@ -90,7 +90,7 @@ const ITEMS: Item[] = [
   { id: 'psym-13', difficulty: 2, sentence: 'Alice admires every poet.', key: [admires, P('P', 1, 'x is a poet'), alice], answer: '∀x(Px → Aax)', tags: ['all', 'names', 'relational'], explanation: 'For anything: if it is a poet, Alice admires it.' },
   { id: 'psym-14', difficulty: 2, sentence: 'Some poet admires Alice.', key: [admires, P('P', 1, 'x is a poet'), alice], answer: '∃x(Px ∧ Axa)', tags: ['some', 'names', 'relational'], explanation: 'Something is a poet and admires Alice.' },
   { id: 'psym-15', difficulty: 2, sentence: 'Not all birds fly.', key: [P('B', 1, 'x is a bird'), P('F', 1, 'x flies')], answer: '¬∀x(Bx → Fx)', alternatives: ['∃x(Bx ∧ ¬Fx)'], tags: ['not-every'], explanation: 'Deny the universal "all birds fly".' },
-  { id: 'psym-16', difficulty: 2, sentence: 'If Alice is a student, then someone is a student.', key: [student, alice], answer: 'Sa → ∃xSx', tags: ['names', 'some', 'scope'], explanation: 'A conditional between a predication and an existential; the quantifier covers only the consequent.' },
+  { id: 'psym-16', difficulty: 2, sentence: 'If Alice is a student, then some teacher admires her.', key: [student, teacher, admires, alice], answer: 'Sa → ∃x(Tx ∧ Axa)', tags: ['names', 'some', 'scope'], explanation: 'A conditional whose consequent is an existential; the quantifier covers only the consequent, and "her" is Alice.' },
   { id: 'psym-17', difficulty: 2, sentence: 'Only members may enter.', key: [P('M', 1, 'x is a member'), P('E', 1, 'x may enter')], answer: '∀x(Ex → Mx)', tags: ['only'], explanation: '"Only M may E": anyone who may enter is a member.' },
   { id: 'psym-18', difficulty: 2, sentence: 'Every dog is either brown or black.', key: [P('D', 1, 'x is a dog'), P('B', 1, 'x is brown'), P('K', 1, 'x is black')], answer: '∀x(Dx → (Bx ∨ Kx))', tags: ['all'], explanation: 'The consequent is a disjunction.' },
   // ------------------------------------------------------------ difficulty 3
@@ -117,7 +117,7 @@ const ITEMS: Item[] = [
   { id: 'psym-38', difficulty: 4, sentence: 'If Alice admires anyone, she admires Bob.', key: [admires, alice, bob], answer: '∃xAax → Aab', alternatives: ['∀x(Aax → Aab)'], tags: ['scope', 'any', 'names'], explanation: '"anyone" in an antecedent is existential (with narrow scope), or a universal with wide scope.' },
   // ------------------------------------------------------------ difficulty 5
   { id: 'psym-39', difficulty: 5, sentence: 'Every student who admires every teacher passes.', key: [student, teacher, admires, P('P', 1, 'x passes')], answer: '∀x((Sx ∧ ∀y(Ty → Axy)) → Px)', tags: ['multiple', 'restricted', 'scope'], explanation: 'The inner ∀y belongs inside the antecedent: "admires every teacher" describes the student.' },
-  { id: 'psym-40', difficulty: 5, sentence: 'Only those who love themselves love everyone.', key: [loves], answer: '∀x(∀yLxy → Lxx)', tags: ['only', 'multiple'], explanation: '"Only F are G": whoever is G (loves everyone) is F (loves themselves).' },
+  { id: 'psym-40', difficulty: 5, sentence: 'Only those who love someone are loved by someone.', key: [loves], answer: '∀x(∃yLyx → ∃zLxz)', tags: ['only', 'multiple'], explanation: '"Only F are G": whoever is G (loved by someone) is F (loves someone).' },
   { id: 'psym-41', difficulty: 5, sentence: 'Some students admire only teachers.', key: [student, teacher, admires], answer: '∃x(Sx ∧ ∀y(Axy → Ty))', tags: ['only', 'multiple'], explanation: 'A student x such that anyone x admires is a teacher.' },
   { id: 'psym-42', difficulty: 5, sentence: 'No one who loves no one is loved by anyone.', key: [loves], answer: '∀x(¬∃yLxy → ¬∃zLzx)', alternatives: ['¬∃x(¬∃yLxy ∧ ∃zLzx)'], tags: ['no', 'multiple'], explanation: 'For any x: if x loves no one, then no one loves x.' },
   { id: 'psym-43', difficulty: 5, sentence: 'Anyone who loves someone loves themselves.', key: [loves], answer: '∀x(∃yLxy → Lxx)', alternatives: ['∀x∀y(Lxy → Lxx)'], tags: ['any', 'multiple', 'scope'], explanation: 'For any x: if x loves some y, x loves x.' },
@@ -389,6 +389,9 @@ function findMutation(key: Formula, ans: Formula): PMutation | null {
   for (const m of ms) if (alphaEquals(m.whole, ans)) return m;
   const dom = Math.min(3, maxDomainFor([key, ans]));
   for (const m of ms) {
+    // "You reversed the conditional" is only said when the answer IS the converse (checked above);
+    // an answer that merely happens to be equivalent to it (e.g. moved negations) gets the generic explanation.
+    if (m.code === 'converse') continue;
     if (boundedEquivalent(m.whole, key, dom).equivalent) continue;
     if (boundedEquivalent(m.whole, ans, dom).equivalent) return m;
   }
@@ -725,7 +728,7 @@ export const INVALID_PREDICATE_FORMS: PredicateArgumentForm[] = [
   { name: 'Converting "all"', premises: ['∀x(Fx → Gx)'], conclusion: '∀x(Gx → Fx)', difficulty: 2, note: '"All {F} are {G}" does not make all {G} {F}.' },
   { name: 'Some G, so some F', premises: ['∀x(Fx → Gx)', '∃xGx'], conclusion: '∃xFx', difficulty: 2, note: 'The {G} might not be {F} — and there may be no {F} at all.' },
   { name: 'Distributing ∀ over ∨', premises: ['∀x(Fx ∨ Gx)'], conclusion: '∀xFx ∨ ∀xGx', difficulty: 3, note: 'Each thing is {F} or {G}, but not all need be the same one.' },
-  { name: 'Existential antecedent', premises: ['∃xFx → ∃xGx'], conclusion: '∀x(Fx → Gx)', difficulty: 3, note: 'Some {G} exists, but that does not make every {F} a {G}.' },
+  { name: 'Existential antecedent', premises: ['∃xFx → ∃xGx'], conclusion: '∀x(Fx → Gx)', difficulty: 3, note: 'Something is {G}, but that does not mean everything that is {F} is {G}.' },
   { name: 'Undistributed middle', premises: ['∃x(Fx ∧ Gx)', '∃x(Gx ∧ Hx)'], conclusion: '∃x(Fx ∧ Hx)', difficulty: 3, note: 'Different things may be the witnesses.' },
   { name: 'Quantifier shift', premises: ['∀x∃yRxy'], conclusion: '∃y∀xRxy', difficulty: 4, note: 'Each thing relating to something does not mean one thing everything relates to.' },
   { name: 'Reflexive from serial', premises: ['∀x∃yRxy'], conclusion: '∃xRxx', difficulty: 4, note: 'Everything may relate only to something else.' },
