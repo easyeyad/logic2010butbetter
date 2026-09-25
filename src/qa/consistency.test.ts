@@ -89,7 +89,7 @@ function bruteClass(f: Formula): 'tautology' | 'contradiction' | 'contingent' {
 }
 
 const depth = (f: Formula): number =>
-  f.kind === 'atom' || f.kind === 'pred'
+  f.kind === 'atom' || f.kind === 'pred' || f.kind === 'identity'
     ? 0
     : f.kind === 'not'
       ? 1 + depth(f.operand)
