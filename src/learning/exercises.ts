@@ -67,6 +67,8 @@ export interface GenerateOptions {
   exclude?: ReadonlySet<string>;
   /** Underlying argument forms to avoid (predicate countermodels; see exerciseFamily). */
   excludeForms?: ReadonlySet<string>;
+  /** A form never to repeat immediately (the previous exercise's form). */
+  avoidForm?: string;
 }
 
 /** Bank items at the difficulty, falling back to the nearest available difficulty. */
@@ -109,7 +111,7 @@ export function generateExercise(topic: Topic, difficulty: Difficulty, seed: num
     case 'model':
       return generateModelExercise(difficulty, s);
     case 'predicate-countermodel':
-      return generatePredicateCountermodel(difficulty, s, { excludeForms: opts.excludeForms });
+      return generatePredicateCountermodel(difficulty, s, { excludeForms: opts.excludeForms, avoidForm: opts.avoidForm });
     case 'quantifier-derivation': {
       const bank = bankAt(QUANTIFIER_DERIVATION_EXERCISES, difficulty, opts.exclude);
       return bank.length ? pick(rng, bank) : pick(rng, bankAt(QUANTIFIER_DERIVATION_EXERCISES, difficulty));

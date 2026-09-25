@@ -175,6 +175,9 @@ export function generateInferenceRule(difficulty: Difficulty, seed: number, mode
       inst = instance(rule, x, y, z, rng);
     }
     if (!inst) continue;
+    // Reject degenerate steps: the conclusion repeats a cited line, or two cited lines are the same.
+    if (inst.cited.some((c) => equals(c, inst!.to))) continue;
+    if (inst.cited.some((c, i) => inst!.cited.some((d, j) => j > i && equals(c, d)))) continue;
     if (m === 'identify') {
       const all = rulesJustifying(inst.cited, inst.to);
       if (all.length !== 1 || all[0] !== rule) continue;

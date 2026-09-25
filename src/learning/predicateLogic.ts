@@ -305,6 +305,7 @@ function firstFalse(g: Extract<Formula, { variable: string }>, m: Interpretation
 
 type PMutationCode =
   | 'missing-distinctness'
+  | 'at-least-one'
   | 'missing-uniqueness'
   | 'universal-with-and'
   | 'existential-with-conditional'
@@ -321,7 +322,7 @@ type PMutationCode =
   | 'missing-negation';
 
 const PRIORITY: PMutationCode[] = [
-  'missing-distinctness', 'missing-uniqueness', 'universal-with-and', 'existential-with-conditional', 'converse', 'no-as-not-all', 'not-every-as-none', 'quantifier-order',
+  'missing-distinctness', 'at-least-one', 'missing-uniqueness', 'universal-with-and', 'existential-with-conditional', 'converse', 'no-as-not-all', 'not-every-as-none', 'quantifier-order',
   'quantifier-scope', 'argument-order', 'wrong-quantifier', 'conditional-as-biconditional', 'and-as-or', 'or-as-and', 'missing-negation',
 ];
 
@@ -428,17 +429,33 @@ function allMutations(key: Formula): PMutation[] {
   return out.sort((a, b) => PRIORITY.indexOf(a.code) - PRIORITY.indexOf(b.code));
 }
 
-function findMutation(key: Formula, ans: Formula): PMutation | null {
+/** Diagnoses that are only made when the answer IS the mutated key (up to bound-variable renaming). */
+const ALPHA_ONLY: PMutationCode[] = ['converse', 'missing-uniqueness'];
+
+function findMutation(key: Formula, ans: Formula): (PMutation & { partOnly?: boolean }) | null {
   const ms = allMutations(key);
   // Cheap pass: exact (up to bound-variable renaming) matches first.
   for (const m of ms) if (alphaEquals(m.whole, ans)) return m;
+  // The answer may render just ONE conjunct of the key, with a mistake in it
+  // (e.g. only the reversed "∀x(Px → x ≠ b)" of "∀x(x ≠ b → Px) ∧ ¬Pb").
+  if (key.kind === 'and') {
+    for (const part of [key.left, key.right])
+      for (const m of allMutations(part)) if (ALPHA_ONLY.includes(m.code) || m.code === 'universal-with-and' || m.code === 'existential-with-conditional') {
+        if (alphaEquals(m.whole, ans)) return { ...m, partOnly: true };
+      }
+  }
   const dom = Math.min(3, maxDomainFor([key, ans]));
   for (const m of ms) {
-    // "You reversed the conditional" is only said when the answer IS the converse (checked above);
-    // an answer that merely happens to be equivalent to it (e.g. moved negations) gets the generic explanation.
-    if (m.code === 'converse') continue;
+    // Named mistakes like "you reversed the conditional" are only claimed on an exact match (above);
+    // an answer that merely happens to be equivalent to one (e.g. moved negations) gets the generic explanation.
+    if (ALPHA_ONLY.includes(m.code)) continue;
     if (boundedEquivalent(m.whole, key, dom).equivalent) continue;
-    if (boundedEquivalent(m.whole, ans, dom).equivalent) return m;
+    if (boundedEquivalent(m.whole, ans, dom).equivalent) {
+      // Dropping x ≠ y from "at least two" leaves "at least one": if that is what the answer says,
+      // but not in two-variable form, say so rather than "you forgot x ≠ y".
+      if (m.code === 'missing-distinctness') return { ...m, code: 'at-least-one' };
+      return m;
+    }
   }
   return null;
 }
@@ -451,6 +468,11 @@ function mutationMessage(m: PMutation, ex: PredicateSymbolizationExercise): { he
       return {
         headline: 'You forgot to say the two things are different.',
         explanation: `"At least two" needs two DIFFERENT objects: add x ≠ y, i.e. ¬(x = y). Without it, x and y may be the same object, so your formula is already true when there is only one. The sentence needs ${o}.`,
+      };
+    case 'at-least-one':
+      return {
+        headline: 'Your formula only says "at least one".',
+        explanation: `"At least two" needs two variables AND a statement that they are different: ∃x∃y((…x… ∧ …y…) ∧ ¬(x = y)). As written, your formula is true when there is just one. The sentence needs ${o}.`,
       };
     case 'missing-uniqueness':
       return has('exactly-one')
@@ -619,7 +641,8 @@ export function checkPredicateSymbolization(ex: PredicateSymbolizationExercise, 
         headline: "That doesn't say the same thing as the sentence.",
         explanation: `Compare the structure: ${notesFor(ex.tags).join(' ') || 'find the main quantifier or connective first, then symbolize each part.'}`,
       };
-  return { correct: false, severity: 'error', code: m?.code ?? 'not-equivalent', headline: msg.headline, explanation: msg.explanation, details: [row, ...describeLines(cmp.model!)] };
+  const partNote = m?.partOnly ? [`Your formula also leaves out the rest of the sentence: the standard symbolization is a conjunction, ${ex.answer}.`] : [];
+  return { correct: false, severity: 'error', code: m?.code ?? 'not-equivalent', headline: msg.headline, explanation: msg.explanation, details: [row, ...partNote, ...describeLines(cmp.model!)] };
 }
 
 function describeLines(m: Interpretation): string[] {
@@ -799,6 +822,15 @@ export const INVALID_PREDICATE_FORMS: PredicateArgumentForm[] = [
   { name: 'Serial to named loop', premises: ['∀x(Fx → ∃yRxy)', 'Fa'], conclusion: 'Raa', difficulty: 4, note: '{a} relates to something — not necessarily to itself.' },
   { name: 'Symmetry to reflexivity', premises: ['∀x∀y(Rxy → Ryx)', 'Rab'], conclusion: 'Raa', difficulty: 5, note: 'Symmetry gives {R}{b}{a}, not {R}{a}{a}.' },
   { name: 'One universal relater', premises: ['∃x∀yRxy'], conclusion: '∀xRxx', difficulty: 5, note: 'Only the special object must relate to itself.' },
+  { name: 'All F are G, so some F is G', premises: ['∀x(Fx → Gx)'], conclusion: '∃x(Fx ∧ Gx)', difficulty: 1, note: 'There may be no {F} at all.' },
+  { name: 'Some not, so none', premises: ['∃x(Fx ∧ ¬Gx)'], conclusion: '¬∃x(Fx ∧ Gx)', difficulty: 1, note: 'One {F} can be {G} while another is not.' },
+  { name: 'Named to all', premises: ['Fa'], conclusion: '∀xFx', difficulty: 1, note: 'One {F} named {a} does not make everything {F}.' },
+  { name: 'Some-not to none', premises: ['∃x¬Fx'], conclusion: '∀x¬Fx', difficulty: 2, note: 'Some things may be {F} and others not.' },
+  { name: 'Complement', premises: ['∀x(Fx → ¬Gx)'], conclusion: '∀x(¬Fx → Gx)', difficulty: 2, note: 'Not being {F} does not make something {G}.' },
+  { name: 'Common consequent', premises: ['∀x(Fx → Gx)', '∀x(Hx → Gx)'], conclusion: '∀x(Fx → Hx)', difficulty: 3, note: 'Sharing {G} does not connect {F} and {H}.' },
+  { name: 'Symmetry to transitivity', premises: ['∀x∀y(Rxy → Ryx)'], conclusion: '∀x∀y∀z((Rxy ∧ Ryz) → Rxz)', difficulty: 5, note: 'A symmetric relation need not be transitive.' },
+  { name: 'Serial both ways to a loop', premises: ['∀x∃yRxy', '∀x∃yRyx'], conclusion: '∃xRxx', difficulty: 5, note: 'Two objects can relate only to each other.' },
+  { name: 'Universally related-to, so relates to another', premises: ['∃x∀yRyx'], conclusion: '∀x∃y(Rxy ∧ ¬(x = y))', difficulty: 5, note: 'The world may contain just one object.' },
   // identity
   { name: 'Distinct names', premises: ['Fa', 'Gb'], conclusion: '¬(a = b)', difficulty: 3, note: '{a} and {b} may name the same object.' },
   { name: 'Some F, so only a', premises: ['Fa'], conclusion: '∀x(Fx → x = a)', difficulty: 3, note: 'Other things besides {a} may be {F} too.' },
@@ -832,12 +864,13 @@ function fillNote(note: string, preds: Record<string, string>, names: Record<str
   return note.replace(/\{([A-Za-z])\}/g, (_, c: string) => preds[c] ?? names[c] ?? c);
 }
 
-export function generatePredicateCountermodel(difficulty: Difficulty, seed: number, opts: { excludeForms?: ReadonlySet<string> } = {}): PredicateCountermodelExercise {
+export function generatePredicateCountermodel(difficulty: Difficulty, seed: number, opts: { excludeForms?: ReadonlySet<string>; avoidForm?: string } = {}): PredicateCountermodelExercise {
   const rng = makeRng(seed);
   let pool = INVALID_PREDICATE_FORMS.filter((x) => x.difficulty === difficulty);
   if (!pool.length) pool = INVALID_PREDICATE_FORMS;
   const fresh = pool.filter((x) => !opts.excludeForms?.has(x.name));
   if (fresh.length) pool = fresh;
+  else if (opts.avoidForm && pool.length > 1) pool = pool.filter((x) => x.name !== opts.avoidForm); // never twice in a row
   for (let attempt = 0; ; attempt++) {
     const form = pick(rng, pool);
     const src = [...form.premises, form.conclusion].map(f);

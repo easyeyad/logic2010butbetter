@@ -246,6 +246,18 @@ function lex(s: string): Token[] {
       i += multi[0].length;
       continue;
     }
+    if (s.startsWith('=/=', i)) {
+      err('unexpected-char', `For “is not identical to” use ≠ (type !=), as in a ≠ b.`, i, i + 3, 'Write ≠');
+      i += 3;
+      continue;
+    }
+    if (s.startsWith('==', i)) {
+      let j = i;
+      while (s[j] === '=') j++;
+      err('unexpected-char', `Use a single = for identity, as in a = b.`, i, j, 'Write =');
+      i = j;
+      continue;
+    }
     if (s.startsWith('!=', i) || c === '=' || c === '≠') {
       const n = c === '!' ? 2 : 1;
       toks.push({ t: 'eq', negated: c !== '=', start: i, end: i + n });
@@ -282,7 +294,7 @@ function lex(s: string): Token[] {
     if (c === '<') {
       err('unexpected-char', `“<” on its own isn't a connective.`, i, i + 1, 'For the biconditional, write <-> (↔).');
     } else {
-      err('unexpected-char', `“${ch}” isn't a symbol used in sentential logic.`, i, i + ch.length, 'Use sentence letters (P, Q, …), ¬ ∧ ∨ → ↔ and brackets.');
+      err('unexpected-char', `“${ch}” isn't a logic symbol.`, i, i + ch.length, 'Use sentence letters (P, Q, …), predicates (Fa), = ≠, ¬ ∧ ∨ → ↔, ∀ ∃ and brackets.');
     }
     i += ch.length;
   }
@@ -450,6 +462,7 @@ class Parser {
   private parseIdentity(t: Token & { t: 'term' }): Node {
     this.next();
     const e = this.peek();
+    if (e.t === 'error' && this.src[e.start] === '=') throw new ParseFailure(e.error); // a==b, a =/= b
     if (e.t !== 'eq') this.fail('invalid-atom', strayTermMessage(t.term), { start: t.start, end: t.end });
     this.next();
     const sym = e.negated ? SYMBOL.nonIdentity : SYMBOL.identity;
@@ -555,7 +568,30 @@ class Parser {
       }
       case 'eq': {
         const sym = t.negated ? SYMBOL.nonIdentity : SYMBOL.identity;
+        const nextTok = this.toks[this.pos + 1];
+        const prevId = prev.f.kind === 'identity' ? prev.f : prev.f.kind === 'not' && prev.f.operand.kind === 'identity' ? prev.f.operand : null;
+        if (prevId) {
+          // "a = b = c"
+          const mid = prevId.right.name;
+          const next = nextTok.t === 'term' ? nextTok.term.name : 'c';
+          const fixed = `${this.src.slice(prev.start, prev.end)} ∧ ${mid} ${sym} ${next}`;
+          this.fail(
+            'misplaced-connective',
+            `Identity can't be chained: each ${SYMBOL.identity} or ${SYMBOL.nonIdentity} relates exactly two terms. Write ${fixed}.`,
+            { start: prev.start, end: nextTok.t === 'term' ? nextTok.end : t.end },
+            `Write ${fixed}`,
+          );
+        }
         if (prev.f.kind === 'atom') {
+          const right = nextTok.t === 'atom' && !nextTok.args.length ? nextTok.name : 'Q';
+          if (t.negated) {
+            this.fail(
+              'misplaced-connective',
+              `${sym} is for terms, as in a ${sym} b, not for sentence letters. Did you mean ¬(${prev.f.name} ↔ ${right})?`,
+              { start: t.start, end: t.end },
+              `For sentence letters write ¬(${prev.f.name} ↔ ${right}).`,
+            );
+          }
           this.fail(
             'misplaced-connective',
             `${sym} is identity: it goes between two terms, like a ${sym} b, not between sentence letters.`,

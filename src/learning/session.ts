@@ -38,6 +38,8 @@ export function createPracticeSession(config: PracticeSessionConfig): PracticeSe
   const used = new Set<string>();
   const families = new Set<string>();
   const usedForms = new Set<string>();
+  let lastForm: string | undefined;
+  const formFamilies = new Set<string>();
   // For mixed sessions, cycle through a shuffled topic order so topics are spread evenly.
   let order: Topic[] = [];
   for (let i = 0; i < count; i++) {
@@ -50,7 +52,9 @@ export function createPracticeSession(config: PracticeSessionConfig): PracticeSe
     let ex: Exercise | null = null;
     let fallback: Exercise | null = null;
     for (let tries = 0; tries < 12; tries++) {
-      const cand = generateExercise(topic, difficulty, Math.floor(rng() * 0x7fffffff), { exclude: used, excludeForms: usedForms });
+      const cand = generateExercise(topic, difficulty, Math.floor(rng() * 0x7fffffff), { exclude: used, excludeForms: usedForms, avoidForm: lastForm });
+      const candForm = 'form' in cand ? cand.form : undefined;
+      if (candForm && candForm === lastForm) continue; // never the same form twice in a row
       if (used.has(cand.id)) continue;
       fallback ??= cand;
       if (!families.has(exerciseFamily(cand))) {
@@ -60,8 +64,18 @@ export function createPracticeSession(config: PracticeSessionConfig): PracticeSe
     }
     ex ??= fallback ?? generateExercise(topic, difficulty, Math.floor(rng() * 0x7fffffff), { exclude: used });
     used.add(ex.id);
+    if ('form' in ex && ex.form) {
+      // Every form has been used once: start a new cycle (the generator only returns a used form when none is left).
+      if (usedForms.has(ex.form)) {
+        usedForms.clear();
+        for (const k of formFamilies) families.delete(k);
+        formFamilies.clear();
+      }
+      usedForms.add(ex.form);
+      formFamilies.add(exerciseFamily(ex));
+      lastForm = ex.form;
+    }
     families.add(exerciseFamily(ex));
-    if ('form' in ex && ex.form) usedForms.add(ex.form);
     exercises.push(ex);
   }
   return { id: `session-${hash(JSON.stringify({ ...config, count }))}`, config: { ...config, count }, exercises };
