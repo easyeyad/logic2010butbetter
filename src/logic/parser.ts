@@ -19,6 +19,7 @@ export type ParseErrorCode =
   | 'misplaced-connective'   // 'P ¬ Q'
   | 'too-deep'               // more than MAX_NESTING_DEPTH nested brackets/negations
   | 'bad-quantifier';        // '∀Fx' (no variable), '∀a' (quantifying a name)
+// Identity problems ('P = Q', 'Fa = b', 'a =') use misplaced-connective / missing-operand.
 
 /**
  * Maximum nesting of brackets and negations `parse` accepts. Deeper input gets a
@@ -60,7 +61,7 @@ const BINARY_CHARS: Record<string, BinaryKind> = {
   '∧': 'and', '&': 'and', '^': 'and', '*': 'and', '·': 'and',
   '∨': 'or', '|': 'or',
   '→': 'implies', '>': 'implies', '⊃': 'implies', '⇒': 'implies',
-  '↔': 'iff', '=': 'iff', '≡': 'iff', '⇔': 'iff',
+  '↔': 'iff', '≡': 'iff', '⇔': 'iff',
 };
 
 /** Quantifier symbols and their ASCII aliases (@ = ∀, $ = ∃). */
@@ -91,13 +92,14 @@ function isStandaloneV(s: string, i: number): boolean {
  *
  * Rules:
  *  - Complete multi-char aliases convert: <-> <=> <> (↔), -> => (→).
- *  - ~ ! ∼ − → ¬;  & ^ * · → ∧;  | → ∨;  > ⊃ ⇒ → →;  ≡ ⇔ → ↔;  @ → ∀;  $ → ∃.
+ *  - ~ ! ∼ − → ¬;  & ^ * · → ∧;  | → ∨;  > ⊃ ⇒ → →;  ≡ ⇔ → ↔;  @ → ∀;  $ → ∃;
+ *    != → ≠. A plain `=` is identity and stays as it is (it is NOT an alias for ↔).
  *  - A lowercase `v` converts to ∨ only when standalone (neither neighbour is a
  *    letter or digit, e.g. "P v Q", "(P)v(Q)").
- *  - "Held" characters: a `-` or `=` that sits at the end of the text or
+ *  - "Held" characters: a `-` or `!` that sits at the end of the text or
  *    immediately before the caret stays raw, because it may be the start of
- *    "->" / "=>" (or the middle of "<->" / "<=>"). It converts (to ¬ / ↔) once
- *    something other than ">" follows it and the caret has moved on.
+ *    "->" / "!=" (or the middle of "<->"). It converts to ¬ once something
+ *    other than ">" / "=" follows it and the caret has moved on.
  *    A lone `<` is never converted (it only ever begins <->, <=>, <>).
  *  - Everything else (letters, whitespace, brackets, unknown chars) is untouched,
  *    so the result may still be unparseable; `parse` reports that.
@@ -121,11 +123,14 @@ export function normalizeInput(input: string, caret?: number): { text: string; c
         break;
       }
     }
+    if (rep === null && input.startsWith('!=', i)) {
+      rep = SYMBOL.nonIdentity;
+      n = 2;
+    }
     if (rep === null) {
       const c = input[i];
-      if (NOT_CHARS.has(c)) rep = SYMBOL.not;
-      else if (c === '-') rep = held(i + 1) ? null : SYMBOL.not;
-      else if (c === '=') rep = held(i + 1) ? null : SYMBOL.iff;
+      if (c === '-' || c === '!') rep = held(i + 1) ? null : SYMBOL.not;
+      else if (NOT_CHARS.has(c)) rep = SYMBOL.not;
       else if (c in BINARY_CHARS) rep = SYMBOL[BINARY_CHARS[c]];
       else if (c in QUANT_CHARS) rep = SYMBOL[QUANT_CHARS[c]];
       else if (isStandaloneV(input, i)) rep = SYMBOL.or;
@@ -152,6 +157,8 @@ type Token =
   | { t: 'term'; term: Term; start: number; end: number }
   /** Quantifier; `variable` is filled in by the parser once the variable is read. */
   | { t: 'quant'; kind: 'forall' | 'exists'; variable?: string; start: number; end: number }
+  /** '=' (identity) or '≠' / '!=' (negated identity). */
+  | { t: 'eq'; negated: boolean; start: number; end: number }
   | { t: 'not'; start: number; end: number }
   | { t: 'bin'; kind: BinaryKind; start: number; end: number }
   | { t: 'open'; ch: string; start: number; end: number }
@@ -237,6 +244,12 @@ function lex(s: string): Token[] {
     if (multi) {
       toks.push({ t: 'bin', kind: multi[1], start: i, end: i + multi[0].length });
       i += multi[0].length;
+      continue;
+    }
+    if (s.startsWith('!=', i) || c === '=' || c === '≠') {
+      const n = c === '!' ? 2 : 1;
+      toks.push({ t: 'eq', negated: c !== '=', start: i, end: i + n });
+      i += n;
       continue;
     }
     if (c in QUANT_CHARS) {
@@ -367,7 +380,17 @@ class Parser {
           end: t.end,
         };
       case 'term':
-        this.fail('invalid-atom', strayTermMessage(t.term), { start: t.start, end: t.end });
+        return this.parseIdentity(t);
+      case 'eq': {
+        const sym = t.negated ? SYMBOL.nonIdentity : SYMBOL.identity;
+        const r = this.toks[this.pos + 1];
+        this.fail(
+          'missing-operand',
+          `${sym} needs a term on each side — nothing comes before it.`,
+          { start: t.start, end: r.t === 'term' ? r.end : t.end },
+          `For example: a ${sym} b`,
+        );
+      }
       case 'quant': {
         this.next();
         const sym = SYMBOL[t.kind];
@@ -421,6 +444,31 @@ class Parser {
       case 'bin':
         return this.binaryWithoutLeft(t, prev);
     }
+  }
+
+  /** term (= | ≠) term. The term token is next. */
+  private parseIdentity(t: Token & { t: 'term' }): Node {
+    this.next();
+    const e = this.peek();
+    if (e.t !== 'eq') this.fail('invalid-atom', strayTermMessage(t.term), { start: t.start, end: t.end });
+    this.next();
+    const sym = e.negated ? SYMBOL.nonIdentity : SYMBOL.identity;
+    const r = this.peek();
+    if (r.t === 'term') {
+      this.next();
+      const id: Formula = { kind: 'identity', left: t.term, right: r.term };
+      return { f: e.negated ? { kind: 'not', operand: id } : id, start: t.start, end: r.end };
+    }
+    if (r.t === 'error') throw new ParseFailure(r.error);
+    if (r.t === 'atom') {
+      this.fail(
+        'misplaced-connective',
+        `${sym} goes between two terms, e.g. ${t.term.name} ${sym} b; ${this.src.slice(r.start, r.end)} is not a term.`,
+        { start: t.start, end: r.end },
+      );
+    }
+    const after = r.t === 'end' ? 'nothing follows it' : `nothing follows it before “${this.src.slice(r.start, r.end)}”`;
+    this.fail('missing-operand', `${sym} needs a term on each side — ${after}.`, { start: e.start, end: e.end }, `For example: ${t.term.name} ${sym} b`);
   }
 
   /** Expected an operand but found the end of input or a closing bracket. */
@@ -505,7 +553,20 @@ class Parser {
             : 'Use ∧, ∨, → or ↔ to join two formulas.',
         );
       }
+      case 'eq': {
+        const sym = t.negated ? SYMBOL.nonIdentity : SYMBOL.identity;
+        if (prev.f.kind === 'atom') {
+          this.fail(
+            'misplaced-connective',
+            `${sym} is identity: it goes between two terms, like a ${sym} b, not between sentence letters.`,
+            { start: t.start, end: t.end },
+            'For “if and only if” use ↔ (type <->).',
+          );
+        }
+        this.fail('misplaced-connective', `${sym} goes between two terms, e.g. a ${sym} b.`, { start: t.start, end: t.end });
+      }
       case 'term': {
+        if (this.toks[this.pos + 1].t === 'eq') this.missingConnective(prev, t);
         if (prevTok.t === 'atom' && prev.end === prevTok.end) {
           // "F a" or "Fa b": terms separated from their predicate letter by spaces.
           let j = this.pos;
@@ -537,19 +598,24 @@ class Parser {
             `Put a connective between them, e.g. ${a} ∧ ${b}.`,
           );
         }
-        const right = this.attempt(() => this.parseUnary(null));
-        const end = right ? right.end : t.end;
-        const r = right ? show(right.f) : this.src.slice(t.start, t.end);
-        this.fail(
-          'missing-connective',
-          `Missing connective: ${show(prev.f)} and ${r} need a connective (∧, ∨, → or ↔) between them.`,
-          { start: prev.start, end },
-          `For example: ${show(prev.f)} ∧ ${r}`,
-        );
+        this.missingConnective(prev, t);
       }
       default:
         return;
     }
+  }
+
+  /** `prev` is followed directly by the start of another formula at token `t`. */
+  private missingConnective(prev: Node, t: Token): never {
+    const right = this.attempt(() => this.parseUnary(null));
+    const end = right ? right.end : t.end;
+    const r = right ? show(right.f) : this.src.slice(t.start, t.end);
+    this.fail(
+      'missing-connective',
+      `Missing connective: ${show(prev.f)} and ${r} need a connective (∧, ∨, → or ↔) between them.`,
+      { start: prev.start, end },
+      `For example: ${show(prev.f)} ∧ ${r}`,
+    );
   }
 
   /** Called with `left op right` parsed and another binary connective next. */

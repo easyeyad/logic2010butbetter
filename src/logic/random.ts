@@ -20,8 +20,8 @@ export interface RandomFormulaOptions {
   /** Source of randomness (default Math.random). */
   random?: () => number;
   /**
-   * Generate a predicate-logic SENTENCE instead: monadic predicates F, G, H and
-   * a binary R, names a, b, and 1–`maxQuantifiers` (default 2) quantifiers over x, y
+   * Generate a predicate-logic SENTENCE instead: monadic predicates F, G, H,
+   * a binary R, identities (t = t, t ≠ t), names a, b, and 1–`maxQuantifiers` (default 2) quantifiers over x, y
    * (the outermost node is always a quantifier). `atoms` is ignored.
    */
   predicate?: boolean;
@@ -55,7 +55,12 @@ function randomPredicateFormula(opts: RandomFormulaOptions): Formula {
     const free = vars.filter((v) => !bound.includes(v));
     if (free.length && quantifiers < maxQ && rnd() < 0.3) return quant(depth, bound, free[0]);
     if (depth <= 0 || rnd() < 0.3) {
-      if (rnd() < 0.25) return { kind: 'pred', name: 'R', args: [term(bound), term(bound)] };
+      const r = rnd();
+      if (r < 0.15) {
+        const id: Formula = { kind: 'identity', left: term(bound), right: term(bound) };
+        return rnd() < 0.4 ? { kind: 'not', operand: id } : id;
+      }
+      if (r < 0.35) return { kind: 'pred', name: 'R', args: [term(bound), term(bound)] };
       return { kind: 'pred', name: pick(['F', 'G', 'H']), args: [term(bound)] };
     }
     const k = pick(['not', 'and', 'or', 'implies', 'iff'] as const);

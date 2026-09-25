@@ -28,6 +28,8 @@ export const SYMBOLS: SymbolDef[] = [
 export const QUANTIFIER_SYMBOLS: SymbolDef[] = [
   { key: 'forall', symbol: '∀', ascii: asciiFor('forall', '@'), name: 'for all (universal quantifier)', typed: asciiFor('forall', '@'), group: 'quantifier' },
   { key: 'exists', symbol: '∃', ascii: asciiFor('exists', '$'), name: 'there exists (existential quantifier)', typed: asciiFor('exists', '$'), group: 'quantifier' },
+  { key: 'eq', symbol: '=', ascii: '=', name: 'is identical to (identity)', typed: '=', binary: true, group: 'quantifier' },
+  { key: 'neq', symbol: '≠', ascii: asciiFor('neq', '!='), name: 'is not identical to', typed: asciiFor('neq', '!='), binary: true, group: 'quantifier' },
   { key: 'x', symbol: 'x', ascii: 'x', name: 'variable x', typed: 'x', group: 'term' },
   { key: 'y', symbol: 'y', ascii: 'y', name: 'variable y', typed: 'y', group: 'term' },
   { key: 'z', symbol: 'z', ascii: 'z', name: 'variable z', typed: 'z', group: 'term' },
@@ -56,8 +58,8 @@ export function insertAt(
 /**
  * True when the text before the caret ends with the beginning of a
  * multi-character ASCII connective ("-" of "->", "<" / "<-" of "<->"), so
- * live normalization should wait for the next keystroke.
+ * live normalization should wait for the next keystroke ("!" may become "!=" → ≠).
  */
 export function endsWithPartialConnective(beforeCaret: string): boolean {
-  return /(<-?|-)$/.test(beforeCaret);
+  return /(<-?|-|!)$/.test(beforeCaret);
 }

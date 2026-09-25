@@ -32,6 +32,8 @@ const PREDICATE_EXAMPLES: { label: string; premises: string[]; conclusion: strin
   { label: 'Some F, some G ∴ some F and G', premises: ['∃xFx', '∃xGx'], conclusion: '∃x(Fx ∧ Gx)' },
   { label: 'Quantifier shift ∀∃ ∴ ∃∀', premises: ['∀x∃yLxy'], conclusion: '∃y∀xLxy' },
   { label: 'All men are mortal', premises: ['∀x(Mx → Dx)', 'Ms'], conclusion: 'Ds' },
+  { label: 'a = b, Fa ∴ Fb', premises: ['a = b', 'Fa'], conclusion: 'Fb' },
+  { label: 'Fa, Gb ∴ a = b', premises: ['Fa', 'Gb'], conclusion: 'a = b' },
 ];
 
 export default function CountermodelsPage() {

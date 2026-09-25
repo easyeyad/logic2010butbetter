@@ -18,7 +18,21 @@ export const ASCII_SYMBOL = {
   iff: '<->',
   forall: '@',
   exists: '$',
+  identity: '=',
+  nonIdentity: '!=',
 } as const;
+
+type Symbols = { not: string; and: string; or: string; implies: string; iff: string; forall: string; exists: string; identity: string; nonIdentity: string };
+
+/** ¬(t1 = t2) is displayed as "t1 ≠ t2". */
+function negatedIdentity(f: Formula): Extract<Formula, { kind: 'identity' }> | null {
+  return f.kind === 'not' && f.operand.kind === 'identity' ? f.operand : null;
+}
+
+/** "a = b" / "a ≠ b" text for an identity (negated or not). */
+function identityText(sym: Symbols, left: Term, right: Term, negated: boolean): string {
+  return `${left.name} ${negated ? sym.nonIdentity : sym.identity} ${right.name}`;
+}
 
 const termsText = (args: Term[]) => args.map((t) => t.name).join('');
 
@@ -28,21 +42,26 @@ const termsText = (args: Term[]) => args.map((t) => t.name).join('');
  * ("∀x(Fx → Gx)", "∀x¬Fx", "∀x∃y Rxy").
  */
 function quantPrefix(sym: string, variable: string, body: Formula): string {
-  const letterNext = body.kind === 'atom' || body.kind === 'pred';
+  const letterNext = body.kind === 'atom' || body.kind === 'pred' || body.kind === 'identity' || negatedIdentity(body) !== null;
   return sym + variable + (letterNext ? ' ' : '');
 }
 
 /** Canonical string for a formula, e.g. "(P ∧ Q) → R", "∀x(Fx → Gx)", "∃x Rxa". parse(format(f)) equals f. */
 export function format(f: Formula, opts?: FormatOptions): string {
-  const sym = opts?.ascii ? ASCII_SYMBOL : SYMBOL;
+  const sym: Symbols = opts?.ascii ? ASCII_SYMBOL : SYMBOL;
   const go = (g: Formula, top: boolean): string => {
     switch (g.kind) {
       case 'atom':
         return g.name;
       case 'pred':
         return g.name + termsText(g.args);
-      case 'not':
+      case 'identity':
+        return identityText(sym, g.left, g.right, false);
+      case 'not': {
+        const id = negatedIdentity(g);
+        if (id) return identityText(sym, id.left, id.right, true);
         return sym.not + go(g.operand, false);
+      }
       case 'forall':
       case 'exists':
         return quantPrefix(sym[g.kind], g.variable, g.body) + go(g.body, false);
@@ -65,7 +84,7 @@ export function format(f: Formula, opts?: FormatOptions): string {
  * always the entire output text.
  */
 export function formatWithSpans(f: Formula, opts?: FormatOptions): { text: string; spans: { formula: Formula; span: Span }[] } {
-  const sym = opts?.ascii ? ASCII_SYMBOL : SYMBOL;
+  const sym: Symbols = opts?.ascii ? ASCII_SYMBOL : SYMBOL;
   const spans: { formula: Formula; span: Span }[] = [];
   let text = '';
   const go = (g: Formula, top: boolean): void => {
@@ -77,10 +96,21 @@ export function formatWithSpans(f: Formula, opts?: FormatOptions): { text: strin
       case 'pred':
         text += g.name + termsText(g.args);
         break;
-      case 'not':
+      case 'identity':
+        text += identityText(sym, g.left, g.right, false);
+        break;
+      case 'not': {
+        const id = negatedIdentity(g);
+        if (id) {
+          // "a ≠ b": the inner identity shares the span of the whole negation.
+          text += identityText(sym, id.left, id.right, true);
+          spans.push({ formula: id, span: { start, end: text.length } });
+          break;
+        }
         text += sym.not;
         go(g.operand, false);
         break;
+      }
       case 'forall':
       case 'exists':
         text += quantPrefix(sym[g.kind], g.variable, g.body);

@@ -30,6 +30,12 @@ export function DomainChips({ size, names }: { size: number; names?: Record<stri
   );
 }
 
+function groupNames(names: [string, number][]): [number, string[]][] {
+  const m = new Map<number, string[]>();
+  names.forEach(([k, v]) => m.set(v, [...(m.get(v) ?? []), k]));
+  return [...m].sort(([a], [b]) => a - b);
+}
+
 const has = (ext: number[][], tuple: number[]) => ext.some((t) => t.length === tuple.length && t.every((v, i) => v === tuple[i]));
 
 /**
@@ -49,10 +55,16 @@ export function ModelView({ model }: { model: Interpretation }) {
         <DomainChips size={n} names={model.names} />
         {names.length > 0 && (
           <p className="model__names">
-            {names.map(([k, v], i) => (
-              <span key={k}>
+            {groupNames(names).map(([v, ns], i) => (
+              <span key={v}>
                 {i > 0 && ' · '}
-                <span className="math">{k}</span> names {obj(v)}
+                {ns.length === 1 ? (
+                  <><span className="math">{ns[0]}</span> names {obj(v)}</>
+                ) : (
+                  <>
+                    <span className="math">{ns.join(', ')}</span> all name {obj(v)} (so <span className="math">{ns[0]} = {ns[1]}</span>)
+                  </>
+                )}
               </span>
             ))}
           </p>

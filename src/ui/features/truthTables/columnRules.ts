@@ -10,5 +10,6 @@ export const COLUMN_RULE: Record<Formula['kind'], string> = {
   iff: 'A biconditional is true exactly when both sides have the same truth value.',
   pred: 'An atomic predication like Fa is true when the object named is in the predicate’s extension.',
   forall: 'A universal quantification is true when its body is true for every object in the domain.',
+  identity: 'An identity statement a = b is true when the two names pick out the same object.',
   exists: 'An existential quantification is true when its body is true for at least one object in the domain.',
 };

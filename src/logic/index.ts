@@ -10,7 +10,8 @@
  *  - Sentence letters: a capital letter A–Z, optionally followed by digits (P, Q1).
  *  - Connectives: ¬ ∧ ∨ → ↔. ASCII input accepted: ~ - ! (not), & ^ * (and),
  *    | v (or, lowercase v only when surrounded by spaces/parens), -> > (implies),
- *    <-> <> = (iff). `normalizeInput` rewrites these into canonical symbols.
+ *    <-> <> <=> ≡ (iff). `normalizeInput` rewrites these into canonical symbols.
+ *    NOTE: '=' is NOT an iff alias (it is identity); '=>' still means →.
  *  - Parentheses ( ) and brackets [ ] { } group.
  *  - Outermost parentheses may be omitted. Any binary sub-formula nested
  *    inside another connective MUST be parenthesized (P ∧ Q ∨ R is rejected as
@@ -25,6 +26,9 @@
  *    quantifier and variable is allowed ("∀ x Fx"). Scope is like ¬: ∀x Fx → Gx
  *    is (∀x Fx) → Gx.
  *  - format(): "∀x(Fx → Gx)", "∀x Fx", "∃x¬Fx", "∀x∃y Rxy", ASCII "@x(Fx -> Gx)".
+ *  - Identity: t = t between two terms (names or variables), atomic, binds
+ *    tightest: ¬a = b is ¬(a = b). a ≠ b (ASCII a != b) parses to ¬(a = b) and
+ *    ¬(a = b) formats as "a ≠ b". "P = Q" / "Fa = b" are errors.
  *  - Sentential tools (evaluate, compileFormula, buildTruthTable, classify,
  *    checkValidity/Equivalence/Consistency) throw NotSententialError on
  *    predicate/quantified input; use predicate.ts (findModel, checkPredicateValidity).

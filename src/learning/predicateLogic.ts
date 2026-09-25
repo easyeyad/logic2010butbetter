@@ -122,11 +122,37 @@ const ITEMS: Item[] = [
   { id: 'psym-42', difficulty: 5, sentence: 'No one who loves no one is loved by anyone.', key: [loves], answer: '∀x(¬∃yLxy → ¬∃zLzx)', alternatives: ['¬∃x(¬∃yLxy ∧ ∃zLzx)'], tags: ['no', 'multiple'], explanation: 'For any x: if x loves no one, then no one loves x.' },
   { id: 'psym-43', difficulty: 5, sentence: 'Anyone who loves someone loves themselves.', key: [loves], answer: '∀x(∃yLxy → Lxx)', alternatives: ['∀x∀y(Lxy → Lxx)'], tags: ['any', 'multiple', 'scope'], explanation: 'For any x: if x loves some y, x loves x.' },
   { id: 'psym-44', difficulty: 5, sentence: 'Everyone who admires Alice admires someone Alice admires.', key: [admires, alice], answer: '∀x(Axa → ∃y(Aay ∧ Axy))', tags: ['multiple', 'names'], explanation: 'For any x who admires Alice there is a y that Alice admires and x admires.' },
+  // ------------------------------------------------------------ identity (3–5)
+  { id: 'pid-01', difficulty: 3, sentence: 'Mark Twain is Samuel Clemens.', key: [Nm('m', 'Mark Twain'), Nm('s', 'Samuel Clemens')], answer: 'm = s', tags: ['identity', 'names'], explanation: 'An identity statement between two names: they refer to the same person.' },
+  { id: 'pid-02', difficulty: 3, sentence: 'Alice is not Bob.', key: [alice, bob], answer: '¬(a = b)', tags: ['identity', 'names'], explanation: 'The negation of an identity, written a ≠ b.' },
+  { id: 'pid-03', difficulty: 3, sentence: 'Alice loves someone other than herself.', key: [loves, alice], answer: '∃x(Lax ∧ ¬(x = a))', tags: ['identity', 'other-than'], explanation: '"someone other than Alice": something that is not identical to Alice.' },
+  { id: 'pid-04', difficulty: 3, sentence: 'Someone other than Alice is a student.', key: [student, alice], answer: '∃x(Sx ∧ ¬(x = a))', tags: ['identity', 'other-than'], explanation: 'A student who is not Alice.' },
+  { id: 'pid-05', difficulty: 3, sentence: 'Only Alice passed.', key: [P('P', 1, 'x passed'), alice], answer: 'Pa ∧ ∀x(Px → x = a)', tags: ['identity', 'only-name'], explanation: 'Two claims: Alice passed, and anyone who passed is Alice.' },
+  { id: 'pid-06', difficulty: 3, sentence: 'Everyone except Bob passed.', key: [P('P', 1, 'x passed'), bob], answer: '∀x(¬(x = b) → Px) ∧ ¬Pb', tags: ['identity', 'except'], explanation: 'Everyone other than Bob passed — and (as "except" is normally read) Bob did not.' },
+  { id: 'pid-07', difficulty: 4, sentence: 'At least two students passed.', key: [student, P('P', 1, 'x passed')], answer: '∃x∃y(((Sx ∧ Px) ∧ (Sy ∧ Py)) ∧ ¬(x = y))', tags: ['identity', 'at-least-two'], explanation: 'Two passing students x and y that are DIFFERENT: x ≠ y.' },
+  { id: 'pid-08', difficulty: 4, sentence: 'At most one student passed.', key: [student, P('P', 1, 'x passed')], answer: '∀x∀y(((Sx ∧ Px) ∧ (Sy ∧ Py)) → x = y)', alternatives: ['¬∃x∃y(((Sx ∧ Px) ∧ (Sy ∧ Py)) ∧ ¬(x = y))'], tags: ['identity', 'at-most-one'], explanation: 'Any two passing students are the same one — equivalently, there are not two different ones.' },
+  { id: 'pid-09', difficulty: 4, sentence: 'Exactly one student passed.', key: [student, P('P', 1, 'x passed')], answer: '∃x((Sx ∧ Px) ∧ ∀y((Sy ∧ Py) → y = x))', tags: ['identity', 'exactly-one'], explanation: '"Exactly one" = at least one (∃x) plus at most one (every passing student is that x).' },
+  { id: 'pid-10', difficulty: 4, sentence: 'There are at least two things.', key: [], answer: '∃x∃y¬(x = y)', tags: ['identity', 'at-least-two'], explanation: 'Two things that are not identical.' },
+  { id: 'pid-11', difficulty: 4, sentence: 'There is at most one thing.', key: [], answer: '∀x∀y(x = y)', tags: ['identity', 'at-most-one'], explanation: 'Any x and y are the same thing.' },
+  { id: 'pid-12', difficulty: 4, sentence: 'Alice is the only student who admires Bob.', key: [student, admires, alice, bob], answer: '(Sa ∧ Aab) ∧ ∀x((Sx ∧ Axb) → x = a)', tags: ['identity', 'only-name'], explanation: 'Alice is a student who admires Bob, and any student who admires Bob is Alice.' },
+  { id: 'pid-13', difficulty: 4, sentence: 'No one but Alice loves Bob.', key: [loves, alice, bob], answer: '∀x(Lxb → x = a)', tags: ['identity', 'only-name'], explanation: 'Anyone who loves Bob is Alice. ("No one but" does not by itself say that Alice does.)' },
+  { id: 'pid-14', difficulty: 5, sentence: 'Everyone loves someone other than themselves.', key: [loves], answer: '∀x∃y(Lxy ∧ ¬(x = y))', tags: ['identity', 'other-than', 'multiple'], explanation: 'For each x, some y different from x whom x loves.' },
+  { id: 'pid-15', difficulty: 5, sentence: 'Exactly one thing is perfect.', key: [P('P', 1, 'x is perfect')], answer: '∃x(Px ∧ ∀y(Py → y = x))', tags: ['identity', 'exactly-one'], explanation: 'Something is perfect, and anything perfect is that thing.' },
+  { id: 'pid-16', difficulty: 5, sentence: 'Alice admires everyone except herself.', key: [admires, alice], answer: '∀x(¬(x = a) → Aax) ∧ ¬Aaa', tags: ['identity', 'except'], explanation: 'Alice admires everyone other than Alice, and does not admire herself.' },
+  { id: 'pid-17', difficulty: 5, sentence: 'At most one student admires every teacher.', key: [student, teacher, admires], answer: '∀x∀y(((Sx ∧ ∀z(Tz → Axz)) ∧ (Sy ∧ ∀z(Tz → Ayz))) → x = y)', tags: ['identity', 'at-most-one', 'multiple'], explanation: 'Any two students who each admire every teacher are the same student.' },
+  { id: 'pid-18', difficulty: 5, sentence: 'Exactly one student admires Alice.', key: [student, admires, alice], answer: '∃x((Sx ∧ Axa) ∧ ∀y((Sy ∧ Aya) → y = x))', tags: ['identity', 'exactly-one'], explanation: 'At least one student admires Alice, and every student who does is that one.' },
 ];
 
 const PROMPT = 'Symbolize the sentence in predicate logic using the given key.';
 
 const TITLE_BY_TAG: [string, string][] = [
+  ['at-least-two', '"At least two"'],
+  ['at-most-one', '"At most one"'],
+  ['exactly-one', '"Exactly one"'],
+  ['only-name', '"Only Alice"'],
+  ['except', '"Except"'],
+  ['other-than', '"Other than"'],
+  ['identity', 'Identity'],
   ['quantifier-order', 'Quantifier order'],
   ['only', '"Only"'],
   ['not-every', '"Not every"'],
@@ -261,6 +287,8 @@ export function explainModelTruth(g: Formula, m: Interpretation, assignment: Rec
     case 'pred':
     case 'atom':
       return `${s} is ${tv(val)} in this world.`;
+    case 'identity':
+      return `${s} is ${tv(val)}: ${val ? 'both terms refer to the same object' : 'the two terms refer to different objects'}.`;
     default:
       return `${s} is ${tv(val)}: ${format(g.left)} is ${tv(ev(g.left))} and ${format(g.right)} is ${tv(ev(g.right))}.`;
   }
@@ -276,6 +304,8 @@ function firstFalse(g: Extract<Formula, { variable: string }>, m: Interpretation
 // ---------------------------------------------------------------------------
 
 type PMutationCode =
+  | 'missing-distinctness'
+  | 'missing-uniqueness'
   | 'universal-with-and'
   | 'existential-with-conditional'
   | 'converse'
@@ -291,7 +321,7 @@ type PMutationCode =
   | 'missing-negation';
 
 const PRIORITY: PMutationCode[] = [
-  'universal-with-and', 'existential-with-conditional', 'converse', 'no-as-not-all', 'not-every-as-none', 'quantifier-order',
+  'missing-distinctness', 'missing-uniqueness', 'universal-with-and', 'existential-with-conditional', 'converse', 'no-as-not-all', 'not-every-as-none', 'quantifier-order',
   'quantifier-scope', 'argument-order', 'wrong-quantifier', 'conditional-as-biconditional', 'and-as-or', 'or-as-and', 'missing-negation',
 ];
 
@@ -306,6 +336,14 @@ const N = (x: Formula): Formula => ({ kind: 'not', operand: x });
 const B = (kind: 'and' | 'or' | 'implies' | 'iff', l: Formula, r: Formula): Formula => ({ kind, left: l, right: r });
 const Q = (kind: 'forall' | 'exists', v: string, body: Formula): Formula => ({ kind, variable: v, body });
 const freeIn = (v: string, g: Formula) => freeVariables(g).includes(v);
+const isDistinctness = (g: Formula) => g.kind === 'not' && g.operand.kind === 'identity';
+function containsIdentity(g: Formula): boolean {
+  if (g.kind === 'identity') return true;
+  if (g.kind === 'not') return containsIdentity(g.operand);
+  if (isQuantified(g)) return containsIdentity(g.body);
+  if (isBinary(g)) return containsIdentity(g.left) || containsIdentity(g.right);
+  return false;
+}
 
 function local(g: Formula): { code: PMutationCode; to: Formula }[] {
   const out: { code: PMutationCode; to: Formula }[] = [];
@@ -349,6 +387,13 @@ function local(g: Formula): { code: PMutationCode; to: Formula }[] {
       break;
     default:
       if (!isBinary(g)) break;
+      if (g.kind === 'and') {
+        // Identity idioms: dropping "x ≠ y" (at least two) or the uniqueness clause (only / exactly one).
+        if (isDistinctness(g.right)) out.push({ code: 'missing-distinctness', to: g.left });
+        if (isDistinctness(g.left)) out.push({ code: 'missing-distinctness', to: g.right });
+        if (isQuantified(g.right) && containsIdentity(g.right)) out.push({ code: 'missing-uniqueness', to: g.left });
+        if (isQuantified(g.left) && containsIdentity(g.left)) out.push({ code: 'missing-uniqueness', to: g.right });
+      }
       if (g.kind === 'implies') {
         out.push({ code: 'converse', to: B('implies', g.right, g.left) });
         out.push({ code: 'conditional-as-biconditional', to: B('iff', g.left, g.right) });
@@ -402,6 +447,17 @@ function mutationMessage(m: PMutation, ex: PredicateSymbolizationExercise): { he
   const o = format(m.original);
   const has = (t: string) => ex.tags.includes(t);
   switch (m.code) {
+    case 'missing-distinctness':
+      return {
+        headline: 'You forgot to say the two things are different.',
+        explanation: `"At least two" needs two DIFFERENT objects: add x ≠ y, i.e. ¬(x = y). Without it, x and y may be the same object, so your formula is already true when there is only one. The sentence needs ${o}.`,
+      };
+    case 'missing-uniqueness':
+      return has('exactly-one')
+        ? { headline: '"Exactly one" is more than "at least one".', explanation: `"Exactly one F" = at least one F AND at most one: ∃x(Fx ∧ ∀y(Fy → y = x)). Your formula only says there is at least one. The sentence needs ${o}.` }
+        : has('only-name')
+          ? { headline: '"Only Alice…" also says no one else does.', explanation: `"Only a is F" says a is F AND anything that is F is a: Fa ∧ ∀x(Fx → x = a). Your formula leaves out the "no one else" part (the uniqueness clause with =). The sentence needs ${o}.` }
+          : { headline: 'The uniqueness clause is missing.', explanation: `Part of the sentence says that nothing else qualifies — that needs a clause with identity (… → x = a / y = x). The sentence needs ${o}.` };
     case 'universal-with-and':
       return {
         headline: '"All F are G" needs →, not ∧, under ∀.',
@@ -587,9 +643,16 @@ export const PREDICATE_PATTERN_NOTES: Record<string, string> = {
   restricted: 'A relative clause ("who studies", "that chases a cat") adds a conjunct to the antecedent.',
   scope: 'A quantifier covers only the formula right after it, so use parentheses to set its scope.',
   any: '"Any" in an if-clause is usually existential with narrow scope: "if anyone cheats" = ∃x Cx → …',
+  identity: 'Identity: a = b says a and b are the same object; a ≠ b (¬(a = b)) says they are different.',
+  'other-than': '"Someone other than a": ∃x(… ∧ ¬(x = a)).',
+  'only-name': '"Only a is F": Fa ∧ ∀x(Fx → x = a) — a is F, and anything that is F is a.',
+  except: '"Everyone except a is F": ∀x(¬(x = a) → Fx), usually with ¬Fa added.',
+  'at-least-two': '"At least two F": ∃x∃y((Fx ∧ Fy) ∧ ¬(x = y)) — the x ≠ y is essential.',
+  'at-most-one': '"At most one F": ∀x∀y((Fx ∧ Fy) → x = y) — any two F\'s are the same.',
+  'exactly-one': '"Exactly one F": ∃x(Fx ∧ ∀y(Fy → y = x)) — at least one, and at most one.',
 };
 
-const NOTE_ORDER = ['only', 'no', 'not-every', 'quantifier-order', 'scope', 'any', 'restricted', 'multiple', 'relational', 'all', 'some', 'names'];
+const NOTE_ORDER = ['at-least-two', 'at-most-one', 'exactly-one', 'only-name', 'except', 'other-than', 'identity', 'only', 'no', 'not-every', 'quantifier-order', 'scope', 'any', 'restricted', 'multiple', 'relational', 'all', 'some', 'names'];
 function notesFor(tags: string[], max = 2): string[] {
   return NOTE_ORDER.filter((t) => tags.includes(t)).slice(0, max).map((t) => PREDICATE_PATTERN_NOTES[t]);
 }
@@ -746,6 +809,8 @@ export function renameSymbols(g: Formula, preds: Record<string, string>, names: 
       return g;
     case 'pred':
       return { kind: 'pred', name: preds[g.name] ?? g.name, args: g.args.map(t) };
+    case 'identity':
+      return { kind: 'identity', left: t(g.left), right: t(g.right) };
     case 'not':
       return N(renameSymbols(g.operand, preds, names));
     case 'forall':

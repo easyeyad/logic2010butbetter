@@ -139,6 +139,7 @@ export function substitute(g: Formula, sub: Record<string, Formula>): Formula {
     case 'atom':
       return sub[g.name] ?? g;
     case 'pred':
+    case 'identity':
       return g;
     case 'not':
       return { kind: 'not', operand: substitute(g.operand, sub) };
@@ -155,6 +156,7 @@ export function size(g: Formula): number {
   switch (g.kind) {
     case 'atom':
     case 'pred':
+    case 'identity':
       return 0;
     case 'not':
       return 1 + size(g.operand);
@@ -170,6 +172,7 @@ export function depth(g: Formula): number {
   switch (g.kind) {
     case 'atom':
     case 'pred':
+    case 'identity':
       return 0;
     case 'not':
       return 1 + depth(g.operand);
@@ -186,6 +189,7 @@ export function hasTrivialNode(g: Formula): boolean {
   switch (g.kind) {
     case 'atom':
     case 'pred':
+    case 'identity':
       return false;
     case 'not':
       return hasTrivialNode(g.operand);

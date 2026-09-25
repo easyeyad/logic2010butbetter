@@ -1,5 +1,5 @@
 import type { Formula } from './ast';
-import { Atom, equals, isPredicateFormula } from './ast';
+import { Atom, equals, isBinary, isPredicateFormula } from './ast';
 import type { Valuation } from './evaluate';
 import { NotSententialError, atomsOf, compileFormula, subformulas } from './evaluate';
 import { format } from './format';
@@ -86,7 +86,7 @@ export function buildTruthTable(formulas: Formula[]): TruthTable {
   for (const f of formulas) {
     for (const s of subformulas(f)) {
       if (find(s) >= 0) continue;
-      const dependsOn = s.kind === 'not' ? [find(s.operand)] : 'left' in s ? [find(s.left), find(s.right)] : [];
+      const dependsOn = s.kind === 'not' ? [find(s.operand)] : isBinary(s) ? [find(s.left), find(s.right)] : [];
       columns.push({ formula: s, label: format(s), isAtom: false, isMain: false, dependsOn });
     }
   }

@@ -133,6 +133,7 @@ const MAIN_CUE: Record<Formula['kind'], string> = {
   implies: 'the sentence states a condition',
   iff: 'the sentence says two things stand or fall together',
   pred: 'it is a single predication',
+  identity: 'it says two things are the same',
   forall: 'it says something about everything',
   exists: 'it says something exists',
 };
@@ -439,6 +440,7 @@ function canon(g: Formula): string {
     case 'not':
       return `~${canon(g.operand)}`;
     case 'pred':
+    case 'identity':
     case 'forall':
     case 'exists':
       return format(g);

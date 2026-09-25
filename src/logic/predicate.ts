@@ -21,6 +21,7 @@ function walk(f: Formula, visit: (g: Formula) => void): void {
   switch (f.kind) {
     case 'atom':
     case 'pred':
+    case 'identity':
       return;
     case 'not':
       walk(f.operand, visit);
@@ -35,6 +36,11 @@ function walk(f: Formula, visit: (g: Formula) => void): void {
   }
 }
 
+/** The terms of an atomic predication or identity, left to right. */
+function termsOf(f: Extract<Formula, { kind: 'pred' | 'identity' }>): Term[] {
+  return f.kind === 'pred' ? f.args : [f.left, f.right];
+}
+
 /** Variables occurring free in f, in order of first occurrence. */
 export function freeVariables(f: Formula): string[] {
   const out: string[] = [];
@@ -43,7 +49,8 @@ export function freeVariables(f: Formula): string[] {
       case 'atom':
         return;
       case 'pred':
-        for (const t of g.args) if (t.kind === 'var' && !bound.includes(t.name) && !out.includes(t.name)) out.push(t.name);
+      case 'identity':
+        for (const t of termsOf(g)) if (t.kind === 'var' && !bound.includes(t.name) && !out.includes(t.name)) out.push(t.name);
         return;
       case 'not':
         go(g.operand, bound);
@@ -65,7 +72,7 @@ function collectTerms(fs: Formula[], kind: Term['kind'], includeQuantVars: boole
   const seen = new Set<string>();
   for (const f of fs) {
     walk(f, (g) => {
-      if (g.kind === 'pred') for (const t of g.args) if (t.kind === kind) seen.add(t.name);
+      if (g.kind === 'pred' || g.kind === 'identity') for (const t of termsOf(g)) if (t.kind === kind) seen.add(t.name);
       if (includeQuantVars && (g.kind === 'forall' || g.kind === 'exists')) seen.add(g.variable);
     });
   }
@@ -84,7 +91,8 @@ export function variablesOf(...fs: Formula[]): string[] {
 
 /**
  * Predicate letters with their arity, e.g. [{name:'F',arity:1},{name:'R',arity:2}],
- * sorted by name then arity. Sentence letters are arity 0. Throws nothing; if one
+ * sorted by name then arity. Sentence letters are arity 0; identity (=) is not
+ * listed. Throws nothing; if one
  * letter is used with two arities, both are listed (see `arityConflicts`).
  */
 export function predicatesOf(...fs: Formula[]): { name: string; arity: number }[] {
@@ -119,12 +127,15 @@ export function isSentence(f: Formula): boolean {
  * i.e. t is not "free for" v in f).
  */
 export function substitute(f: Formula, v: string, t: Term): Formula | null {
+  const sub = (a: Term): Term => (a.kind === 'var' && a.name === v ? t : a);
   const go = (g: Formula): Formula | null => {
     switch (g.kind) {
       case 'atom':
         return g;
       case 'pred':
-        return { kind: 'pred', name: g.name, args: g.args.map((a) => (a.kind === 'var' && a.name === v ? t : a)) };
+        return { kind: 'pred', name: g.name, args: g.args.map(sub) };
+      case 'identity':
+        return { kind: 'identity', left: sub(g.left), right: sub(g.right) };
       case 'not': {
         const o = go(g.operand);
         return o && { kind: 'not', operand: o };
@@ -136,7 +147,10 @@ export function substitute(f: Formula, v: string, t: Term): Formula | null {
         const b = go(g.body);
         return b && { kind: g.kind, variable: g.variable, body: b };
       }
-      default: {
+      case 'and':
+      case 'or':
+      case 'implies':
+      case 'iff': {
         const l = go(g.left);
         const r = l && go(g.right);
         return l && r && { kind: g.kind, left: l, right: r };
@@ -159,11 +173,13 @@ export function matchInstance(body: Formula, v: string, instance: Formula): Term
     switch (b.kind) {
       case 'atom':
         return b.name === (i as typeof b).name;
-      case 'pred': {
+      case 'pred':
+      case 'identity': {
         const ii = i as typeof b;
-        if (b.name !== ii.name || b.args.length !== ii.args.length) return false;
-        return b.args.every((a, k) => {
-          const x = ii.args[k];
+        if (b.kind === 'pred' && (b.name !== (ii as typeof b).name || b.args.length !== (ii as typeof b).args.length)) return false;
+        const its = termsOf(ii);
+        return termsOf(b).every((a, k) => {
+          const x = its[k];
           if (!vBound && a.kind === 'var' && a.name === v) {
             if (found === null) found = x;
             return termEquals(found, x);
@@ -222,6 +238,10 @@ export function alphaEquals(a: Formula, b: Formula): boolean {
       case 'pred': {
         const yy = y as typeof x;
         return x.name === yy.name && x.args.length === yy.args.length && x.args.every((t, k) => term(t, yy.args[k], ea, eb));
+      }
+      case 'identity': {
+        const yy = y as typeof x;
+        return term(x.left, yy.left, ea, eb) && term(x.right, yy.right, ea, eb);
       }
       case 'not':
         return go(x.operand, (y as typeof x).operand, ea, eb, depth);
@@ -299,6 +319,8 @@ export function evaluateIn(f: Formula, m: Interpretation, assignment: Record<str
         const vs = g.args.map(val);
         return p.extension.some((e) => e.length === vs.length && e.every((x, k) => x === vs[k]));
       }
+      case 'identity':
+        return val(g.left) === val(g.right);
       case 'not':
         return !go(g.operand);
       case 'and':
@@ -398,6 +420,10 @@ class Grounder {
           f.name,
           f.args.map((t) => (t.kind === 'var' ? (env.get(t.name) ?? this.consts[t.name]) : this.consts[t.name])),
         );
+      case 'identity': {
+        const tv = (t: Term) => (t.kind === 'var' ? (env.get(t.name) ?? this.consts[t.name]) : this.consts[t.name]);
+        return tv(f.left) === tv(f.right);
+      }
       case 'not':
         return neg(this.ground(f.operand, env));
       case 'and':
@@ -580,6 +606,7 @@ function quantDepth(f: Formula): number {
   switch (f.kind) {
     case 'atom':
     case 'pred':
+    case 'identity':
       return 0;
     case 'not':
       return quantDepth(f.operand);

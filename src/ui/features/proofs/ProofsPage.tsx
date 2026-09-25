@@ -130,7 +130,7 @@ function ProofsWorkspace() {
         <>
           <div className="actionbar" role="region" aria-label="Proof tools">
             {formulaFocused ? (
-              <SymbolBar compact label="Insert symbol into the focused line" onInsert={(d) => target?.insert(d)} />
+              <SymbolBar compact terms={false} label="Insert symbol into the focused line" onInsert={(d) => target?.insert(d)} />
             ) : (
               <div className="actionbar__buttons">
                 <Button size="sm" variant={errorCount > 0 ? 'danger' : 'default'} icon={errorCount > 0 ? 'xCircle' : 'checkCircle'} onClick={() => openPanel('feedback')} aria-haspopup="dialog">

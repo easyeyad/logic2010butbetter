@@ -335,7 +335,7 @@ export function checkTerminology(ex: TerminologyExercise, a: { position?: number
 function scopeAt(g: Formula, pos: number): string | null {
   const { text, spans } = formatWithSpans(g);
   for (const { formula: h, span } of spans) {
-    if (h.kind === 'atom' || h.kind === 'pred') continue;
+    if (h.kind === 'atom' || h.kind === 'pred' || h.kind === 'identity') continue;
     const top = span.start === 0 && span.end === text.length;
     const main = !isBinary(h) ? span.start : span.start + (top ? 0 : 1) + format(h.left, { dropOuter: false }).length + 1;
     if (main === pos) return format(h);

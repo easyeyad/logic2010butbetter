@@ -46,7 +46,7 @@ function DerivationEditor({ exercise, initial, onChange, solution }: AnswerProps
       <ProofEditor ed={ed} inlineSymbolBar={!docked} />
       {docked && focused && (
         <div className="actionbar" role="region" aria-label="Proof tools">
-          <SymbolBar compact label="Insert symbol into the focused line" onInsert={(d) => target?.insert(d)} />
+          <SymbolBar compact terms={false} label="Insert symbol into the focused line" onInsert={(d) => target?.insert(d)} />
         </div>
       )}
     </div>

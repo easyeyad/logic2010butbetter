@@ -8,12 +8,15 @@ export function RefsInput({
   label,
   invalid,
   onKeyDown,
+  noRefs,
 }: {
   refs: number[] | undefined;
   onChange: (refs: number[]) => void;
   label: string;
   invalid?: boolean;
   onKeyDown?: (e: KeyboardEvent<HTMLInputElement>) => void;
+  /** The rule cites no lines (e.g. Id): show a disabled "none" field with a note. */
+  noRefs?: string;
 }) {
   const id = useId();
   const [text, setText] = useState(formatRefs(refs));
@@ -25,6 +28,14 @@ export function RefsInput({
   }, [refs]);
 
   const bad = parsed === null;
+  if (noRefs && (!refs || refs.length === 0)) {
+    return (
+      <div className="refs">
+        <label htmlFor={id} className="visually-hidden">{label}</label>
+        <input id={id} className="refs__input refs__input--none" data-field="refs" value="" placeholder="none" disabled title={noRefs} aria-description={noRefs} />
+      </div>
+    );
+  }
   return (
     <div className="refs">
       <label htmlFor={id} className="visually-hidden">{label}</label>

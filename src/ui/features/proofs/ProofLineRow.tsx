@@ -1,6 +1,7 @@
 import { memo } from 'react';
 import type { DraftLine, LineCheck } from '../../../proof';
 import { FormulaInput } from '../../components/FormulaInput';
+import { getRuleInfo } from '../../engine/safe';
 import { Icon } from '../../components/Icon';
 import { isUntouched, justKeyOf, type RailInfo } from './draftOps';
 import type { JustOption } from './justification';
@@ -131,6 +132,7 @@ export const ProofLineRow = memo(function ProofLineRow({ line, index, lc, rails,
                 refs={line.refs}
                 onChange={(r) => handlers.onRefs(line.id, r)}
                 label={`Line ${n} cited lines`}
+                noRefs={line.rule && getRuleInfo(line.rule)?.premisesCount === 0 ? `${line.rule} cites no lines` : line.rule === ('Id' as string) ? 'Id cites no lines: a = a needs no justification lines' : undefined}
                 invalid={target('refs')}
               />
             )}

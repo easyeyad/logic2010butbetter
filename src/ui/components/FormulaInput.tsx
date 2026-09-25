@@ -7,6 +7,7 @@ import React, {
   useLayoutEffect,
   useMemo,
   useRef,
+  useState,
   type FocusEvent,
   type InputHTMLAttributes,
   type KeyboardEvent,
@@ -15,6 +16,7 @@ import type { ParseResult } from '../../logic';
 import { useSettings } from '../app/settings';
 import { safeNormalize, safeParse } from '../engine/safe';
 import { useDebounced } from '../hooks/useDebounced';
+import { BP, useMediaQuery } from '../hooks/useMediaQuery';
 import { useFormulaTarget } from './FormulaTarget';
 import { FormulaText } from './FormulaText';
 import { Icon } from './Icon';
@@ -90,6 +92,8 @@ export const FormulaInput = forwardRef<FormulaInputHandle, FormulaInputProps>(fu
   const pendingCaret = useRef<number | null>(null);
   const lastSel = useRef<{ start: number; end: number }>({ start: value.length, end: value.length });
   const target = useFormulaTarget();
+  const isPhone = useMediaQuery(BP.mobile);
+  const [within, setWithin] = useState(false);
 
   useImperativeHandle(ref, () => ({
     focus: (caret) => {
@@ -187,7 +191,8 @@ export const FormulaInput = forwardRef<FormulaInputHandle, FormulaInputProps>(fu
   const parseOk = !stale && result?.ok && result.value.ok;
   const engineDown = !stale && result && !result.ok;
   const isInvalid = Boolean(parseError) || Boolean(invalid);
-  const showToolbar = toolbar ?? !compact;
+  // On phones a field's symbol bar appears only while the field (or its bar) has focus.
+  const showToolbar = (toolbar ?? !compact) && (!isPhone || within);
 
   const handleKeyDown = (e: KeyboardEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     if (multiline && e.key === 'Enter') e.preventDefault(); // never a newline; parents may still act on Enter
@@ -195,7 +200,13 @@ export const FormulaInput = forwardRef<FormulaInputHandle, FormulaInputProps>(fu
   };
 
   return (
-    <div className={`fi ${compact ? 'fi--compact' : ''} ${className ?? ''}`}>
+    <div
+      className={`fi ${compact ? 'fi--compact' : ''} ${className ?? ''}`}
+      onFocus={() => setWithin(true)}
+      onBlur={(e) => {
+        if (!e.currentTarget.contains(e.relatedTarget as Node | null)) setWithin(false);
+      }}
+    >
       <label htmlFor={id} className={hideLabel ? 'visually-hidden' : 'field__label'}>
         {label}
       </label>

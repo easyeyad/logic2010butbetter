@@ -12,12 +12,15 @@ export function SymbolBar({
   label = 'Insert symbol',
   compact,
   quantifiers,
+  terms = true,
 }: {
   onInsert: (def: SymbolDef) => void;
   label?: string;
   compact?: boolean;
   /** Show the quantifier row (∀ ∃ and common terms). Defaults to the predicate-logic setting. */
   quantifiers?: boolean;
+  /** Include the x y z a b term buttons (docked phone bars leave them out to stay compact). */
+  terms?: boolean;
 }) {
   const { settings } = useSettings();
   const showQ = quantifiers ?? settings.predicateMode;
@@ -40,7 +43,7 @@ export function SymbolBar({
       <div className={`symbar symbar--pred ${compact ? 'symbar--compact' : ''}`} role="toolbar" aria-label={label}>
         <div className="symbar__row">{SYMBOLS.map(button)}</div>
         <div className="symbar__row symbar__row--q" role="group" aria-label="Quantifiers and terms">
-          {QUANTIFIER_SYMBOLS.map(button)}
+          {QUANTIFIER_SYMBOLS.filter((q) => terms || q.group !== 'term').map(button)}
         </div>
       </div>
     );

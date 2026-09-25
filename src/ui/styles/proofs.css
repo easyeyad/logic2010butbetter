@@ -184,7 +184,7 @@
   background: var(--c-surface-2); color: var(--c-text);
   font-family: var(--font-mono); font-size: var(--fs-sm); font-weight: 600;
 }
-.picker__input { width: 5.75rem; text-transform: uppercase; }
+.picker__input { width: 5.75rem; }
 .picker__input::placeholder, .refs__input::placeholder { text-transform: none; font-family: var(--font-sans); font-weight: 400; color: var(--c-text-3); opacity: 1; }
 .refs__input { width: 4.75rem; }
 .picker__input:focus-visible, .refs__input:focus-visible { border-color: var(--c-accent); background: var(--c-surface); box-shadow: 0 0 0 3px color-mix(in srgb, var(--c-accent) 22%, transparent); }
@@ -293,3 +293,4 @@
 .practice-proof { padding-bottom: 0; }
 @media (max-width: 1023px) { .exercise[data-kind="derivation"] { margin-bottom: 72px; } }
 .picker__group { padding: 6px var(--sp-2) 2px; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: var(--c-text-3); }
+.refs__input--none { opacity: 0.7; cursor: not-allowed; }

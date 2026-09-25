@@ -1,14 +1,14 @@
-import type { RuleId } from '../../../proof';
+
 import { getRuleInfo, ruleList } from '../../engine/safe';
 
 export interface JustOption {
   key: string;
   abbr: string;
   name: string;
-  group: 'Rules' | 'Quantifier rules' | 'Derived rules' | 'Line types';
+  group: 'Rules' | 'Quantifier rules' | 'Identity rules' | 'Derived rules' | 'Line types';
 }
 
-const PRIMITIVE: [RuleId, string][] = [
+const PRIMITIVE: [string, string][] = [
   ['MP', 'Modus Ponens'],
   ['MT', 'Modus Tollens'],
   ['DN', 'Double Negation'],
@@ -22,8 +22,11 @@ const PRIMITIVE: [RuleId, string][] = [
   ['UI', 'Universal Instantiation'],
   ['EG', 'Existential Generalization'],
   ['EI', 'Existential Instantiation'],
+  ['Id', 'Identity'],
+  ['LL', "Leibniz' Law"],
+  ['SM', 'Symmetry'],
 ];
-const DERIVED: [RuleId, string][] = [
+const DERIVED: [string, string][] = [
   ['DM', "De Morgan's"],
   ['NC', 'Negation of Conditional'],
   ['NB', 'Negation of Biconditional'],
@@ -38,9 +41,11 @@ const DERIVED: [RuleId, string][] = [
  * when available (falls back to the Logic 2010 rule ids).
  */
 export const QUANTIFIER_RULE_IDS = new Set(['UI', 'EG', 'EI', 'UD', 'QN', 'AV']);
+export const IDENTITY_RULE_IDS = new Set(['Id', 'LL', 'SM']);
 
 function groupOf(id: string, derived: boolean): JustOption['group'] {
   if (derived) return 'Derived rules';
+  if (IDENTITY_RULE_IDS.has(id)) return 'Identity rules';
   return QUANTIFIER_RULE_IDS.has(id) ? 'Quantifier rules' : 'Rules';
 }
 

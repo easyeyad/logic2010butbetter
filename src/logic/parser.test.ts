@@ -59,7 +59,7 @@ describe('parse: happy paths', () => {
     // implies
     ['P -> Q', Implies(P, Q)], ['P > Q', Implies(P, Q)], ['P ⊃ Q', Implies(P, Q)], ['P => Q', Implies(P, Q)], ['P ⇒ Q', Implies(P, Q)], ['P->Q', Implies(P, Q)],
     // iff
-    ['P <-> Q', Iff(P, Q)], ['P <> Q', Iff(P, Q)], ['P = Q', Iff(P, Q)], ['P ≡ Q', Iff(P, Q)], ['P <=> Q', Iff(P, Q)], ['P ⇔ Q', Iff(P, Q)],
+    ['P <-> Q', Iff(P, Q)], ['P <> Q', Iff(P, Q)], ['P ≡ Q', Iff(P, Q)], ['P <=> Q', Iff(P, Q)], ['P ⇔ Q', Iff(P, Q)],
     // mixed
     ['~(P & Q) -> (-R v Q)', Implies(Not(And(P, Q)), Or(Not(R), Q))],
     ['-P->Q', Implies(Not(P), Q)],
@@ -255,7 +255,11 @@ describe('normalizeInput', () => {
     expect(normalizeInput('P => Q').text).toBe('P → Q');
     expect(normalizeInput('P > Q').text).toBe('P → Q');
     expect(normalizeInput('P | Q ^ R * S').text).toBe('P ∨ Q ∧ R ∧ S');
-    expect(normalizeInput('!P = -Q').text).toBe('¬P ↔ ¬Q');
+    expect(normalizeInput('!P <-> -Q').text).toBe('¬P ↔ ¬Q');
+    expect(normalizeInput('a != b').text).toBe('a ≠ b');
+    expect(normalizeInput('a = b').text).toBe('a = b'); // = is identity, not ↔
+    expect(normalizeInput('!P').text).toBe('¬P');
+    expect(normalizeInput('P ∧ !').text).toBe('P ∧ !'); // held: may become !=
     expect(normalizeInput('P ⊃ Q ≡ R · S').text).toBe('P → Q ↔ R ∧ S');
   });
 
@@ -267,11 +271,12 @@ describe('normalizeInput', () => {
     expect(normalizeInput('P v1').text).toBe('P v1');
   });
 
-  it('holds a trailing "-" or "=" (might become -> / =>)', () => {
+  it('holds a trailing "-" or "!" (might become -> / !=)', () => {
     expect(normalizeInput('P -').text).toBe('P -');
     expect(normalizeInput('P <-').text).toBe('P <-');
     expect(normalizeInput('P <').text).toBe('P <');
     expect(normalizeInput('P =').text).toBe('P =');
+    expect(normalizeInput('a !').text).toBe('a !');
     expect(normalizeInput('P <=').text).toBe('P <=');
     expect(normalizeInput('-P').text).toBe('¬P');
     expect(normalizeInput('P - Q').text).toBe('P ¬ Q');
@@ -300,7 +305,7 @@ describe('normalizeInput', () => {
   });
 
   it('simulates typing "~P & Q -> R" and "-P => Q"', () => {
-    for (const [typed, want] of [['~P & Q -> R', '¬P ∧ Q → R'], ['-P => Q', '¬P → Q'], ['P = Q', 'P ↔ Q'], ['P v Q', 'P ∨ Q']]) {
+    for (const [typed, want] of [['~P & Q -> R', '¬P ∧ Q → R'], ['-P => Q', '¬P → Q'], ['a != b', 'a ≠ b'], ['x=y', 'x=y'], ['P v Q', 'P ∨ Q']]) {
       let text = '';
       let caret = 0;
       for (const ch of typed) {
@@ -323,7 +328,7 @@ describe('normalizeInput', () => {
   });
 
   it('is idempotent', () => {
-    const samples = ['~P & Q -> R', 'P <-', 'P -', 'P <> Q = R', 'x v y', '((P)v-Q)=>R', 'P =', '<<->>', '---', '->-', 'P<=>Q'];
+    const samples = ['~P & Q -> R', 'P <-', 'P -', 'P <> Q <-> R', 'a != b', 'a !', 'x v y', '((P)v-Q)=>R', 'P =', '<<->>', '---', '->-', 'P<=>Q'];
     for (const s of samples) {
       const once = normalizeInput(s);
       expect(normalizeInput(once.text).text, s).toBe(once.text);
@@ -335,7 +340,7 @@ describe('normalizeInput', () => {
   });
 
   it('never changes what parse() accepts', () => {
-    const samples = ['~P & (Q -> R)', '(P v Q) <-> -R', 'P => Q', '!(P ^ Q) = R', 'P * Q', 'P <> Q'];
+    const samples = ['~P & (Q -> R)', '(P v Q) <-> -R', 'P => Q', '!(P ^ Q) <-> R', 'a != b', 'P * Q', 'P <> Q'];
     for (const s of samples) {
       const a = parse(s);
       const b = parse(normalizeInput(s).text);

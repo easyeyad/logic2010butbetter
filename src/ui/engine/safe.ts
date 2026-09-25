@@ -111,6 +111,7 @@ export function isPredicateInput(fs: Formula[]): boolean {
   const walk = (f: Formula): boolean => {
     switch (f.kind) {
       case 'pred':
+      case 'identity':
       case 'forall':
       case 'exists':
         return true;

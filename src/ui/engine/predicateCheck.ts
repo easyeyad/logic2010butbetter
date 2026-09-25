@@ -93,7 +93,16 @@ export function describeModelInWords(m: Interpretation): string[] {
   const o = (i: number) => `#${i + 1}`;
   const lines: string[] = [];
   lines.push(`The domain has ${m.domainSize} object${m.domainSize === 1 ? '' : 's'}: ${Array.from({ length: m.domainSize }, (_, i) => o(i)).join(', ')}.`);
-  for (const [n, v] of Object.entries(m.names).sort(([a], [b]) => a.localeCompare(b))) lines.push(`${n} names ${o(v)}.`);
+  const byObj = new Map<number, string[]>();
+  for (const [n, v] of Object.entries(m.names).sort(([a], [b]) => a.localeCompare(b))) byObj.set(v, [...(byObj.get(v) ?? []), n]);
+  for (const [v, ns] of [...byObj].sort(([a], [b]) => a - b)) {
+    if (ns.length === 1) lines.push(`${ns[0]} names ${o(v)}.`);
+    else lines.push(`${ns.slice(0, -1).join(', ')} and ${ns[ns.length - 1]} name the same object ${o(v)}, so ${ns[0]} = ${ns[1]} is true.`);
+  }
+  if (byObj.size > 1) {
+    const firsts = [...byObj.values()].map((ns) => ns[0]);
+    lines.push(`${firsts[0]} and ${firsts[1]} name different objects, so ${firsts[0]} ≠ ${firsts[1]}.`);
+  }
   for (const [name, p] of Object.entries(m.predicates).sort(([a], [b]) => a.localeCompare(b))) {
     if ('value' in p) {
       lines.push(`${name} is ${p.value ? 'true' : 'false'}.`);

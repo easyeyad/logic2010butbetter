@@ -45,6 +45,7 @@ export function atomsOf(...fs: Formula[]): string[] {
         seen.add(f.name);
         return;
       case 'pred':
+      case 'identity':
         return;
       case 'not':
         walk(f.operand);
@@ -133,7 +134,7 @@ export function compileFormula(f: Formula, atoms: string[]): (values: boolean[])
  * Distinct non-atomic subformulas in evaluation order (inner first, the formula
  * itself last). Duplicates removed by structural equality.
  * Order is a left-to-right post-order traversal keeping first occurrences.
- * Atomic formulas (sentence letters and predications like Fa) are excluded;
+ * Atomic formulas (sentence letters, predications like Fa, identities a = b) are excluded;
  * quantified formulas are included (their bodies first).
  */
 export function subformulas(f: Formula): Formula[] {
@@ -142,6 +143,7 @@ export function subformulas(f: Formula): Formula[] {
     switch (g.kind) {
       case 'atom':
       case 'pred':
+      case 'identity':
         return;
       case 'not':
         walk(g.operand);
@@ -165,6 +167,7 @@ export function complexity(f: Formula): number {
   switch (f.kind) {
     case 'atom':
     case 'pred':
+    case 'identity':
       return 0;
     case 'not':
       return 1 + complexity(f.operand);

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { Exists, Forall, Name, Not, Pred, Var, equals } from './ast';
+import { Exists, Forall, Identity, Name, Not, Pred, Var, equals } from './ast';
 import type { Formula } from './ast';
 import { NotSententialError, atomsOf, complexity, evaluate, subformulas } from './evaluate';
 import { format, formatWithSpans } from './format';
@@ -12,6 +12,7 @@ import {
 import type { Interpretation } from './predicate';
 import { randomFormula, seededRandom } from './random';
 import { buildTruthTable, classify } from './truthTable';
+import { isPredicateFormula as isPredicate } from './ast';
 import { checkConsistency, checkEquivalence, checkValidity } from './validity';
 
 const x = Var('x'), y = Var('y'), a = Name('a'), b = Name('b');
@@ -107,8 +108,11 @@ describe('format: predicate formulas', () => {
       }
       const { text, spans } = formatWithSpans(f);
       for (const s of spans) {
-        const r = parse(text.slice(s.span.start, s.span.end));
-        expect(r.ok && equals(r.formula, s.formula)).toBe(true);
+        const piece = text.slice(s.span.start, s.span.end);
+        const r = parse(piece);
+        // In "a ≠ b" the inner identity shares the span of the whole negation.
+        const want = s.formula.kind === 'identity' && piece.includes('≠') ? Not(s.formula) : s.formula;
+        expect(r.ok && equals(r.formula, want)).toBe(true);
       }
     }
   });
@@ -340,3 +344,92 @@ describe('findModel / checkPredicateValidity', () => {
   });
 });
 
+
+describe('identity', () => {
+  const c = Name('c');
+  it('parses', () => {
+    const cases: [string, Formula][] = [
+      ['a = b', Identity(a, b)],
+      ['x=y', Identity(x, y)],
+      ['a ≠ b', Not(Identity(a, b))],
+      ['a != b', Not(Identity(a, b))],
+      ['¬a = b', Not(Identity(a, b))],
+      ['¬a ≠ b', Not(Not(Identity(a, b)))],
+      ['a = b ∧ Fa', { kind: 'and', left: Identity(a, b), right: Pred('F', a) }],
+      ['∀x x = x', Forall('x', Identity(x, x))],
+      ['∀x(x = a → Fx)', Forall('x', { kind: 'implies', left: Identity(x, a), right: Pred('F', x) })],
+      ['∃x∃y x ≠ y', Exists('x', Exists('y', Not(Identity(x, y))))],
+      ['(b = c)', Identity(b, c)],
+    ];
+    for (const [s, f] of cases) {
+      const r = parse(s);
+      if (!r.ok) throw new Error(`${s}: ${r.error.message}`);
+      expect(equals(r.formula, f), s).toBe(true);
+    }
+  });
+  it('= is no longer an alias for ↔', () => {
+    const e = err('P = Q', 'misplaced-connective', '=');
+    expect(e.hint).toBe('For “if and only if” use ↔ (type <->).');
+    expect(err('Fa = b', 'misplaced-connective', '=').message).toBe('= goes between two terms, e.g. a = b.');
+    expect(parse('P => Q').ok).toBe(true);
+    expect(parse('P <=> Q').ok).toBe(true);
+  });
+  it('errors', () => {
+    expect(err('a = ', 'missing-operand', '=').message).toBe('= needs a term on each side — nothing follows it.');
+    expect(err('= b', 'missing-operand', '= b').message).toMatch(/nothing comes before it/);
+    err('(a ≠)', 'missing-operand', '≠');
+    err('a = P', 'misplaced-connective', 'a = P');
+    err('a = b = c', 'misplaced-connective');
+    err('a ∧ P', 'invalid-atom', 'a');
+    err('F a = b', 'missing-connective', 'F a = b');
+  });
+  it('formats', () => {
+    expect(format(Identity(a, b))).toBe('a = b');
+    expect(format(Not(Identity(a, b)))).toBe('a ≠ b');
+    expect(format(Not(Identity(a, b)), { ascii: true })).toBe('a != b');
+    expect(format(Not(Not(Identity(a, b))))).toBe('¬a ≠ b');
+    expect(format(p('∀x∀y(x = y ∨ x ≠ y)'))).toBe('∀x∀y(x = y ∨ x ≠ y)');
+    expect(format(Forall('x', Identity(x, x)))).toBe('∀x x = x');
+    expect(format(Forall('x', Not(Identity(x, a))))).toBe('∀x x ≠ a');
+  });
+  it('symbols and substitution', () => {
+    const f = p('∀x(x = a → Rxy)');
+    expect(freeVariables(f)).toEqual(['y']);
+    expect(namesOf(p('a = b ∧ c ≠ a'))).toEqual(['a', 'b', 'c']);
+    expect(variablesOf(p('x = y'))).toEqual(['x', 'y']);
+    expect(predicatesOf(p('a = b ∧ Fa'))).toEqual([{ name: 'F', arity: 1 }]);
+    expect(format(substitute(p('x = a ∧ ∀x x = x'), 'x', b)!)).toBe('b = a ∧ ∀x x = x');
+    expect(substitute(p('∃y x ≠ y'), 'x', y)).toBeNull();
+    expect(matchInstance(p('x = a'), 'x', p('b = a'))).toEqual(b);
+    expect(matchInstance(p('x = x'), 'x', p('a = b'))).toBeNull();
+    expect(isGeneralizationOf(p('∃x x = a'), p('a = a'))).toBe(true);
+    expect(isGeneralizationOf(p('∃x a = x'), p('a = a'))).toBe(true);
+    expect(alphaEquals(p('∀x x = a'), p('∀y y = a'))).toBe(true);
+    expect(alphaEquals(p('∀x x = y'), p('∀y y = y'))).toBe(false);
+    expect(isPredicate(p('a = b'))).toBe(true);
+  });
+  it('evaluateIn: same object', () => {
+    const m: Interpretation = { domainSize: 2, names: { a: 0, b: 0, c: 1 }, predicates: {} };
+    expect(evaluateIn(p('a = b'), m)).toBe(true);
+    expect(evaluateIn(p('a = c'), m)).toBe(false);
+    expect(evaluateIn(p('a ≠ c'), m)).toBe(true);
+    expect(evaluateIn(p('∃x∃y x ≠ y'), m)).toBe(true);
+    expect(evaluateIn(p('∀x∀y x = y'), m)).toBe(false);
+  });
+  it('countermodels', () => {
+    const v = (ps: string[], c: string) => checkPredicateValidity(ps.map(p), p(c));
+    expect(v(['a = b', 'Fa'], 'Fb').status).toBe('no-countermodel-found');
+    expect(v(['Fa', '¬Fb'], 'a ≠ b').status).toBe('no-countermodel-found');
+    expect(v(['∀x∀y x = y'], 'Fa → Fb').status).toBe('no-countermodel-found');
+    const r = v(['a = b'], 'b = c');
+    expect(r.status).toBe('invalid');
+    expect(r.countermodel!.names.b).not.toBe(r.countermodel!.names.c);
+    const m = findModel([p('∃x∃y x ≠ y')], []);
+    expect(m.status).toBe('found');
+    expect(m.model!.domainSize).toBe(2);
+    expect(m.searchedUpTo).toBe(1);
+    expect(v(['∃x∀y(Fy ↔ y = x)'], '∀x∀y((Fx ∧ Fy) → x = y)').status).toBe('no-countermodel-found');
+    const three = findModel([p('∃x∃y∃z((x ≠ y ∧ y ≠ z) ∧ x ≠ z)')], []);
+    expect(three.model!.domainSize).toBe(3);
+  });
+});
