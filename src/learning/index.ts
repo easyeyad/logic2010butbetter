@@ -110,6 +110,7 @@ export {
   checkInferenceRule,
   ruleJustifies,
   rulesJustifying,
+  semanticallySensible,
   PRIMITIVE_RULES,
   DERIVED_RULES,
   ALL_RULES,

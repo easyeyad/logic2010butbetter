@@ -8,7 +8,7 @@
  * OWNER: Learning System.
  */
 import type { Formula, Term } from '../logic';
-import { CONNECTIVE_NAME, checkValidity, equals, format, freeVariables, isPredicateFormula, namesOf, parse, variablesOf } from '../logic';
+import { CONNECTIVE_NAME, checkConsistency, checkValidity, classify, equals, findModel, format, freeVariables, isPredicateFormula, namesOf, parse, variablesOf } from '../logic';
 import type { RuleId } from '../proof';
 import { checkRuleApplication, getRule, ruleLabel } from '../proof';
 import type { Difficulty, Feedback, InferenceRuleExercise, Solution } from './types';
@@ -149,6 +149,21 @@ function quantInstance(rule: RuleId, rng: Rng, difficulty: Difficulty): Instance
   }
 }
 
+/**
+ * Every cited line and the conclusion are contingent, and the cited lines are
+ * jointly consistent (truth tables for sentential items, bounded model search
+ * for predicate ones).
+ */
+export function semanticallySensible(cited: Formula[], to: Formula): boolean {
+  const all = [...cited, to];
+  if (!all.some(isPredicateFormula)) {
+    return all.every((g) => classify(g) === 'contingent') && checkConsistency(cited).consistent;
+  }
+  const opts = { maxDomain: 3 };
+  const found = (t: Formula[], fl: Formula[]) => findModel(t, fl, opts).status === 'found';
+  return all.every((g) => found([g], []) && found([], [g])) && found(cited, []);
+}
+
 const isQuantOrIdentityRule = (r: RuleId) => [...QUANTIFIER_RULES, ...DERIVED_QUANTIFIER_RULES, ...IDENTITY_RULES].includes(r);
 
 const APPLY_RULES: RuleId[] = ['MP', 'MT', 'MTP', 'S', 'BC', 'CB', 'ADJ'];
@@ -178,6 +193,8 @@ export function generateInferenceRule(difficulty: Difficulty, seed: number, mode
     // Reject degenerate steps: the conclusion repeats a cited line, or two cited lines are the same.
     if (inst.cited.some((c) => equals(c, inst!.to))) continue;
     if (inst.cited.some((c, i) => inst!.cited.some((d, j) => j > i && equals(c, d)))) continue;
+    // …or semantically silly ones: a tautologous/contradictory line or conclusion, or inconsistent cited lines.
+    if (!semanticallySensible(inst.cited, inst.to)) continue;
     if (m === 'identify') {
       const all = rulesJustifying(inst.cited, inst.to);
       if (all.length !== 1 || all[0] !== rule) continue;

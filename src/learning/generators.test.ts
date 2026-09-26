@@ -18,6 +18,7 @@ import {
   mainConnectiveIndex,
   ruleJustifies,
   rulesJustifying,
+  semanticallySensible,
   type Difficulty,
   type Exercise,
 } from './index';
@@ -428,5 +429,30 @@ describe('inference-rule drill: no degenerate items (review round 4)', () => {
           expect([ex.lines.join(', ') + ' ⊢ ' + ex.conclusion, cited.some((c) => equals(c, concl))]).toEqual([ex.lines.join(', ') + ' ⊢ ' + ex.conclusion, false]);
           expect(new Set(ex.lines).size).toBe(ex.lines.length);
         }
+  });
+});
+
+describe('inference-rule drill: no contradictory or tautological items (review round 5)', () => {
+  it('cited lines consistent; every line and the conclusion contingent (5000 items, levels 1–5)', () => {
+    let n = 0;
+    for (const d of DS)
+      for (let s = 0; s < 500; s++)
+        for (const mode of ['identify', 'apply'] as const) {
+          const ex = generateInferenceRule(d, s + 10_000, mode);
+          const cited = ex.lines.map(parseOrThrow);
+          const concl = parseOrThrow(ex.conclusion);
+          const label = `${ex.lines.join(' ; ')} ⊢ ${ex.conclusion}`;
+          expect([label, semanticallySensible(cited, concl)]).toEqual([label, true]);
+          if (mode === 'identify') expect([label, rulesJustifying(cited, concl)]).toEqual([label, [ex.rule]]);
+          n++;
+        }
+    expect(n).toBe(5000);
+  });
+
+  it('the reported examples are rejected by the filter', () => {
+    const F = parseOrThrow;
+    expect(semanticallySensible([F('¬¬P'), F('P ∨ ¬P')], F('P'))).toBe(false);
+    expect(semanticallySensible([F('¬S'), F('S')], F('¬S ∧ S'))).toBe(false);
+    expect(semanticallySensible([F('P → Q'), F('P')], F('Q'))).toBe(true);
   });
 });
