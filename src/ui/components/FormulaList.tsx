@@ -1,6 +1,7 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useId, useRef, useState } from 'react';
 import { Button } from './Button';
-import { FormulaInput, type FormulaInputHandle } from './FormulaInput';
+import { FormulaInput, useActiveFormulaId, type FormulaInputHandle } from './FormulaInput';
+import { BP, useMediaQuery } from '../hooks/useMediaQuery';
 import { FormulaTargetProvider, useFormulaTarget } from './FormulaTarget';
 import { SymbolBar } from './SymbolBar';
 
@@ -25,7 +26,10 @@ function SharedBar({ fallbackLabel, onFallback }: { fallbackLabel: string; onFal
     <SymbolBar
       label={`Insert symbol into ${label}`}
       onInsert={(d) => {
-        if (!target?.insert(d)) onFallback();
+        if (target?.insert(d)) return;
+        // Nothing focused yet: target the row the bar sits under.
+        onFallback();
+        target?.insert(d);
       }}
     />
   );
@@ -49,6 +53,14 @@ function FormulaListInner({
 }) {
   const refs = useRef<(FormulaInputHandle | null)[]>([]);
   const [focusRow, setFocusRow] = useState<number | null>(null);
+  // The shared symbol bar sits under the most recently focused row (the last row until one is focused).
+  const [activeRow, setActiveRow] = useState<number | null>(null);
+  const barRow = Math.min(activeRow ?? values.length - 1, values.length - 1);
+  const listId = useId();
+  const activeId = useActiveFormulaId();
+  // Phones: show the bar only while one of this list's fields is the one being edited.
+  const isPhone = useMediaQuery(BP.mobile);
+  const showBar = !isPhone || (activeId?.startsWith(`fl-${listId}-`) ?? false);
 
   useEffect(() => {
     if (focusRow === null) return;
@@ -71,11 +83,13 @@ function FormulaListInner({
   return (
     <div className="stack stack--sm">
       {values.map((v, i) => (
-        <div key={i} className="row row--top">
+        <div key={i} className="fl__item" onFocus={() => setActiveRow(i)}>
+        <div className="row row--top">
           <FormulaInput
             ref={(h) => {
               refs.current[i] = h;
             }}
+            id={`fl-${listId}-${i}`}
             className="grow"
             label={labelFor(i)}
             value={v}
@@ -91,15 +105,16 @@ function FormulaListInner({
               icon="trash"
               label={`Remove ${labelFor(i).toLowerCase()}`}
               className="row__trail"
-              onClick={() => onChange(values.filter((_, j) => j !== i))}
+              onClick={() => {
+                onChange(values.filter((_, j) => j !== i));
+                setActiveRow(null);
+              }}
             />
           )}
         </div>
+        {i === barRow && showBar && <SharedBar fallbackLabel={labelFor(i)} onFallback={() => refs.current[i]?.focus('end')} />}
+        </div>
       ))}
-      <SharedBar
-        fallbackLabel={labelFor(0)}
-        onFallback={() => refs.current[0]?.focus('end')}
-      />
       <div>
         <Button
           size="sm"

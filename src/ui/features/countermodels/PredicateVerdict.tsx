@@ -49,13 +49,26 @@ export function PredicateVerdict({
       </div>
     );
   }
+  if (result.kind === 'premises-unsatisfied') {
+    return (
+      <div className="verdict-card verdict-card--unknown" role="status">
+        <h2 className="verdict-card__title"><Icon name="alert" size={26} /> No conclusion</h2>
+        <p>
+          The premises have no model with up to {result.searchedUpTo} object{result.searchedUpTo === 1 ? '' : 's'}, so the search can't
+          tell whether a countermodel exists with more objects — no conclusion either way.
+        </p>
+        <p className="subtle">If you believe the argument is valid, prove it with a derivation.</p>
+      </div>
+    );
+  }
   if (result.kind === 'none-found') {
     return (
       <div className="verdict-card verdict-card--unknown" role="status">
         <h2 className="verdict-card__title"><Icon name="search" size={26} /> No countermodel found</h2>
         <p>
           There is no countermodel with up to {result.searchedUpTo} object{result.searchedUpTo === 1 ? '' : 's'}. That suggests the
-          argument is valid — but with quantifiers a search can't prove it. To be sure, prove it with a derivation.
+          argument is valid{result.quantifiers ? ' — but with quantifiers a search can’t prove it' : ''}. To be sure, prove it with a
+          derivation.
         </p>
         <div>
           <Link

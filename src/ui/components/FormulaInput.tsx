@@ -66,6 +66,11 @@ function setActive(id: string) {
   activeListeners.forEach((l) => l());
 }
 
+/** Id of the most recently focused FormulaInput (for bars shared by several fields). */
+export function useActiveFormulaId(): string | null {
+  return useSyncExternalStore(subscribeActive, getActive, getActive);
+}
+
 export interface FormulaInputHandle {
   focus: (caret?: 'start' | 'end') => void;
   input: HTMLInputElement | HTMLTextAreaElement | null;

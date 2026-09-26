@@ -24,9 +24,28 @@ export interface InputProblem {
 export type PredicateCheck =
   | { kind: 'input-problems'; problems: InputProblem[] }
   | { kind: 'invalid'; model: Interpretation; searchedUpTo: number }
-  | { kind: 'none-found'; searchedUpTo: number }
+  | { kind: 'none-found'; searchedUpTo: number; quantifiers: boolean }
+  /** The premises alone have no model within the limit, so the search says nothing. */
+  | { kind: 'premises-unsatisfied'; searchedUpTo: number }
   | { kind: 'too-large'; searchedUpTo: number; note: string }
   | { kind: 'engine'; error: string };
+
+function hasQuantifier(f: Formula): boolean {
+  switch (f.kind) {
+    case 'forall':
+    case 'exists':
+      return true;
+    case 'not':
+      return hasQuantifier(f.operand);
+    case 'and':
+    case 'or':
+    case 'implies':
+    case 'iff':
+      return hasQuantifier(f.left) || hasQuantifier(f.right);
+    default:
+      return false;
+  }
+}
 
 const termsWord = (n: number) => `${n} term${n === 1 ? '' : 's'}`;
 
@@ -84,9 +103,16 @@ export function checkPredicateArgument(premises: Formula[], conclusion: Formula,
   if (!r.ok) return { kind: 'engine', error: r.error };
   const m = r.value;
   if (m.status === 'found' && m.model) return { kind: 'invalid', model: m.model, searchedUpTo: m.searchedUpTo };
-  if (m.status === 'none-up-to-limit' && m.searchedUpTo >= 1) return { kind: 'none-found', searchedUpTo: m.searchedUpTo };
+  if (m.status === 'none-up-to-limit' && m.searchedUpTo >= 1) {
+    // If no small world even makes the premises true, "no countermodel" tells us nothing.
+    const pm = attempt(() => logic.findModel(premises, [], { maxDomain }));
+    if (!pm.ok || pm.value.status !== 'found') return { kind: 'premises-unsatisfied', searchedUpTo: m.searchedUpTo };
+    return { kind: 'none-found', searchedUpTo: m.searchedUpTo, quantifiers: [...premises, conclusion].some(hasQuantifier) };
+  }
   return { kind: 'too-large', searchedUpTo: m.searchedUpTo, note: m.note };
 }
+
+const listAnd = (xs: string[]) => (xs.length <= 1 ? xs.join('') : `${xs.slice(0, -1).join(', ')} and ${xs[xs.length - 1]}`);
 
 /** "#1 is F; #2 is not F; #1 bears R to #2" — a model in plain words. */
 export function describeModelInWords(m: Interpretation): string[] {
@@ -97,7 +123,7 @@ export function describeModelInWords(m: Interpretation): string[] {
   for (const [n, v] of Object.entries(m.names).sort(([a], [b]) => a.localeCompare(b))) byObj.set(v, [...(byObj.get(v) ?? []), n]);
   for (const [v, ns] of [...byObj].sort(([a], [b]) => a - b)) {
     if (ns.length === 1) lines.push(`${ns[0]} names ${o(v)}.`);
-    else lines.push(`${ns.slice(0, -1).join(', ')} and ${ns[ns.length - 1]} name the same object ${o(v)}, so ${ns[0]} = ${ns[1]} is true.`);
+    else lines.push(`${listAnd(ns)} ${ns.length === 2 ? 'both' : 'all'} name ${o(v)}, so ${ns.join(' = ')} is true.`);
   }
   if (byObj.size > 1) {
     const firsts = [...byObj.values()].map((ns) => ns[0]);

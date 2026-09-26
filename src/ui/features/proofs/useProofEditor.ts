@@ -21,6 +21,7 @@ import {
   shiftDepth,
   trimTrailingBlank,
   isBlank,
+  isUntouched,
   updateLine,
 } from './draftOps';
 import { ALL_DERIVATIONS as DERIVATION_EXERCISES } from './exercises';
@@ -275,8 +276,11 @@ export function useProofEditor(opts: ProofEditorOptions = {}) {
 
   const loadProblem = useCallback(
     (problem: ProofProblem) => {
-      setDoc(docForProblem(problem));
-      setFocusReq(null);
+      const d = docForProblem(problem);
+      setDoc(d);
+      // Put the student straight onto the first line they need to write.
+      const first = d.lines.find((l) => isUntouched(l)) ?? d.lines[d.lines.length - 1];
+      setFocusReq(first ? { id: first.id, field: 'formula' } : null);
     },
     [setDoc],
   );

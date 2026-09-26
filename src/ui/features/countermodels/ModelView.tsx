@@ -62,7 +62,8 @@ export function ModelView({ model }: { model: Interpretation }) {
                   <><span className="math">{ns[0]}</span> names {obj(v)}</>
                 ) : (
                   <>
-                    <span className="math">{ns.join(', ')}</span> all name {obj(v)} (so <span className="math">{ns[0]} = {ns[1]}</span>)
+                    <span className="math">{ns.length === 2 ? ns.join(' and ') : `${ns.slice(0, -1).join(', ')} and ${ns[ns.length - 1]}`}</span>{' '}
+                    {ns.length === 2 ? 'both' : 'all'} name {obj(v)} (so <span className="math">{ns.join(' = ')}</span>)
                   </>
                 )}
               </span>

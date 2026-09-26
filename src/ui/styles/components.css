@@ -88,7 +88,8 @@
   width: min(440px, calc(100vw - 2 * var(--sp-4)));
   pointer-events: none;
 }
-@media (max-width: 767px) { .toasts { bottom: calc(var(--tabbar-h) + 72px + env(safe-area-inset-bottom)); } }
+/* Phones: toasts at the top, clear of the docked bars and of the line being edited near them. */
+@media (max-width: 767px) { .toasts { bottom: auto; top: calc(var(--sp-2) + env(safe-area-inset-top)); } }
 .toast {
   pointer-events: auto;
   display: flex; align-items: center; gap: var(--sp-3);
@@ -142,5 +143,4 @@
 .switch__desc { font-size: var(--fs-sm); color: var(--c-text-3); }
 .drawer .sheet__head { padding-top: var(--sp-4); }
 /* When a docked action bar is showing (phones/tablets), keep toasts above it. */
-body:has(.actionbar) .toasts { bottom: calc(var(--tabbar-h) + 150px + env(safe-area-inset-bottom)); }
 @media (min-width: 768px) { body:has(.actionbar) .toasts { bottom: 130px; } }
