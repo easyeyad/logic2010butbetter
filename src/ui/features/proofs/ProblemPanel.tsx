@@ -22,10 +22,10 @@ function Sequent({ premises, goal }: { premises: string[]; goal: string }) {
   );
 }
 
-type Verdict = { kind: 'invalid'; text: string } | { kind: 'bad-input'; text: string } | null;
+export type Verdict = { kind: 'invalid'; text: string } | { kind: 'bad-input'; text: string } | null;
 
 /** Is the entered argument valid? (Invalid arguments have no derivation.) */
-function assess(premises: string[], goal: string): Verdict {
+export function assess(premises: string[], goal: string): Verdict {
   const fs = [];
   for (const [i, p] of premises.entries()) {
     const r = safeParse(p);

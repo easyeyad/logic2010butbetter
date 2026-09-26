@@ -45,6 +45,8 @@ export interface FormulaInputProps
   /** Hide the success check (e.g. when the parent shows its own status). */
   hideSuccess?: boolean;
   debounceMs?: number;
+  /** Term buttons for the symbol bar (defaults to x y z a b). */
+  termLetters?: string[];
   /**
    * Wrap long formulas onto several lines (auto-growing textarea; Enter never
    * inserts a newline). Defaults to `compact`.
@@ -91,6 +93,7 @@ export const FormulaInput = forwardRef<FormulaInputHandle, FormulaInputProps>(fu
     hideSuccess,
     debounceMs = 150,
     wrap,
+    termLetters,
     id: idProp,
     className,
     onKeyDown,
@@ -300,7 +303,7 @@ export const FormulaInput = forwardRef<FormulaInputHandle, FormulaInputProps>(fu
           </span>
         )}
       </div>
-      {showToolbar && <SymbolBar onInsert={insert} label={`Insert symbol into ${label}`} />}
+      {showToolbar && <SymbolBar onInsert={insert} label={`Insert symbol into ${label}`} termLetters={termLetters} />}
       {parseError && (
         <div id={msgId} className="fi__error" role="status">
           <Icon name="xCircle" size={16} />

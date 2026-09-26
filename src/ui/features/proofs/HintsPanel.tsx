@@ -7,6 +7,7 @@ import { Icon } from '../../components/Icon';
 import { EngineError, Notice } from '../../components/Notice';
 import { safeSolve, safeSuggestNextStep, solverAvailable } from '../../engine/safe';
 import { signature } from './draftOps';
+import { assess } from './ProblemPanel';
 
 interface HintEntry {
   level: 1 | 2 | 3;
@@ -110,11 +111,19 @@ export function HintsPanel({
         <div className="solution-box">
           <p className="subtle">Stuck for good? You can reveal a complete solution. It replaces your current lines (you can undo).</p>
           <Button variant="danger" icon="eye" onClick={() => setConfirm(true)}>Show solution</Button>
-          {noSolution && (
-            <Notice tone="warn">
-              No solution found — the conclusion may not follow from the premises, or the proof is too long for the automatic prover.
-            </Notice>
-          )}
+          {noSolution &&
+            (() => {
+              const v = assess(premises, goal);
+              return v?.kind === 'invalid' ? (
+                <Notice tone="err" title="This argument is invalid, so there is no derivation">
+                  {v.text}
+                </Notice>
+              ) : (
+                <Notice tone="warn">
+                  No solution found — the proof may be too long for the automatic prover, or the conclusion may not follow from the premises.
+                </Notice>
+              );
+            })()}
         </div>
       )}
       <ConfirmDialog

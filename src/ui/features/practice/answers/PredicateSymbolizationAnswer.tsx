@@ -10,7 +10,13 @@ export function PredicateSymbolizationAnswer({ exercise, initial, onChange }: An
     <div className="stack">
       <blockquote className="sentence">{exercise.sentence}</blockquote>
       <PredicateKey entries={exercise.key} />
-      <FormulaInput label="Your symbolization" value={text} onChange={setText} placeholder="e.g. ∀x(Dx → Mx)" />
+      <FormulaInput
+        label="Your symbolization"
+        value={text}
+        onChange={setText}
+        placeholder="e.g. ∀x(Dx → Mx)"
+        termLetters={['x', 'y', 'z', ...exercise.key.filter((k) => k.kind === 'name').map((k) => k.symbol)]}
+      />
     </div>
   );
 }

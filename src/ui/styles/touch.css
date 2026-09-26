@@ -57,3 +57,4 @@
   .symbar__row, .symbar--pred .symbar__row { display: contents; }
   .symbar__btn, .symbar--compact .symbar__btn, .symbar--pred .symbar__btn, .actionbar .symbar__btn { min-width: 44px; width: 100%; padding: 0; }
 }
+@media (pointer: coarse), (max-width: 1023px) { .select, .input { min-height: var(--touch); } }
