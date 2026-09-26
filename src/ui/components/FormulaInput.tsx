@@ -194,6 +194,18 @@ export const FormulaInput = forwardRef<FormulaInputHandle, FormulaInputProps>(fu
     insertRef.current = insert;
   }, [insert]);
 
+  // Shared-toolbar registration: identity token, label kept current, removed on unmount.
+  const ownerRef = useRef<object>({});
+  useEffect(() => {
+    target?.relabel(ownerRef.current, label);
+  }, [target, label]);
+  useEffect(() => {
+    const owner = ownerRef.current;
+    return () => target?.unregister(owner);
+    // Only on unmount (target identity changes whenever its label does).
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   const rememberSel = () => {
     const el = inputRef.current;
     if (el) lastSel.current = { start: el.selectionStart ?? 0, end: el.selectionEnd ?? 0 };
@@ -256,7 +268,7 @@ export const FormulaInput = forwardRef<FormulaInputHandle, FormulaInputProps>(fu
             onKeyUp={rememberSel}
             onKeyDown={handleKeyDown}
             onFocus={(e: FocusEvent<HTMLTextAreaElement>) => {
-              target?.register((d) => insertRef.current(d), label);
+              target?.register(ownerRef.current, (d) => insertRef.current(d), label);
               onFocus?.(e as unknown as FocusEvent<HTMLInputElement>);
             }}
             onBlur={(e: FocusEvent<HTMLTextAreaElement>) => {
@@ -286,7 +298,7 @@ export const FormulaInput = forwardRef<FormulaInputHandle, FormulaInputProps>(fu
             onKeyUp={rememberSel}
             onKeyDown={handleKeyDown}
             onFocus={(e: FocusEvent<HTMLInputElement>) => {
-              target?.register((d) => insertRef.current(d), label);
+              target?.register(ownerRef.current, (d) => insertRef.current(d), label);
               onFocus?.(e);
             }}
             onBlur={(e: FocusEvent<HTMLInputElement>) => {
