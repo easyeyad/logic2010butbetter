@@ -144,3 +144,7 @@
 .drawer .sheet__head { padding-top: var(--sp-4); }
 /* When a docked action bar is showing (phones/tablets), keep toasts above it. */
 @media (min-width: 768px) { body:has(.actionbar) .toasts { bottom: 130px; } }
+@media (max-width: 767px) {
+  .toast { padding: 2px 2px 2px var(--sp-3); font-size: var(--fs-xs); box-shadow: var(--shadow); }
+  .toast__action, .toast__close { min-height: 40px; }
+}

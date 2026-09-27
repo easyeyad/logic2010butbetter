@@ -49,6 +49,24 @@ export function PredicateVerdict({
       </div>
     );
   }
+  if (result.kind === 'valid') {
+    return (
+      <div className="verdict-card verdict-card--valid" role="status">
+        <h2 className="verdict-card__title"><Icon name="checkCircle" size={28} /> Valid</h2>
+        {result.vacuous ? (
+          <>
+            <p>The premises can never all be true together, so the argument is valid vacuously — no world can make them all true.</p>
+            <p className="subtle">There are no quantifiers, so worlds with one object per name are enough to check — this settles it.</p>
+          </>
+        ) : (
+          <p>
+            No world makes every premise true and the conclusion false. There are no quantifiers, so worlds with one object per name are
+            enough to check — this settles it.
+          </p>
+        )}
+      </div>
+    );
+  }
   if (result.kind === 'premises-unsatisfied') {
     return (
       <div className="verdict-card verdict-card--unknown" role="status">

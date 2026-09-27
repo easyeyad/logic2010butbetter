@@ -1,10 +1,10 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Button } from '../../components/Button';
 import { Notice } from '../../components/Notice';
 import { isPredicateInput, safeAtoms, safeParse, safeValidity } from '../../engine/safe';
 import { checkPredicateArgument, describeModelInWords } from '../../engine/predicateCheck';
 import { countermodelNarrative } from '../countermodels/narrative';
-import { FormulaInput } from '../../components/FormulaInput';
+import { FormulaInput, type FormulaInputHandle } from '../../components/FormulaInput';
 import { FormulaText } from '../../components/FormulaText';
 import { ALL_DERIVATIONS as DERIVATION_EXERCISES } from './exercises';
 import type { DerivationExercise } from '../../../learning';
@@ -59,6 +59,13 @@ export function assess(premises: string[], goal: string): Verdict {
 function CustomProblemForm({ onStart }: { onStart: (p: ProofProblem) => void }) {
   const [premises, setPremises] = useState<string[]>(['']);
   const [goal, setGoal] = useState('');
+  const premiseRefs = useRef<(FormulaInputHandle | null)[]>([]);
+  const [focusNew, setFocusNew] = useState<number | null>(null);
+  useEffect(() => {
+    if (focusNew === null) return;
+    premiseRefs.current[focusNew]?.focus('end');
+    setFocusNew(null);
+  }, [focusNew]);
   const [verdict, setVerdict] = useState<Verdict>(null);
   const [confirmed, setConfirmed] = useState(false);
   const start = () => onStart({ id: 'custom', title: 'Your problem', premises: premises.filter((p) => p.trim()), goal });
@@ -80,6 +87,9 @@ function CustomProblemForm({ onStart }: { onStart: (p: ProofProblem) => void }) 
       {premises.map((p, i) => (
         <div key={i} className="row row--top">
           <FormulaInput
+            ref={(h) => {
+              premiseRefs.current[i] = h;
+            }}
             className="grow"
             label={`Premise ${i + 1}`}
             value={p}
@@ -101,7 +111,15 @@ function CustomProblemForm({ onStart }: { onStart: (p: ProofProblem) => void }) 
           />
         </div>
       ))}
-      <Button size="sm" variant="ghost" icon="plus" onClick={() => setPremises((ps) => [...ps, ''])}>
+      <Button
+        size="sm"
+        variant="ghost"
+        icon="plus"
+        onClick={() => {
+          setPremises((ps) => [...ps, '']);
+          setFocusNew(premises.length);
+        }}
+      >
         Add premise
       </Button>
       <FormulaInput
@@ -197,19 +215,30 @@ function ExerciseGroups({ currentId, onPick }: { currentId: string; onPick: (e: 
   const current = DERIVATION_EXERCISES.find((e) => e.id === currentId);
   return (
     <div className="levels">
-      {[...LEVELS, 'q' as const].map((lvl) => {
-        const quant = lvl === 'q';
-        const items = DERIVATION_EXERCISES.filter((e) => (quant ? e.topic === 'quantifier-derivation' : e.topic !== 'quantifier-derivation' && e.difficulty === lvl));
+      {[...LEVELS, 'q' as const, 'id' as const].map((lvl) => {
+        const quant = lvl === 'q' || lvl === 'id';
+        const isId = (e: DerivationExercise) => e.tags.includes('identity');
+        const items = DERIVATION_EXERCISES.filter((e) =>
+          lvl === 'id' ? isId(e) : lvl === 'q' ? e.topic === 'quantifier-derivation' && !isId(e) : e.topic !== 'quantifier-derivation' && e.difficulty === lvl,
+        );
         if (!items.length) return null;
         const done = items.filter((e) => store.isSolved(e.id)).length;
         return (
           <details
             key={lvl}
             className="level"
-            open={current ? (quant ? current.topic === 'quantifier-derivation' : current.topic !== 'quantifier-derivation' && current.difficulty === lvl) : lvl === 1}
+            open={
+              current
+                ? lvl === 'id'
+                  ? isId(current)
+                  : lvl === 'q'
+                    ? current.topic === 'quantifier-derivation' && !isId(current)
+                    : current.topic !== 'quantifier-derivation' && current.difficulty === lvl
+                : lvl === 1
+            }
           >
             <summary className="level__summary">
-              <span className="level__name">{quant ? 'Quantifiers (∀ ∃)' : `Level ${lvl}`}</span>
+              <span className="level__name">{lvl === 'id' ? 'Identity (=)' : quant ? 'Quantifiers (∀ ∃)' : `Level ${lvl}`}</span>
               <span className="level__count">
                 {done} of {items.length} done
               </span>

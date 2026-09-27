@@ -44,7 +44,7 @@ export function DashboardPage() {
   const [done, setDone] = useLocalStorage<boolean>(ONBOARDING_KEY, false);
   return (
     <div className="page">
-      <PageHeader title="Welcome to Logic Studio" description="Practice sentential logic the way your course teaches it — with instant, specific feedback." />
+      <PageHeader title="Welcome to Logic Studio" description="Practice sentential and predicate logic the way your course teaches it — with instant, specific feedback." />
       <div className="stack stack--lg">
         {!done && <Onboarding onDone={() => setDone(true)} />}
         <ContinueExercise />
@@ -107,7 +107,7 @@ function ProgressSnapshot() {
         </div>
         <div className="stat-row stat-row--cards">
           <div className="stat card"><span className="stat__value">{v.streak.current}</span><span className="stat__label">Day streak{v.streak.practicedToday ? ' · practiced today' : ''}</span></div>
-          <div className="stat card"><span className="stat__value">{v.accuracy === null ? '—' : `${Math.round(100 * v.accuracy)}%`}</span><span className="stat__label">Accuracy · {v.totalAttempts} attempts</span></div>
+          <div className="stat card"><span className="stat__value">{v.accuracy === null ? '—' : `${Math.round(100 * v.accuracy)}%`}</span><span className="stat__label">Accuracy · {v.totalAttempts} attempt{v.totalAttempts === 1 ? '' : 's'}</span></div>
           <div className="stat card"><span className="stat__value">{v.topics.filter((t) => t.attempts > 0).length}/{v.topics.length}</span><span className="stat__label">Topics practiced</span></div>
         </div>
       </section>

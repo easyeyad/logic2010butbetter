@@ -119,7 +119,11 @@ export default function CountermodelsPage() {
                   clearBad();
                   setPremises(v);
                 }}
-                invalidRows={bad.rows} labelFor={(i) => `Premise ${i + 1}`} addLabel="Add premise" min={0} />
+                invalidRows={bad.rows}
+                onConclusion={(t) => {
+                  clearBad();
+                  setConclusion(t);
+                }} labelFor={(i) => `Premise ${i + 1}`} addLabel="Add premise" min={0} />
             </fieldset>
             <div className="concl">
               <span className="concl__therefore" aria-hidden="true">∴</span>

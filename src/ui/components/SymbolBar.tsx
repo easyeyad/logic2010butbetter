@@ -1,3 +1,4 @@
+import { useState, type KeyboardEvent } from 'react';
 import { useSettings } from '../app/settings';
 import { QUANTIFIER_SYMBOLS, SYMBOLS, type SymbolDef } from './symbols';
 
@@ -27,10 +28,31 @@ export function SymbolBar({
 }) {
   const { settings } = useSettings();
   const showQ = quantifiers ?? settings.predicateMode;
-  const button = (s: SymbolDef) => (
+  // Toolbar pattern: one tab stop; arrow keys / Home / End move between buttons.
+  const [focusIdx, setFocusIdx] = useState(0);
+  let idx = 0;
+  const onToolbarKey = (e: KeyboardEvent<HTMLDivElement>) => {
+    const btns = Array.from(e.currentTarget.querySelectorAll<HTMLButtonElement>('button.symbar__btn'));
+    const cur = btns.indexOf(document.activeElement as HTMLButtonElement);
+    if (cur < 0) return;
+    let next = -1;
+    if (e.key === 'ArrowRight' || e.key === 'ArrowDown') next = (cur + 1) % btns.length;
+    else if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') next = (cur - 1 + btns.length) % btns.length;
+    else if (e.key === 'Home') next = 0;
+    else if (e.key === 'End') next = btns.length - 1;
+    if (next < 0) return;
+    e.preventDefault();
+    setFocusIdx(next);
+    btns[next].focus();
+  };
+  const button = (s: SymbolDef) => {
+    const my = idx++;
+    return (
     <button
       key={s.key}
       type="button"
+      tabIndex={my === focusIdx ? 0 : -1}
+      onFocus={() => setFocusIdx(my)}
       className={`symbar__btn math ${s.group ? `symbar__btn--${s.group}` : ''}`}
       aria-label={`Insert ${s.name}`}
       title={s.group === 'term' ? s.name : `${s.name} — or type ${s.typed}`}
@@ -40,10 +62,11 @@ export function SymbolBar({
     >
       {settings.asciiDisplay && !s.group ? s.ascii : s.symbol}
     </button>
-  );
+    );
+  };
   if (showQ) {
     return (
-      <div className={`symbar symbar--pred ${compact ? 'symbar--compact' : ''}`} role="toolbar" aria-label={label}>
+      <div className={`symbar symbar--pred ${compact ? 'symbar--compact' : ''}`} role="toolbar" aria-label={label} onKeyDown={onToolbarKey}>
         <div className="symbar__row">{SYMBOLS.map(button)}</div>
         <div className="symbar__row symbar__row--q" role="group" aria-label="Quantifiers and terms">
           {QUANTIFIER_SYMBOLS.filter((q) => q.group !== 'term').map(button)}
@@ -64,21 +87,8 @@ export function SymbolBar({
     );
   }
   return (
-    <div className={`symbar ${compact ? 'symbar--compact' : ''}`} role="toolbar" aria-label={label}>
-      {SYMBOLS.map((s) => (
-        <button
-          key={s.key}
-          type="button"
-          className="symbar__btn math"
-          aria-label={`Insert ${s.name}`}
-          title={`${s.name} — or type ${s.typed}`}
-          onMouseDown={(e) => e.preventDefault()}
-          onPointerDown={(e) => e.pointerType !== "mouse" && e.preventDefault()}
-          onClick={() => onInsert(s)}
-        >
-          {settings.asciiDisplay ? s.ascii : s.symbol}
-        </button>
-      ))}
+    <div className={`symbar ${compact ? 'symbar--compact' : ''}`} role="toolbar" aria-label={label} onKeyDown={onToolbarKey}>
+      {SYMBOLS.map(button)}
     </div>
   );
 }

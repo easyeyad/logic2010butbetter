@@ -42,6 +42,7 @@ function FormulaListInner({
   addLabel = 'Add formula',
   min = 1,
   invalidRows,
+  onConclusion,
 }: {
   values: string[];
   onChange: (v: string[]) => void;
@@ -50,12 +51,33 @@ function FormulaListInner({
   min?: number;
   /** Rows flagged by a whole-argument check (e.g. inconsistent predicate arity). */
   invalidRows?: Set<number>;
+  /** Receives the part after ∴ / therefore / ⊢ when an argument is pasted into a row. */
+  onConclusion?: (text: string) => void;
 }) {
   const refs = useRef<(FormulaInputHandle | null)[]>([]);
   const [focusRow, setFocusRow] = useState<number | null>(null);
+  // Latest values: row handlers must never act on a stale copy (that would resurrect deleted rows).
+  const valuesRef = useRef(values);
+  valuesRef.current = values;
+  // Stable row ids (React keys and field ids), kept in step with `values`.
+  const idSeq = useRef(0);
+  const [rowIds, setRowIds] = useState<string[]>(() => values.map(() => `r${idSeq.current++}`));
+  const ids =
+    rowIds.length === values.length
+      ? rowIds
+      : rowIds.length > values.length
+        ? rowIds.slice(0, values.length)
+        : [...rowIds, ...values.slice(rowIds.length).map(() => `r${idSeq.current++}`)];
+  useEffect(() => {
+    if (ids !== rowIds) setRowIds(ids);
+  }, [ids, rowIds]);
+  const idsRef = useRef(ids);
+  idsRef.current = ids;
+
   // The shared symbol bar sits under the most recently focused row (the last row until one is focused).
-  const [activeRow, setActiveRow] = useState<number | null>(null);
-  const barRow = Math.min(activeRow ?? values.length - 1, values.length - 1);
+  const [activeRowId, setActiveRowId] = useState<string | null>(null);
+  const activeIdx = activeRowId ? ids.indexOf(activeRowId) : -1;
+  const barRow = activeIdx >= 0 ? activeIdx : values.length - 1;
   const listId = useId();
   const activeId = useActiveFormulaId();
   // Phones: show the bar only while one of this list's fields is the one being edited.
@@ -68,33 +90,60 @@ function FormulaListInner({
     setFocusRow(null);
   }, [focusRow, values]);
 
-  const setAt = (i: number, text: string) => {
-    if (text.includes(',')) {
-      const parts = text.split(',').map((p, k) => (k === 0 ? p.trimEnd() : p.trimStart()));
-      const next = [...values.slice(0, i), ...parts, ...values.slice(i + 1)];
-      onChange(next);
+  /** Replace row `rowId` (looked up in the CURRENT rows) with one or more texts. */
+  const setRow = (rowId: string, text: string) => {
+    const cur = valuesRef.current;
+    const curIds = idsRef.current;
+    const i = curIds.indexOf(rowId);
+    if (i < 0) return; // the row was deleted: never recreate it
+    let t = text;
+    // "P -> Q, P ∴ Q" pasted into a premise: the part after ∴ / therefore / ⊢ / |- is the conclusion.
+    const concl = onConclusion ? t.match(/\s*(?:∴|⊢|\|-|\btherefore\b)\s*/i) : null;
+    if (concl && concl.index !== undefined && onConclusion) {
+      onConclusion(t.slice(concl.index + concl[0].length).trim());
+      t = t.slice(0, concl.index);
+    }
+    if (t.includes(',')) {
+      const parts = t.split(',').map((p, k) => (k === 0 ? p.trimEnd() : p.trimStart()));
+      const newIds = parts.map((_, k) => (k === 0 ? rowId : `r${idSeq.current++}`));
+      setRowIds([...curIds.slice(0, i), ...newIds, ...curIds.slice(i + 1)]);
+      onChange([...cur.slice(0, i), ...parts, ...cur.slice(i + 1)]);
       setFocusRow(i + parts.length - 1);
       return;
     }
     // Leading whitespace carries no meaning (typically the space after a comma).
-    onChange(values.map((v, j) => (j === i ? text.replace(/^\s+/, '') : v)));
+    onChange(cur.map((v, j) => (j === i ? t.replace(/^\s+/, '') : v)));
+  };
+
+  const removeRow = (rowId: string) => {
+    const cur = valuesRef.current;
+    const curIds = idsRef.current;
+    const i = curIds.indexOf(rowId);
+    if (i < 0) return;
+    const nextIds = curIds.filter((x) => x !== rowId);
+    setRowIds(nextIds);
+    onChange(cur.filter((_, j) => j !== i));
+    // Retarget the shared bar: if the deleted row was active, move to the nearest surviving row.
+    if (activeRowId === rowId) setActiveRowId(nextIds[Math.min(i, nextIds.length - 1)] ?? null);
+    // Keep keyboard focus in the list (the trash button just disappeared).
+    if (nextIds.length) setFocusRow(Math.min(i, nextIds.length - 1));
   };
 
   return (
     <div className="stack stack--sm">
       {values.map((v, i) => (
-        <div key={i} className="fl__item" onFocus={() => setActiveRow(i)}>
+        <div key={ids[i]} className="fl__item" onFocus={() => setActiveRowId(ids[i])}>
         <div className="row row--top">
           <FormulaInput
             ref={(h) => {
               refs.current[i] = h;
             }}
-            id={`fl-${listId}-${i}`}
+            id={`fl-${listId}-${ids[i]}`}
             className="grow"
             label={labelFor(i)}
             value={v}
             invalid={invalidRows?.has(i)}
-            onChange={(t) => setAt(i, t)}
+            onChange={(t) => setRow(ids[i], t)}
             toolbar={false}
           />
           {values.length > min && (
@@ -105,10 +154,7 @@ function FormulaListInner({
               icon="trash"
               label={`Remove ${labelFor(i).toLowerCase()}`}
               className="row__trail"
-              onClick={() => {
-                onChange(values.filter((_, j) => j !== i));
-                setActiveRow(null);
-              }}
+              onClick={() => removeRow(ids[i])}
             />
           )}
         </div>
@@ -121,8 +167,8 @@ function FormulaListInner({
           variant="ghost"
           icon="plus"
           onClick={() => {
-            onChange([...values, '']);
-            setFocusRow(values.length);
+            onChange([...valuesRef.current, '']);
+            setFocusRow(valuesRef.current.length);
           }}
         >
           {addLabel}

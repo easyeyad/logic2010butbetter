@@ -51,7 +51,7 @@ export default function ProgressPage() {
           <h2 id="ov-h" className="section-h">Overview</h2>
           <div className="stat-row stat-row--cards">
             <div className="stat card"><span className="stat__value">{pct(o.accuracy)}</span><span className="stat__label">Accuracy</span></div>
-            <div className="stat card"><span className="stat__value">{o.totalAttempts}</span><span className="stat__label">Attempts ({o.correct} correct)</span></div>
+            <div className="stat card"><span className="stat__value">{o.totalAttempts}</span><span className="stat__label">Attempt{o.totalAttempts === 1 ? '' : 's'} ({o.correct} correct)</span></div>
             <div className="stat card">
               <span className="stat__value">{o.streak.current} day{o.streak.current === 1 ? '' : 's'}</span>
               <span className="stat__label">Streak · best {o.streak.longest}{o.streak.practicedToday ? ' · practiced today' : ''}</span>
@@ -76,7 +76,7 @@ export default function ProgressPage() {
             <h2 id="topics-h" className="card__title">Accuracy by topic</h2>
             <ul className="bars">
               {o.topics.map((t) => (
-                <li key={t.topic} className="bar" title={`${t.title}: ${t.attempts} attempts, ${pct(t.accuracy)} accuracy, level ${t.level}`}>
+                <li key={t.topic} className="bar" title={`${t.title}: ${t.attempts} attempt${t.attempts === 1 ? '' : 's'}, ${pct(t.accuracy)} accuracy, level ${t.level}`}>
                   <span className="bar__label">{t.title}</span>
                   <span className="bar__track" aria-hidden="true">
                     <span className="bar__fill" style={{ width: `${t.accuracy === null ? 0 : 100 * t.accuracy}%` }} />

@@ -25,6 +25,8 @@ export type PredicateCheck =
   | { kind: 'input-problems'; problems: InputProblem[] }
   | { kind: 'invalid'; model: Interpretation; searchedUpTo: number }
   | { kind: 'none-found'; searchedUpTo: number; quantifiers: boolean }
+  /** Quantifier-free input: the finite search is decisive. `vacuous` = the premises have no model at all. */
+  | { kind: 'valid'; vacuous: boolean; searchedUpTo: number }
   /** The premises alone have no model within the limit, so the search says nothing. */
   | { kind: 'premises-unsatisfied'; searchedUpTo: number }
   | { kind: 'too-large'; searchedUpTo: number; note: string }
@@ -99,6 +101,12 @@ export function checkPredicateArgument(premises: Formula[], conclusion: Formula,
   ];
   const problems = inputProblems(inputs);
   if (problems.length) return { kind: 'input-problems', problems };
+  const all = [...premises, conclusion];
+  const quantifiers = all.some(hasQuantifier);
+  // Without quantifiers, a domain with one object per name (at least 1) is enough to decide.
+  const names = attempt(() => logic.namesOf(...all));
+  const needed = Math.max(1, names.ok ? names.value.length : 1);
+  if (!quantifiers) maxDomain = Math.max(maxDomain, needed);
   const r = attempt(() => logic.findModel(premises, [conclusion], { maxDomain }));
   if (!r.ok) return { kind: 'engine', error: r.error };
   const m = r.value;
@@ -106,8 +114,14 @@ export function checkPredicateArgument(premises: Formula[], conclusion: Formula,
   if (m.status === 'none-up-to-limit' && m.searchedUpTo >= 1) {
     // If no small world even makes the premises true, "no countermodel" tells us nothing.
     const pm = attempt(() => logic.findModel(premises, [], { maxDomain }));
-    if (!pm.ok || pm.value.status !== 'found') return { kind: 'premises-unsatisfied', searchedUpTo: m.searchedUpTo };
-    return { kind: 'none-found', searchedUpTo: m.searchedUpTo, quantifiers: [...premises, conclusion].some(hasQuantifier) };
+    const premisesOk = pm.ok && pm.value.status === 'found';
+    const premisesDecided = pm.ok && (pm.value.status === 'found' || pm.value.status === 'none-up-to-limit');
+    if (!quantifiers && m.searchedUpTo >= needed) {
+      if (premisesOk) return { kind: 'valid', vacuous: false, searchedUpTo: m.searchedUpTo };
+      if (premisesDecided) return { kind: 'valid', vacuous: true, searchedUpTo: m.searchedUpTo };
+    }
+    if (!premisesOk) return { kind: 'premises-unsatisfied', searchedUpTo: m.searchedUpTo };
+    return { kind: 'none-found', searchedUpTo: m.searchedUpTo, quantifiers };
   }
   return { kind: 'too-large', searchedUpTo: m.searchedUpTo, note: m.note };
 }

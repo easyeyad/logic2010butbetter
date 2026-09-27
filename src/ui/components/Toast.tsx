@@ -22,7 +22,10 @@ export function ToastProvider({ children }: { children: ReactNode }) {
   const seq = useRef(0);
   const dismiss = useCallback((id: number) => setItems((xs) => xs.filter((x) => x.id !== id)), []);
   const show = useCallback<ToastApi['show']>(
-    (message, action, ms = 6000) => {
+    (message, action, ms) => {
+      // Phones: toasts sit at the top of the screen, so keep them brief.
+      const phone = typeof window !== 'undefined' && window.matchMedia?.('(max-width: 767px)').matches;
+      ms = ms ?? (phone ? 3500 : 6000);
       const id = ++seq.current;
       setItems((xs) => [...xs.slice(-2), { id, message, action }]);
       setTimeout(() => dismiss(id), ms);
