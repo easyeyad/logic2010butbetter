@@ -65,8 +65,14 @@ export default function CountermodelsPage() {
     if (outcome && window.innerWidth < 1280) verdictRef.current?.scrollIntoView?.({ block: 'start' });
   }, [outcome]);
 
+  // The inputs the current verdict belongs to; any later edit makes it stale.
+  const [checkedKey, setCheckedKey] = useState<string | null>(null);
+  const inputKey = JSON.stringify([premises.map((p) => p.trim()).filter(Boolean), conclusion.trim()]);
+  const stale = outcome !== null && checkedKey !== null && checkedKey !== inputKey;
+
   const run = (ps = premises, c = conclusion) => {
     setShowAll(false);
+    setCheckedKey(JSON.stringify([ps.map((p) => p.trim()).filter(Boolean), c.trim()]));
     clearBad();
     const rowsOf: number[] = [];
     ps.forEach((p, i) => p.trim() && rowsOf.push(i));
@@ -165,6 +171,18 @@ export default function CountermodelsPage() {
         </section>
 
         <section ref={verdictRef} className="stack verdict-section" aria-label="Verdict" aria-live="polite">
+          {stale && (
+            <div className="stale-banner" role="status">
+              <Icon name="alert" size={20} />
+              <span className="grow">
+                <strong>Out of date</strong> — you changed the argument after checking. The verdict below is for the old argument.
+              </span>
+              <Button variant="primary" size="sm" icon="refresh" onClick={() => run()}>
+                Check again
+              </Button>
+            </div>
+          )}
+          <div className={stale ? 'is-stale' : undefined} aria-hidden={stale || undefined} inert={stale || undefined}>
           {!outcome && (
             <EmptyState icon="target" title="Test an argument">
               Enter premises and a conclusion, then press Check validity.
@@ -220,6 +238,7 @@ export default function CountermodelsPage() {
               )}
             </div>
           )}
+          </div>
         </section>
       </div>
     </div>

@@ -103,6 +103,16 @@ export function checkPredicateArgument(premises: Formula[], conclusion: Formula,
   if (problems.length) return { kind: 'input-problems', problems };
   const all = [...premises, conclusion];
   const quantifiers = all.some(hasQuantifier);
+  // Quantifier-free premises: whether they can all be true is decidable (one object per name suffices).
+  // If they can't, the argument is valid vacuously, whatever the conclusion says.
+  if (premises.length && !premises.some(hasQuantifier)) {
+    const pn = attempt(() => logic.namesOf(...premises));
+    const need = Math.max(1, pn.ok ? pn.value.length : 1);
+    const pm = attempt(() => logic.findModel(premises, [], { maxDomain: need }));
+    if (pm.ok && pm.value.status === 'none-up-to-limit' && pm.value.searchedUpTo >= need) {
+      return { kind: 'valid', vacuous: true, searchedUpTo: pm.value.searchedUpTo };
+    }
+  }
   // Without quantifiers, a domain with one object per name (at least 1) is enough to decide.
   const names = attempt(() => logic.namesOf(...all));
   const needed = Math.max(1, names.ok ? names.value.length : 1);

@@ -56,7 +56,7 @@ export function PredicateVerdict({
         {result.vacuous ? (
           <>
             <p>The premises can never all be true together, so the argument is valid vacuously — no world can make them all true.</p>
-            <p className="subtle">There are no quantifiers, so worlds with one object per name are enough to check — this settles it.</p>
+            <p className="subtle">The premises have no quantifiers, so checking worlds with one object per name is enough to show this — it settles it.</p>
           </>
         ) : (
           <p>

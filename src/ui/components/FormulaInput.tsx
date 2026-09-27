@@ -48,6 +48,11 @@ export interface FormulaInputProps
   /** Term buttons for the symbol bar (defaults to x y z a b). */
   termLetters?: string[];
   /**
+   * Sees pasted text RAW (before ASCII conversion) with the selection; return
+   * true if it was handled (the default paste is then cancelled).
+   */
+  onPasteText?: (raw: string, selStart: number, selEnd: number) => boolean;
+  /**
    * Wrap long formulas onto several lines (auto-growing textarea; Enter never
    * inserts a newline). Defaults to `compact`.
    */
@@ -75,6 +80,8 @@ export function useActiveFormulaId(): string | null {
 
 export interface FormulaInputHandle {
   focus: (caret?: 'start' | 'end') => void;
+  /** Insert a symbol at this field's caret (or its last caret), via its onChange. */
+  insert: (def: SymbolDef) => void;
   input: HTMLInputElement | HTMLTextAreaElement | null;
 }
 
@@ -94,6 +101,7 @@ export const FormulaInput = forwardRef<FormulaInputHandle, FormulaInputProps>(fu
     debounceMs = 150,
     wrap,
     termLetters,
+    onPasteText,
     id: idProp,
     className,
     onKeyDown,
@@ -129,6 +137,7 @@ export const FormulaInput = forwardRef<FormulaInputHandle, FormulaInputProps>(fu
       if (caret === 'start') el.setSelectionRange(0, 0);
       else if (caret === 'end') el.setSelectionRange(el.value.length, el.value.length);
     },
+    insert: (def: SymbolDef) => insertRef.current(def),
     get input() {
       return inputRef.current;
     },
@@ -141,6 +150,15 @@ export const FormulaInput = forwardRef<FormulaInputHandle, FormulaInputProps>(fu
     el.style.height = 'auto';
     el.style.height = `${el.scrollHeight}px`;
   }, [value, multiline]);
+
+  // A value replaced from outside (example chip, undo, list edit) puts the remembered caret at the end.
+  const lastEmitted = useRef(value);
+  useEffect(() => {
+    if (value !== lastEmitted.current) {
+      lastSel.current = { start: value.length, end: value.length };
+      lastEmitted.current = value;
+    }
+  }, [value]);
 
   // Restore the caret after a normalization/insertion re-render.
   useLayoutEffect(() => {
@@ -160,16 +178,19 @@ export const FormulaInput = forwardRef<FormulaInputHandle, FormulaInputProps>(fu
       const caret = before.length;
       if (ascii) {
         pendingCaret.current = caret;
+        lastEmitted.current = raw;
         onChange(raw);
         return;
       }
       if (!force && endsWithPartialConnective(raw.slice(0, caret))) {
         pendingCaret.current = caret;
+        lastEmitted.current = raw;
         onChange(raw);
         return;
       }
       const n = safeNormalize(raw, caret);
       pendingCaret.current = n.caret;
+      lastEmitted.current = n.text;
       onChange(n.text);
     },
     [ascii, onChange],
@@ -182,6 +203,7 @@ export const FormulaInput = forwardRef<FormulaInputHandle, FormulaInputProps>(fu
       const r = insertAt(value, sel.start, sel.end, def, ascii);
       pendingCaret.current = r.caret;
       lastSel.current = { start: r.caret, end: r.caret };
+      lastEmitted.current = r.text;
       el?.focus();
       onChange(r.text);
     },
@@ -264,6 +286,11 @@ export const FormulaInput = forwardRef<FormulaInputHandle, FormulaInputProps>(fu
             aria-invalid={isInvalid || undefined}
             aria-describedby={[parseError || engineDown ? msgId : null, describedBy].filter(Boolean).join(' ') || undefined}
             onChange={(e) => emit(e.target.value, e.target.selectionStart ?? e.target.value.length)}
+            onPaste={(e: React.ClipboardEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+              if (!onPasteText) return;
+              const t = e.currentTarget;
+              if (onPasteText(e.clipboardData.getData('text'), t.selectionStart ?? t.value.length, t.selectionEnd ?? t.value.length)) e.preventDefault();
+            }}
             onSelect={rememberSel}
             onKeyUp={rememberSel}
             onKeyDown={handleKeyDown}
@@ -294,6 +321,11 @@ export const FormulaInput = forwardRef<FormulaInputHandle, FormulaInputProps>(fu
             aria-invalid={isInvalid || undefined}
             aria-describedby={[parseError || engineDown ? msgId : null, describedBy].filter(Boolean).join(' ') || undefined}
             onChange={(e) => emit(e.target.value, e.target.selectionStart ?? e.target.value.length)}
+            onPaste={(e: React.ClipboardEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+              if (!onPasteText) return;
+              const t = e.currentTarget;
+              if (onPasteText(e.clipboardData.getData('text'), t.selectionStart ?? t.value.length, t.selectionEnd ?? t.value.length)) e.preventDefault();
+            }}
             onSelect={rememberSel}
             onKeyUp={rememberSel}
             onKeyDown={handleKeyDown}

@@ -1,10 +1,11 @@
-import { useEffect, useRef, useState } from 'react';
+import { useState } from 'react';
 import { Button } from '../../components/Button';
 import { Notice } from '../../components/Notice';
 import { isPredicateInput, safeAtoms, safeParse, safeValidity } from '../../engine/safe';
 import { checkPredicateArgument, describeModelInWords } from '../../engine/predicateCheck';
 import { countermodelNarrative } from '../countermodels/narrative';
-import { FormulaInput, type FormulaInputHandle } from '../../components/FormulaInput';
+import { FormulaInput } from '../../components/FormulaInput';
+import { FormulaList } from '../../components/FormulaList';
 import { FormulaText } from '../../components/FormulaText';
 import { ALL_DERIVATIONS as DERIVATION_EXERCISES } from './exercises';
 import type { DerivationExercise } from '../../../learning';
@@ -59,13 +60,6 @@ export function assess(premises: string[], goal: string): Verdict {
 function CustomProblemForm({ onStart }: { onStart: (p: ProofProblem) => void }) {
   const [premises, setPremises] = useState<string[]>(['']);
   const [goal, setGoal] = useState('');
-  const premiseRefs = useRef<(FormulaInputHandle | null)[]>([]);
-  const [focusNew, setFocusNew] = useState<number | null>(null);
-  useEffect(() => {
-    if (focusNew === null) return;
-    premiseRefs.current[focusNew]?.focus('end');
-    setFocusNew(null);
-  }, [focusNew]);
   const [verdict, setVerdict] = useState<Verdict>(null);
   const [confirmed, setConfirmed] = useState(false);
   const start = () => onStart({ id: 'custom', title: 'Your problem', premises: premises.filter((p) => p.trim()), goal });
@@ -84,44 +78,22 @@ function CustomProblemForm({ onStart }: { onStart: (p: ProofProblem) => void }) 
         start();
       }}
     >
-      {premises.map((p, i) => (
-        <div key={i} className="row row--top">
-          <FormulaInput
-            ref={(h) => {
-              premiseRefs.current[i] = h;
-            }}
-            className="grow"
-            label={`Premise ${i + 1}`}
-            value={p}
-            toolbar={false}
-            onChange={(t) => {
-              setVerdict(null);
-              setConfirmed(false);
-              setPremises((ps) => ps.map((x, j) => (j === i ? t : x)));
-            }}
-          />
-          <Button
-            variant="ghost"
-            size="sm"
-            iconOnly
-            icon="trash"
-            label={`Remove premise ${i + 1}`}
-            className="row__trail"
-            onClick={() => setPremises((ps) => (ps.length > 1 ? ps.filter((_, j) => j !== i) : ['']))}
-          />
-        </div>
-      ))}
-      <Button
-        size="sm"
-        variant="ghost"
-        icon="plus"
-        onClick={() => {
-          setPremises((ps) => [...ps, '']);
-          setFocusNew(premises.length);
+      <FormulaList
+        values={premises}
+        onChange={(v) => {
+          setVerdict(null);
+          setConfirmed(false);
+          setPremises(v);
         }}
-      >
-        Add premise
-      </Button>
+        labelFor={(i) => `Premise ${i + 1}`}
+        addLabel="Add premise"
+        min={1}
+        onConclusion={(t) => {
+          setVerdict(null);
+          setConfirmed(false);
+          setGoal(t);
+        }}
+      />
       <FormulaInput
         label="Conclusion to show"
         value={goal}
