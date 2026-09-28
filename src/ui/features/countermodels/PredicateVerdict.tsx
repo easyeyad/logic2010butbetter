@@ -18,11 +18,14 @@ export function PredicateVerdict({
   premises,
   conclusion,
   ascii,
+  premiseLabels,
 }: {
   result: PredicateCheck;
   premises: Formula[];
   conclusion: Formula;
   ascii: boolean;
+  /** On-screen label of each premise (blank rows are skipped, so these can differ from position). */
+  premiseLabels?: string[];
 }) {
   if (result.kind === 'engine') return <EngineError error={result.error} />;
   if (result.kind === 'input-problems') {
@@ -120,7 +123,7 @@ export function PredicateVerdict({
             const v = val(p);
             return (
               <li key={i}>
-                <span className="eval-list__role">Premise {i + 1}</span>
+                <span className="eval-list__role">{premiseLabels?.[i] ?? `Premise ${i + 1}`}</span>
                 <FormulaText text={safeFormat(p, ascii)} className="eval-list__f" />
                 {v !== null && <Pill v={v} />}
               </li>

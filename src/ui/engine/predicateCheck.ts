@@ -94,9 +94,15 @@ export function inputProblems(inputs: ArgInput[]): InputProblem[] {
 }
 
 /** Search for a countermodel with up to `maxDomain` objects. */
-export function checkPredicateArgument(premises: Formula[], conclusion: Formula, maxDomain = 4): PredicateCheck {
+export function checkPredicateArgument(
+  premises: Formula[],
+  conclusion: Formula,
+  maxDomain = 4,
+  /** How each premise is labelled on screen (e.g. "Premise 3" when row 2 is blank). */
+  premiseLabels?: string[],
+): PredicateCheck {
   const inputs: ArgInput[] = [
-    ...premises.map((f, i) => ({ label: `premise ${i + 1}`, formula: f })),
+    ...premises.map((f, i) => ({ label: (premiseLabels?.[i] ?? `Premise ${i + 1}`).toLowerCase(), formula: f })),
     { label: 'the conclusion', formula: conclusion },
   ];
   const problems = inputProblems(inputs);

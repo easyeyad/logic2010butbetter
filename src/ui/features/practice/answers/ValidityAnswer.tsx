@@ -5,7 +5,7 @@ import { ChoiceGroup } from './ChoiceGroup';
 import type { AnswerProps } from './types';
 import { isComplete, ValuationToggles } from './ValuationToggles';
 
-export function ValidityAnswer({ exercise, initial, onChange, feedback }: AnswerProps<'validity'>) {
+export function ValidityAnswer({ exercise, initial, onChange, checked }: AnswerProps<'validity'>) {
   const [valid, setValid] = useState<boolean | undefined>(initial?.valid);
   const [cm, setCm] = useState<Partial<Valuation>>(initial?.countermodel ?? {});
   const complete = isComplete(exercise.atoms, cm);
@@ -17,7 +17,7 @@ export function ValidityAnswer({ exercise, initial, onChange, feedback }: Answer
   }, [valid, cm, complete, exercise.requireCountermodel, onChange]);
   return (
     <div className="stack">
-      <ArgumentView premises={exercise.premises} conclusion={exercise.conclusion} valuation={feedback && valid === false && complete ? (cm as Valuation) : undefined} />
+      <ArgumentView premises={exercise.premises} conclusion={exercise.conclusion} valuation={checked && valid === false && complete ? (cm as Valuation) : undefined} />
       <ChoiceGroup<boolean>
         label="This argument is…"
         columns={2}

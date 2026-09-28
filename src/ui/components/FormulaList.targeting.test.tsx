@@ -111,3 +111,17 @@ test('a newly added row receives symbols (ids are stable across renders)', async
   await insertAndCheck(/Insert not/);
   expect(vals()[1]).toBe('F ∧ ¬');
 });
+
+test('with rememberKey, a remounted list keeps its bar on the last targeted row', async () => {
+  function L() {
+    const [v, setV] = useState(['A', 'B', 'C']);
+    return <FormulaList values={v} onChange={setV} labelFor={(i) => `Formula ${i + 1}`} rememberKey="remount-test" />;
+  }
+  const first = renderWithProviders(<L />);
+  await userEvent.click(screen.getByLabelText('Formula 2'));
+  expect(bar()).toHaveAccessibleName('Insert symbol into Formula 2');
+  first.unmount();
+  renderWithProviders(<L />);
+  expect(bar()).toHaveAccessibleName('Insert symbol into Formula 2');
+  expect(barRowIndex()).toBe(1);
+});

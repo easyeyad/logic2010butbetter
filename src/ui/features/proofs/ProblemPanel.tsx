@@ -6,6 +6,7 @@ import { checkPredicateArgument, describeModelInWords } from '../../engine/predi
 import { countermodelNarrative } from '../countermodels/narrative';
 import { FormulaInput } from '../../components/FormulaInput';
 import { FormulaList } from '../../components/FormulaList';
+import { FormulaTargetBoundary } from '../../components/FormulaTarget';
 import { FormulaText } from '../../components/FormulaText';
 import { ALL_DERIVATIONS as DERIVATION_EXERCISES } from './exercises';
 import type { DerivationExercise } from '../../../learning';
@@ -26,19 +27,20 @@ function Sequent({ premises, goal }: { premises: string[]; goal: string }) {
 export type Verdict = { kind: 'invalid'; text: string } | { kind: 'bad-input'; text: string } | null;
 
 /** Is the entered argument valid? (Invalid arguments have no derivation.) */
-export function assess(premises: string[], goal: string): Verdict {
+export function assess(premises: string[], goal: string, premiseLabels?: string[]): Verdict {
   const fs = [];
+  const labelOf = (i: number) => premiseLabels?.[i] ?? `Premise ${i + 1}`;
   for (const [i, p] of premises.entries()) {
     const r = safeParse(p);
     if (!r.ok) return null;
-    if (!r.value.ok) return { kind: 'bad-input', text: `Premise ${i + 1} isn't well-formed yet.` };
+    if (!r.value.ok) return { kind: 'bad-input', text: `${labelOf(i)} isn't well-formed yet.` };
     fs.push(r.value.formula);
   }
   const g = safeParse(goal);
   if (!g.ok) return null;
   if (!g.value.ok) return { kind: 'bad-input', text: "The conclusion isn't well-formed yet." };
   if (isPredicateInput([...fs, g.value.formula])) {
-    const r = checkPredicateArgument(fs, g.value.formula, 4);
+    const r = checkPredicateArgument(fs, g.value.formula, 4, premises.map((_, i) => labelOf(i)));
     if (r.kind === 'input-problems') return { kind: 'bad-input', text: r.problems.map((p) => p.message).join(' ') };
     if (r.kind !== 'invalid') return null;
     return {
@@ -69,7 +71,9 @@ function CustomProblemForm({ onStart }: { onStart: (p: ProofProblem) => void }) 
       onSubmit={(e) => {
         e.preventDefault();
         if (!goal.trim()) return;
-        const v = assess(premises.filter((p) => p.trim()), goal);
+        // Name premises by their on-screen label, even when blank rows are skipped.
+        const rows = premises.flatMap((p, i) => (p.trim() ? [i] : []));
+        const v = assess(rows.map((i) => premises[i]), goal, rows.map((i) => `Premise ${i + 1}`));
         if (v && !(v.kind === 'invalid' && confirmed)) {
           setVerdict(v);
           setConfirmed(v.kind === 'invalid');
@@ -149,12 +153,15 @@ export function ProblemPanel({
           <span aria-hidden="true">{custom ? '−' : '+'}</span>
         </button>
         {custom && (
+          // Not proof lines: the Derivation card's "focused line" bar must never write here.
+          <FormulaTargetBoundary>
           <CustomProblemForm
             onStart={(p) => {
               onLoad(p);
               if (collapsible) setOpen(false);
             }}
           />
+          </FormulaTargetBoundary>
         )}
       </section>
     </div>

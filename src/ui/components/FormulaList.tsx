@@ -3,7 +3,11 @@ import { safeNormalize } from '../engine/safe';
 import { BP, useMediaQuery } from '../hooks/useMediaQuery';
 import { Button } from './Button';
 import { FormulaInput, useActiveFormulaId, type FormulaInputHandle } from './FormulaInput';
+import { FormulaTargetBoundary } from './FormulaTarget';
 import { SymbolBar } from './SymbolBar';
+
+/** Last target row index per `rememberKey`, so a remounted list (navigate away and back) keeps its bar where it was. */
+const rememberedTarget = new Map<string, number>();
 
 /** Argument markers recognized when a whole argument is pasted into a row. */
 const MARKER = /\s*(?:∴|⊢|\|-|\btherefore\b)\s*/i;
@@ -29,6 +33,7 @@ export function FormulaList({
   min = 1,
   invalidRows,
   onConclusion,
+  rememberKey,
 }: {
   values: string[];
   onChange: (v: string[]) => void;
@@ -39,6 +44,8 @@ export function FormulaList({
   invalidRows?: Set<number>;
   /** Receives the part after ∴ / therefore / ⊢ / |- when an argument is PASTED into a row. */
   onConclusion?: (text: string) => void;
+  /** Remember the targeted row across remounts under this key. */
+  rememberKey?: string;
 }) {
   const seq = useRef(0);
   const mint = useCallback(() => `r${++seq.current}`, []);
@@ -61,9 +68,15 @@ export function FormulaList({
   const latest = useRef({ values, rowIds });
   latest.current = { values, rowIds };
 
-  const [targetRowId, setTargetRowId] = useState<string | null>(null);
+  const [targetRowId, setTargetRowId] = useState<string | null>(() => {
+    const i = rememberKey ? rememberedTarget.get(rememberKey) : undefined;
+    return i !== undefined && i < ids.length ? ids[i] : null;
+  });
   const targetIdx = targetRowId ? rowIds.indexOf(targetRowId) : -1;
   const barIdx = targetIdx >= 0 ? targetIdx : values.length - 1;
+  useEffect(() => {
+    if (rememberKey && targetIdx >= 0) rememberedTarget.set(rememberKey, targetIdx);
+  }, [rememberKey, targetIdx]);
 
   const handles = useRef(new Map<string, FormulaInputHandle>());
   const [focusRowId, setFocusRowId] = useState<string | null>(null);
@@ -152,7 +165,9 @@ export function FormulaList({
   };
 
   const barRowId = rowIds[barIdx];
+  // Rows are reached through their own handles; they never register with an outer FormulaTarget.
   return (
+    <FormulaTargetBoundary>
     <div className="stack stack--sm">
       {values.map((v, i) => {
         const rowId = rowIds[i];
@@ -201,5 +216,6 @@ export function FormulaList({
         </Button>
       </div>
     </div>
+    </FormulaTargetBoundary>
   );
 }

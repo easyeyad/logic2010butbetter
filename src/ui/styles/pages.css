@@ -122,7 +122,4 @@ code { font-family: var(--font-mono); font-size: 0.9em; background: var(--c-surf
 .matrix td { text-align: center; padding: 4px; border-radius: 6px; background: var(--c-surface); border: 1px solid var(--c-border); }
 .matrix td.is-yes { background: var(--c-ok-soft); border-color: var(--c-ok-border); }
 .problem-msgs { padding-left: var(--sp-4); display: flex; flex-direction: column; gap: var(--sp-1); }
-.stale-banner { display: flex; align-items: center; gap: var(--sp-3); flex-wrap: wrap; padding: var(--sp-3) var(--sp-4); border-radius: var(--radius); background: var(--c-warn-soft); border: 1px solid var(--c-warn-border); }
-.stale-banner > svg { color: var(--c-warn); flex: none; }
-.verdict-section .is-stale { opacity: 0.45; filter: grayscale(0.8); pointer-events: none; }
-.verdict-section > div { display: flex; flex-direction: column; gap: var(--sp-4); min-width: 0; }
+.verdict-section > div:not(.stale-banner) { display: flex; flex-direction: column; gap: var(--sp-4); min-width: 0; }

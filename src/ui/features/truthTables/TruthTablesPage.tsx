@@ -53,7 +53,7 @@ export default function TruthTablesPage() {
               <button type="button" aria-pressed={mode === 'practice'} onClick={() => setMode('practice')}>Practice</button>
             </div>
           </div>
-          <FormulaList values={formulas} onChange={setFormulas} labelFor={(i) => `Formula ${i + 1}`} />
+          <FormulaList values={formulas} onChange={setFormulas} labelFor={(i) => `Formula ${i + 1}`} rememberKey="truth-tables" />
           <div className="row">
             <span className="subtle">Try:</span>
             {EXAMPLES.map((ex) => (

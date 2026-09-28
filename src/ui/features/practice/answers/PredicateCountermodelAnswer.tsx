@@ -7,7 +7,7 @@ import { emptyBuilder, ModelBuilder, toInterpretation, type BuilderState } from 
 import type { AnswerProps } from './types';
 
 /** Build a world where every premise is true and the conclusion false; after checking, each sentence's value is shown live. */
-export function PredicateCountermodelAnswer({ exercise, initial, onChange, feedback }: AnswerProps<'predicate-countermodel'>) {
+export function PredicateCountermodelAnswer({ exercise, initial, onChange, checked }: AnswerProps<'predicate-countermodel'>) {
   const [state, setState] = useState<BuilderState>(() => {
     if (initial?.model) {
       const m = initial.model;
@@ -28,7 +28,7 @@ export function PredicateCountermodelAnswer({ exercise, initial, onChange, feedb
     return { premises: exercise.premises.map(p), conclusion: p(exercise.conclusion) };
   }, [exercise]);
   const val = (f: Formula | null) => {
-    if (!f || !feedback) return null;
+    if (!f || !checked) return null;
     const r = safeEvaluateIn(f, model);
     return r.ok ? r.value : null;
   };
@@ -54,7 +54,7 @@ export function PredicateCountermodelAnswer({ exercise, initial, onChange, feedb
         {row('∴ Conclusion', exercise.conclusion, parsed.conclusion, true)}
       </ol>
       <ModelBuilder state={state} onChange={setState} predicates={exercise.predicates} maxSize={Math.max(4, exercise.maxDomain || 4)} />
-      {feedback && <p className="subtle">Each sentence's value in your model is shown above and updates as you edit.</p>}
+      {checked && <p className="subtle">Each sentence's value in your model is shown above and updates as you edit.</p>}
     </div>
   );
 }

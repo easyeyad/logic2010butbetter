@@ -17,15 +17,17 @@ export function AnswerArea({
   initial,
   onChange,
   feedback,
+  checked,
   solution,
 }: {
   exercise: Exercise;
   initial?: Answer;
   onChange: (a: Answer | null) => void;
   feedback?: Feedback | null;
+  checked?: boolean;
   solution?: Solution | null;
 }) {
-  const common = { onChange, feedback, solution } as const;
+  const common = { onChange, feedback, checked, solution } as const;
   switch (exercise.kind) {
     case 'wff':
       return <WffAnswer exercise={exercise} initial={initial?.kind === 'wff' ? initial : undefined} {...common} />;

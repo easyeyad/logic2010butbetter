@@ -150,3 +150,9 @@
   .toast > span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .toast__action, .toast__close { min-height: 44px; }
 }
+
+/* Out-of-date feedback (StaleNotice) */
+.stale-banner { display: flex; flex-direction: row; align-items: center; gap: var(--sp-3); flex-wrap: wrap; padding: var(--sp-3) var(--sp-4); border-radius: var(--radius); background: var(--c-warn-soft); border: 1px solid var(--c-warn-border); }
+.stale-banner > svg { color: var(--c-warn); flex: none; }
+.stale-banner > .grow { flex: 1 1 16rem; min-width: 0; }
+.is-stale:not(.hint) { opacity: 0.45; filter: grayscale(0.8); pointer-events: none; user-select: none; }

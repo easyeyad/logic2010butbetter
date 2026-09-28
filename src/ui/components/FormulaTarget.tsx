@@ -51,3 +51,13 @@ export function FormulaTargetProvider({ children }: { children: ReactNode }) {
   );
   return <Ctx.Provider value={api}>{children}</Ctx.Provider>;
 }
+
+/**
+ * Hides any outer FormulaTarget from the fields inside. Used around formula
+ * fields that are not proof lines (e.g. the custom-problem form, FormulaList
+ * rows) so a page-level "insert into the focused line" bar can never write
+ * into them.
+ */
+export function FormulaTargetBoundary({ children }: { children: ReactNode }) {
+  return <Ctx.Provider value={null}>{children}</Ctx.Provider>;
+}

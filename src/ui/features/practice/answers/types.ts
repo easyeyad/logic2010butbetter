@@ -7,7 +7,10 @@ export interface AnswerProps<K extends ExerciseKind> {
   initial?: AnswerOf<K>;
   /** Report the current answer; null while it is incomplete. */
   onChange: (a: AnswerOf<K> | null) => void;
+  /** Feedback for the CURRENT answer only (null once the answer changes after a check). */
   feedback?: Feedback | null;
+  /** True once the answer has been checked at least once (live per-sentence values may then be shown). */
+  checked?: boolean;
   /** Revealed solution (derivations load it into the editor). */
   solution?: Solution | null;
 }

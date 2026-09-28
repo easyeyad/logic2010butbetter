@@ -9,6 +9,7 @@ import { EmptyState } from '../../components/EmptyState';
 import { FormulaInput } from '../../components/FormulaInput';
 import { FormulaList } from '../../components/FormulaList';
 import { Icon } from '../../components/Icon';
+import { StaleNotice } from '../../components/StaleNotice';
 import { EngineError, Notice } from '../../components/Notice';
 import { isPredicateInput, safeAtoms, safeParse, safeValidity } from '../../engine/safe';
 import { PredicateVerdict } from './PredicateVerdict';
@@ -16,10 +17,10 @@ import { useLocalStorage } from '../../hooks/useLocalStorage';
 import { CounterexampleTable, CountermodelView } from './CountermodelView';
 
 type Outcome =
-  | { kind: 'predicate'; result: PredicateCheck; premises: Formula[]; conclusion: Formula }
+  | { kind: 'predicate'; result: PredicateCheck; premises: Formula[]; conclusion: Formula; labels: string[] }
   | { kind: 'invalid-input'; message: string }
   | { kind: 'engine'; error: string }
-  | { kind: 'done'; result: ValidityResult; premises: Formula[]; conclusion: Formula; atoms: string[] };
+  | { kind: 'done'; result: ValidityResult; premises: Formula[]; conclusion: Formula; atoms: string[]; labels: string[] };
 
 const EXAMPLES: { label: string; premises: string[]; conclusion: string }[] = [
   { label: 'Affirming the consequent', premises: ['P → Q', 'Q'], conclusion: 'P' },
@@ -35,6 +36,8 @@ const PREDICATE_EXAMPLES: { label: string; premises: string[]; conclusion: strin
   { label: 'a = b, Fa ∴ Fb', premises: ['a = b', 'Fa'], conclusion: 'Fb' },
   { label: 'Fa, Gb ∴ a = b', premises: ['Fa', 'Gb'], conclusion: 'a = b' },
 ];
+
+const premiseLabel = (i: number) => `Premise ${i + 1}`;
 
 export default function CountermodelsPage() {
   const { settings } = useSettings();
@@ -77,11 +80,16 @@ export default function CountermodelsPage() {
     const rowsOf: number[] = [];
     ps.forEach((p, i) => p.trim() && rowsOf.push(i));
     const texts = rowsOf.map((i) => ps[i].trim());
+    // Messages name premises by their visible label, not by position among the non-blank rows.
+    const labels = rowsOf.map((i) => premiseLabel(i));
     const parsed: Formula[] = [];
     for (const [i, t] of texts.entries()) {
       const r = safeParse(t);
       if (!r.ok) return setOutcome({ kind: 'engine', error: r.error });
-      if (!r.value.ok) return setOutcome({ kind: 'invalid-input', message: `Premise ${i + 1} isn't well-formed: ${r.value.error.message}` });
+      if (!r.value.ok) {
+        setBad({ rows: new Set([rowsOf[i]]), conclusion: false });
+        return setOutcome({ kind: 'invalid-input', message: `${labels[i]} isn't well-formed: ${r.value.error.message}` });
+      }
       parsed.push(r.value.formula);
     }
     if (!c.trim()) return setOutcome({ kind: 'invalid-input', message: 'Enter a conclusion to test.' });
@@ -89,16 +97,16 @@ export default function CountermodelsPage() {
     if (!rc.ok) return setOutcome({ kind: 'engine', error: rc.error });
     if (!rc.value.ok) return setOutcome({ kind: 'invalid-input', message: `The conclusion isn't well-formed: ${rc.value.error.message}` });
     if (isPredicateInput([...parsed, rc.value.formula])) {
-      const pr = checkPredicateArgument(parsed, rc.value.formula, 4);
+      const pr = checkPredicateArgument(parsed, rc.value.formula, 4, labels);
       if (pr.kind === 'input-problems') {
         const idx = pr.problems.flatMap((p) => p.inputs);
         setBad({ rows: new Set(idx.filter((i) => i < parsed.length).map((i) => rowsOf[i])), conclusion: idx.includes(parsed.length) });
       }
-      return setOutcome({ kind: 'predicate', result: pr, premises: parsed, conclusion: rc.value.formula });
+      return setOutcome({ kind: 'predicate', result: pr, premises: parsed, conclusion: rc.value.formula, labels });
     }
     const res = safeValidity(parsed, rc.value.formula);
     if (!res.ok) return setOutcome({ kind: 'engine', error: res.error });
-    setOutcome({ kind: 'done', result: res.value, premises: parsed, conclusion: rc.value.formula, atoms: safeAtoms([...parsed, rc.value.formula]) });
+    setOutcome({ kind: 'done', result: res.value, premises: parsed, conclusion: rc.value.formula, atoms: safeAtoms([...parsed, rc.value.formula]), labels });
   };
 
   return (
@@ -129,7 +137,7 @@ export default function CountermodelsPage() {
                 onConclusion={(t) => {
                   clearBad();
                   setConclusion(t);
-                }} labelFor={(i) => `Premise ${i + 1}`} addLabel="Add premise" min={0} />
+                }} labelFor={premiseLabel} rememberKey="countermodels" addLabel="Add premise" min={0} />
             </fieldset>
             <div className="concl">
               <span className="concl__therefore" aria-hidden="true">∴</span>
@@ -171,18 +179,7 @@ export default function CountermodelsPage() {
         </section>
 
         <section ref={verdictRef} className="stack verdict-section" aria-label="Verdict" aria-live="polite">
-          {stale && (
-            <div className="stale-banner" role="status">
-              <Icon name="alert" size={20} />
-              <span className="grow">
-                <strong>Out of date</strong> — you changed the argument after checking. The verdict below is for the old argument.
-              </span>
-              <Button variant="primary" size="sm" icon="refresh" onClick={() => run()}>
-                Check again
-              </Button>
-            </div>
-          )}
-          <div className={stale ? 'is-stale' : undefined} aria-hidden={stale || undefined} inert={stale || undefined}>
+          <StaleNotice stale={stale} what="the argument" detail="The verdict below is for the old argument." onRecheck={() => run()}>
           {!outcome && (
             <EmptyState icon="target" title="Test an argument">
               Enter premises and a conclusion, then press Check validity.
@@ -191,7 +188,7 @@ export default function CountermodelsPage() {
           {outcome?.kind === 'invalid-input' && <Notice tone="warn" title="Check your input">{outcome.message}</Notice>}
           {outcome?.kind === 'engine' && <EngineError error={outcome.error} />}
           {outcome?.kind === 'predicate' && (
-            <PredicateVerdict result={outcome.result} premises={outcome.premises} conclusion={outcome.conclusion} ascii={settings.asciiDisplay} />
+            <PredicateVerdict result={outcome.result} premises={outcome.premises} conclusion={outcome.conclusion} ascii={settings.asciiDisplay} premiseLabels={outcome.labels} />
           )}
           {outcome?.kind === 'done' && outcome.result.valid && (
             <div className="verdict-card verdict-card--valid">
@@ -219,6 +216,7 @@ export default function CountermodelsPage() {
                 premises={outcome.premises}
                 conclusion={outcome.conclusion}
                 ascii={settings.asciiDisplay}
+                premiseLabels={outcome.labels}
               />
               {outcome.result.counterexamples.length > 1 && (
                 <div className="stack stack--sm">
@@ -238,7 +236,7 @@ export default function CountermodelsPage() {
               )}
             </div>
           )}
-          </div>
+          </StaleNotice>
         </section>
       </div>
     </div>

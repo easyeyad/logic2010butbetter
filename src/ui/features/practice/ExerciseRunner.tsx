@@ -6,6 +6,7 @@ import { ConfirmDialog } from '../../components/Dialog';
 import { FormulaText } from '../../components/FormulaText';
 import { Icon } from '../../components/Icon';
 import { EngineError } from '../../components/Notice';
+import { StaleNotice } from '../../components/StaleNotice';
 import { attempt } from '../../engine/safe';
 import { progressStore } from '../../learning/progress';
 import { safeCheckAnswer, safeHints, safeSolution } from '../../learning/safeLearning';
@@ -44,6 +45,8 @@ export function ExerciseRunner({ exercise, initialAnswer, initialHints = 0, sess
   const [confirmSolution, setConfirmSolution] = useState(false);
   const [solved, setSolved] = useState(false);
   const [checkedKey, setCheckedKey] = useState<string | null>(null);
+  // The answer the current feedback was computed for ("Your answer: …" quotes this, not the live answer).
+  const [checkedAnswer, setCheckedAnswer] = useState<Answer | null>(null);
   const started = useRef(Date.now());
   const hints = useRef<string[] | null>(null);
   const rootRef = useRef<HTMLElement>(null);
@@ -76,6 +79,7 @@ export function ExerciseRunner({ exercise, initialAnswer, initialHints = 0, sess
   const check = () => {
     if (!answer || !canCheck) return;
     setCheckedKey(JSON.stringify(answer));
+    setCheckedAnswer(answer);
     const r = safeCheckAnswer(exercise, answer);
     if (!r.ok) {
       setError(r.error);
@@ -159,7 +163,13 @@ export function ExerciseRunner({ exercise, initialAnswer, initialHints = 0, sess
   const info = TOPIC_INFO[exercise.topic];
   // Check is available whenever the current answer hasn't been checked yet —
   // including after a correct answer, if the student edits it.
-  const canCheck = Boolean(answer) && JSON.stringify(answer) !== checkedKey;
+  const currentKey = answer ? JSON.stringify(answer) : null;
+  const canCheck = currentKey !== null && currentKey !== checkedKey;
+  // Feedback belongs to the answer it was computed for. Once the answer differs
+  // (or becomes incomplete) it is marked out of date, and no highlight from it
+  // is applied to the answer UI.
+  const stale = feedback !== null && currentKey !== checkedKey;
+  const liveFeedback = stale ? null : feedback;
 
   return (
     <article ref={rootRef} className="exercise" aria-labelledby={`ex-title-${exercise.id}`} data-kind={exercise.kind}>
@@ -174,7 +184,7 @@ export function ExerciseRunner({ exercise, initialAnswer, initialHints = 0, sess
       </header>
 
       <div className="exercise__answer">
-        <AnswerArea exercise={exercise} initial={initialAnswer} onChange={onChange} feedback={feedback} solution={solution} />
+        <AnswerArea exercise={exercise} initial={initialAnswer} onChange={onChange} feedback={liveFeedback} checked={feedback !== null} solution={solution} />
       </div>
 
       <div className="exercise__actions">
@@ -184,7 +194,7 @@ export function ExerciseRunner({ exercise, initialAnswer, initialHints = 0, sess
         <Button icon="lightbulb" onClick={hint} disabled={hintsShown >= totalHints} title="Hint (H)">
           {totalHints === 0 ? 'No hints' : hintsShown >= totalHints ? 'No more hints' : hintsShown === 0 ? 'Hint' : `Hint ${hintsShown + 1} of ${totalHints}`}
         </Button>
-        {feedback && !feedback.correct && (
+        {liveFeedback && !liveFeedback.correct && (
           <Button variant="ghost" icon="refresh" onClick={retry}>
             Retry
           </Button>
@@ -193,7 +203,7 @@ export function ExerciseRunner({ exercise, initialAnswer, initialHints = 0, sess
           Show solution
         </Button>
         {onNext && (
-          <Button className="exercise__next" variant={feedback?.correct || solution ? 'primary' : 'default'} iconRight="arrowRight" onClick={onNext} title="Next (N)">
+          <Button className="exercise__next" variant={liveFeedback?.correct || solution ? 'primary' : 'default'} iconRight="arrowRight" onClick={onNext} title="Next (N)">
             {nextLabel}
           </Button>
         )}
@@ -217,7 +227,16 @@ export function ExerciseRunner({ exercise, initialAnswer, initialHints = 0, sess
         </ol>
       )}
 
-      {feedback && <FeedbackView feedback={feedback} exercise={exercise} answerText={answerText(answer)} />}
+      {feedback && (
+        <StaleNotice
+          stale={stale}
+          what="your answer"
+          detail="The feedback below is for the answer you checked."
+          next={canCheck ? 'Press Check again to check your new answer.' : 'Finish your answer to check it again.'}
+        >
+          <FeedbackView feedback={feedback} exercise={exercise} answerText={answerText(checkedAnswer)} />
+        </StaleNotice>
+      )}
 
       {solution && <SolutionView solution={solution} exercise={exercise} />}
 
