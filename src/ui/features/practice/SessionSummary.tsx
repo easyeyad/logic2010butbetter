@@ -40,6 +40,7 @@ export function SessionSummary({
           <div className="stat"><span className="stat__value">{s.firstTryCorrect}/{s.total}</span><span className="stat__label">Right first try</span></div>
           <div className="stat"><span className="stat__value">{s.correctAfterRetry}</span><span className="stat__label">Right after a retry</span></div>
           <div className="stat"><span className="stat__value">{s.partial}</span><span className="stat__label">Partly right</span></div>
+          <div className="stat"><span className="stat__value">{s.solutionViewed}</span><span className="stat__label">Solution viewed</span></div>
           <div className="stat"><span className="stat__value">{s.skipped}</span><span className="stat__label">Skipped</span></div>
           <div className="stat"><span className="stat__value">{s.hintsUsed}</span><span className="stat__label">Hints used</span></div>
           <div className="stat"><span className="stat__value">{fmtTime(s.totalTimeMs)}</span><span className="stat__label">Time</span></div>

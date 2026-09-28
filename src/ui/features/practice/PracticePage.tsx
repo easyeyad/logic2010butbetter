@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import type { Difficulty, ExerciseResult, PracticeSession, Topic } from '../../../learning';
-import { createPracticeSession, mergeResult, scoreSession, PREDICATE_TOPICS, SENTENTIAL_TOPICS, TOPICS } from '../../../learning';
+import { createPracticeSession, mergeResult, resultOutcome, PREDICATE_TOPICS, SENTENTIAL_TOPICS, TOPICS } from '../../../learning';
 import { PageHeader } from '../../app/PageHeader';
 import { Button } from '../../components/Button';
 import { EngineError } from '../../components/Notice';
@@ -92,10 +92,10 @@ export default function PracticePage() {
   const total = run?.session.exercises.length ?? 0;
   const current = run && !run.finished ? run.session.exercises[run.index] : null;
 
-  // Same rule as the end-of-session summary (learning's scoreSession), never recomputed here.
+  // Same rule as the end-of-session summary: learning's resultOutcome over the merged results.
   const firstTrySoFar = useMemo(() => {
     if (!run) return 0;
-    const r = attempt(() => scoreSession(run.session, run.results).firstTryCorrect);
+    const r = attempt(() => run.results.filter((x) => resultOutcome(x) === 'first-try').length);
     return r.ok ? r.value : 0;
   }, [run]);
 
