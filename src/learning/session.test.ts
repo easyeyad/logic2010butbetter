@@ -1,4 +1,4 @@
-import { TOPICS, checkAnswer, createPracticeSession, exerciseLabel, generateExercise, getSolution, mergeResult, pointsFor, scoreSession, type Answer, type Exercise, type ExerciseResult } from './index';
+import { TOPICS, resultOutcome, checkAnswer, createPracticeSession, exerciseLabel, generateExercise, getSolution, mergeResult, pointsFor, scoreSession, type Answer, type Exercise, type ExerciseResult } from './index';
 
 /** Build a correct answer from the exercise's own solution data (used to drive sessions end-to-end). */
 function correctAnswer(ex: Exercise): Answer | null {
@@ -81,11 +81,11 @@ describe('scoring', () => {
       { exerciseId: d, correct: true, solutionViewed: true },
       // fifth skipped
     ]);
-    expect(score).toMatchObject({ total: 5, answered: 4, correct: 3, firstTryCorrect: 3, partial: 1, skipped: 1, hintsUsed: 2, totalTimeMs: 3000 });
+    expect(score).toMatchObject({ total: 5, answered: 4, correct: 2, firstTryCorrect: 2, partial: 1, solutionViewed: 1, skipped: 1, hintsUsed: 2, totalTimeMs: 3000 });
     // 1 + 0.8 + 0.25 + 0 + 0 = 2.05 / 5
     expect(score.score).toBe(41);
     expect(score.toReview).toEqual([c, d]);
-    expect(score.byTopic.wff).toMatchObject({ total: 5, correct: 3 });
+    expect(score.byTopic.wff).toMatchObject({ total: 5, correct: 2 });
   });
 
   it('caps the hint penalty', () => {
@@ -134,5 +134,61 @@ describe('retries and review labels (review round 1)', () => {
     const score = scoreSession(s, s.exercises.map((e) => ({ exerciseId: e.id, correct: false })));
     expect(score.review.map((r) => r.label)).toEqual(s.exercises.map((e) => (e.kind === 'wff' ? e.formula : '')));
     expect(new Set(score.review.map((r) => r.label)).size).toBe(5);
+  });
+});
+
+describe('one consistent outcome per exercise (review round 8)', () => {
+  const s = createPracticeSession({ topic: 'wff', difficulty: 1, count: 5, seed: 3 });
+  const [a, b, c, d, e] = s.exercises.map((x) => x.id);
+  const merge = (steps: ExerciseResult[]) => steps.reduce<ExerciseResult[]>((acc, r) => mergeResult(acc, r), []);
+
+  it('correct, then rechecked wrong → wrong (0 points, not first-try)', () => {
+    const rs = merge([{ exerciseId: a, correct: true, feedback: { correct: true } }, { exerciseId: a, correct: false, feedback: { correct: false } }]);
+    expect(resultOutcome(rs[0])).toBe('wrong');
+    expect(pointsFor(rs[0])).toBe(0);
+    const score = scoreSession(s, rs);
+    expect(score).toMatchObject({ score: 0, firstTryCorrect: 0, correct: 0, correctAfterRetry: 0 });
+    expect(score.review.map((r) => r.reason)).toEqual(['wrong']);
+  });
+
+  it('solution viewed, then checked correct → solution-viewed (0 points, never after-retry)', () => {
+    const rs = merge([{ exerciseId: b, correct: false }, { exerciseId: b, correct: true, feedback: { correct: true }, solutionViewed: true }]);
+    expect(resultOutcome(rs[0])).toBe('solution-viewed');
+    const score = scoreSession(s, rs);
+    expect(score).toMatchObject({ score: 0, correct: 0, correctAfterRetry: 0, firstTryCorrect: 0, solutionViewed: 1 });
+    // solution viewed before the very first check behaves the same
+    const rs2 = merge([{ exerciseId: b, correct: true, feedback: { correct: true }, solutionViewed: true }]);
+    expect(scoreSession(s, rs2)).toMatchObject({ score: 0, correct: 0, firstTryCorrect: 0 });
+  });
+
+  it('wrong, then correct → after-retry (½ point)', () => {
+    const rs = merge([{ exerciseId: c, correct: false, feedback: { correct: false } }, { exerciseId: c, correct: true, feedback: { correct: true } }]);
+    expect(resultOutcome(rs[0])).toBe('after-retry');
+    expect(scoreSession(s, rs)).toMatchObject({ score: 10, correct: 1, correctAfterRetry: 1, firstTryCorrect: 0 });
+  });
+
+  it('skipped → skipped; correct once → first-try', () => {
+    const rs = merge([{ exerciseId: d, correct: true, feedback: { correct: true } }, { exerciseId: e, skipped: true }]);
+    expect(resultOutcome(rs.find((r) => r.exerciseId === e))).toBe('skipped');
+    expect(resultOutcome(undefined)).toBe('skipped');
+    expect(scoreSession(s, rs)).toMatchObject({ score: 20, correct: 1, firstTryCorrect: 1, skipped: 4, answered: 1 });
+  });
+
+  it('score, counts and per-topic points always agree with resultOutcome', () => {
+    const rs = merge([
+      { exerciseId: a, correct: true },
+      { exerciseId: b, correct: false },
+      { exerciseId: b, correct: true },
+      { exerciseId: c, correct: true },
+      { exerciseId: c, correct: false },
+      { exerciseId: d, correct: true, solutionViewed: true },
+    ]);
+    const score = scoreSession(s, rs);
+    const outcomes = s.exercises.map((x) => resultOutcome(rs.find((r) => r.exerciseId === x.id)));
+    expect(score.firstTryCorrect).toBe(outcomes.filter((o) => o === 'first-try').length);
+    expect(score.correctAfterRetry).toBe(outcomes.filter((o) => o === 'after-retry').length);
+    expect(score.correct).toBe(score.firstTryCorrect + score.correctAfterRetry);
+    expect(score.byTopic.wff!.points).toBeCloseTo(rs.reduce((t, r) => t + pointsFor(r), 0));
+    expect(score.score).toBe(30); // 1 + 0.5 + 0 + 0 + 0 over 5
   });
 });

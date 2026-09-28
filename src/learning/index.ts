@@ -154,8 +154,8 @@ export {
   formulaPart,
 } from './terminology';
 
-export { createPracticeSession, scoreSession, mergeResult, pointsFor, randomTopic } from './session';
-export type { PracticeSession, PracticeSessionConfig, ExerciseResult, SessionScore, ReviewItem } from './session';
+export { createPracticeSession, scoreSession, mergeResult, pointsFor, randomTopic, resultOutcome } from './session';
+export type { PracticeSession, PracticeSessionConfig, ExerciseResult, SessionScore, ReviewItem, ResultOutcome } from './session';
 
 export {
   ProgressStore,

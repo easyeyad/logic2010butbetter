@@ -138,14 +138,39 @@ export interface ReviewItem {
 }
 
 /**
- * Scoring semantics (documented contract):
- *  - `firstTryCorrect` / `firstTryAccuracy` count only exercises answered fully
- *    correctly on the FIRST check. This is the headline number.
- *  - `correct` (a.k.a. eventually correct) counts exercises that ended correct,
- *    including after retries; `correctAfterRetry` is the difference.
- *  - `score` (0–100): first-try correct = 1, correct after retry = 0.5,
- *    ended partially right = 0.25, wrong / skipped / solution viewed = 0;
- *    each hint costs 0.1 of the item (at most half of it).
+ * How one exercise ended. THE single source of truth for every session number
+ * (score, counts, per-topic breakdown, review list) — and for a live
+ * "N right on the first try so far" header, which should count 'first-try'.
+ *
+ *  - 'skipped'          no result, or skipped.
+ *  - 'solution-viewed'  the solution was revealed (at any point). 0 points; never
+ *                       counted as correct, first-try or after-retry.
+ *  - 'first-try'        the FIRST check was fully correct AND the final check is
+ *                       correct (a correct answer later edited into a wrong one
+ *                       does not count).
+ *  - 'after-retry'      the final check is correct but the first was not.
+ *  - 'partial'          the final check is partly right.
+ *  - 'wrong'            anything else (including correct first, wrong at the end).
+ */
+export type ResultOutcome = 'skipped' | 'solution-viewed' | 'first-try' | 'after-retry' | 'partial' | 'wrong';
+
+export function resultOutcome(r: ExerciseResult | undefined): ResultOutcome {
+  if (!r || r.skipped) return 'skipped';
+  if (r.solutionViewed) return 'solution-viewed';
+  if (finalCorrect(r)) return firstTry(r) ? 'first-try' : 'after-retry';
+  return r.feedback?.partial ? 'partial' : 'wrong';
+}
+
+const BASE_POINTS: Record<ResultOutcome, number> = { skipped: 0, 'solution-viewed': 0, 'first-try': 1, 'after-retry': 0.5, partial: 0.25, wrong: 0 };
+
+/**
+ * Scoring semantics (documented contract) — everything derives from `resultOutcome`:
+ *  - `firstTryCorrect` / `firstTryAccuracy`: outcome 'first-try'. The headline number.
+ *  - `correctAfterRetry`: outcome 'after-retry'. `correct` = first-try + after-retry
+ *    (solution-viewed items are never counted as correct).
+ *  - `score` (0–100): first-try = 1, after-retry = 0.5, partial = 0.25,
+ *    wrong / skipped / solution-viewed = 0; each hint costs 0.1 of the item
+ *    (at most half of it).
  *  - ProgressStore accuracy is per recorded ATTEMPT (every Check is one attempt,
  *    partial = ½), so a retry-heavy session lowers it too; the two agree when
  *    every exercise is answered once.
@@ -153,11 +178,12 @@ export interface ReviewItem {
 export interface SessionScore {
   total: number;
   answered: number;
-  /** Ended correct (first try or after retries). */
+  /** Ended correct without viewing the solution (first try or after retries). */
   correct: number;
   firstTryCorrect: number;
   correctAfterRetry: number;
   partial: number;
+  solutionViewed: number;
   skipped: number;
   /** firstTryCorrect / total, 0–1 (null for an empty session). */
   firstTryAccuracy: number | null;
@@ -172,17 +198,22 @@ export interface SessionScore {
 }
 
 export function pointsFor(r: ExerciseResult): number {
-  if (r.skipped || r.solutionViewed) return 0;
-  const partial = r.feedback?.partial ?? false;
-  const base = firstTry(r) ? 1 : finalCorrect(r) ? 0.5 : partial ? 0.25 : 0;
+  const base = BASE_POINTS[resultOutcome(r)];
   const penalty = Math.min(base / 2, 0.1 * (r.hintsUsed ?? 0));
   return Math.max(0, base - penalty);
 }
 
+const REVIEW_REASON: Partial<Record<ResultOutcome, ReviewItem['reason']>> = {
+  'after-retry': 'correct-after-retry',
+  'solution-viewed': 'solution-viewed',
+  partial: 'partial',
+  wrong: 'wrong',
+};
+
 export function scoreSession(session: PracticeSession, results: readonly ExerciseResult[]): SessionScore {
   const byId = new Map(results.map((r) => [r.exerciseId, r]));
   const out: SessionScore = {
-    total: session.exercises.length, answered: 0, correct: 0, firstTryCorrect: 0, correctAfterRetry: 0, partial: 0, skipped: 0,
+    total: session.exercises.length, answered: 0, correct: 0, firstTryCorrect: 0, correctAfterRetry: 0, partial: 0, solutionViewed: 0, skipped: 0,
     firstTryAccuracy: null, score: 0, hintsUsed: 0, totalTimeMs: 0, byTopic: {}, toReview: [], review: [],
   };
   let points = 0;
@@ -190,36 +221,31 @@ export function scoreSession(session: PracticeSession, results: readonly Exercis
     const r = byId.get(ex.id);
     const t = (out.byTopic[ex.topic] ??= { total: 0, correct: 0, firstTryCorrect: 0, points: 0 });
     t.total++;
-    if (!r || r.skipped) {
+    const outcome = resultOutcome(r);
+    if (outcome === 'skipped') {
       out.skipped++;
       continue;
     }
     out.answered++;
-    const correct = finalCorrect(r);
-    const first = firstTry(r);
-    let reason: ReviewItem['reason'] | null = null;
-    if (correct) {
+    if (outcome === 'first-try') {
+      out.firstTryCorrect++;
+      t.firstTryCorrect++;
+    }
+    if (outcome === 'first-try' || outcome === 'after-retry') {
       out.correct++;
       t.correct++;
-      if (first) {
-        out.firstTryCorrect++;
-        t.firstTryCorrect++;
-      } else {
-        out.correctAfterRetry++;
-        reason = 'correct-after-retry';
-      }
-    } else if (r.feedback?.partial) {
-      out.partial++;
-      reason = 'partial';
-    } else reason = 'wrong';
-    if (r.solutionViewed) reason = 'solution-viewed';
+    }
+    if (outcome === 'after-retry') out.correctAfterRetry++;
+    if (outcome === 'partial') out.partial++;
+    if (outcome === 'solution-viewed') out.solutionViewed++;
+    const reason = REVIEW_REASON[outcome];
     if (reason) {
       out.toReview.push(ex.id);
       out.review.push({ exerciseId: ex.id, topic: ex.topic, title: ex.title, label: exerciseLabel(ex), reason });
     }
-    out.hintsUsed += r.hintsUsed ?? 0;
-    out.totalTimeMs += r.timeMs ?? 0;
-    const p = pointsFor(r);
+    out.hintsUsed += r!.hintsUsed ?? 0;
+    out.totalTimeMs += r!.timeMs ?? 0;
+    const p = pointsFor(r!);
     points += p;
     t.points += p;
   }

@@ -455,3 +455,14 @@ describe('review round 4 fixes', () => {
       }
   });
 });
+
+describe('wrong-quantifier direction (review round 8)', () => {
+  it('says which way the quantifier is wrong', () => {
+    const a = check('psym-05', '∃xPx');
+    expect(a.code).toBe('wrong-quantifier');
+    expect(a.headline).toBe('Wrong quantifier: you used ∃ where the sentence needs ∀.');
+    const b = check('psym-06', '∀xBx');
+    expect(b.code).toBe('wrong-quantifier');
+    expect(b.headline).toBe('Wrong quantifier: you used ∀ where the sentence needs ∃.');
+  });
+});

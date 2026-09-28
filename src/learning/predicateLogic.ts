@@ -519,11 +519,15 @@ function mutationMessage(m: PMutation, ex: PredicateSymbolizationExercise): { he
         headline: 'The arguments of a relation are in the wrong order.',
         explanation: `Check the key: ${ex.key.filter((k) => k.kind === 'predicate' && k.arity >= 2).map(keyLabel).join('; ')}. The first place is the one doing the ${ex.key.find((k) => k.kind === 'predicate' && k.arity >= 2)?.meaning.replace(/^x /, '').replace(/ y$/, '') ?? 'relating'}. The sentence needs ${o}.`,
       };
-    case 'wrong-quantifier':
+    case 'wrong-quantifier': {
+      const needsAll = m.original.kind === 'forall';
       return {
-        headline: 'Wrong quantifier: ∀ where ∃ is needed, or vice versa.',
-        explanation: `"all", "every", "each", "any(one) who" signal ∀; "some", "a", "there is", "someone" signal ∃. The sentence needs ${o}.`,
+        headline: needsAll ? 'Wrong quantifier: you used ∃ where the sentence needs ∀.' : 'Wrong quantifier: you used ∀ where the sentence needs ∃.',
+        explanation: needsAll
+          ? `This part is about EVERY thing ("all", "every", "each", "any(one) who"), so it needs ∀; ∃ only says that at least one thing qualifies. The sentence needs ${o}.`
+          : `This part says that SOME thing qualifies ("some", "a", "there is", "someone"), so it needs ∃; ∀ would claim it of everything. The sentence needs ${o}.`,
       };
+    }
     case 'conditional-as-biconditional':
       return { headline: 'The sentence only goes one way; ↔ claims both.', explanation: `Use → unless the sentence says "all and only" / "if and only if". The sentence needs ${o}.` };
     case 'and-as-or':
