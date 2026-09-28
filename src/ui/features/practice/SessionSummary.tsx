@@ -64,7 +64,10 @@ export function SessionSummary({
               <li key={e.exerciseId}>
                 <Icon name="refresh" size={16} />
                 <span className="review-list__text">
-                  <span className="badge">{REASON[e.reason] ?? e.reason}</span> <strong>{e.title}</strong> · {TOPIC_INFO[e.topic].title}
+                  <span className="review-list__head">
+                    <span className="badge">{REASON[e.reason] ?? e.reason}</span> <strong>{e.title}</strong>{' '}
+                    <span className="subtle">· {TOPIC_INFO[e.topic].title}</span>
+                  </span>
                   <span className="review-list__label math">{e.label}</span>
                 </span>
               </li>

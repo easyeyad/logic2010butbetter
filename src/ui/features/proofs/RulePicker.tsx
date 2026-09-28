@@ -34,6 +34,7 @@ export function RulePicker({
   const [active, setActive] = useState(0);
   const [focused, setFocused] = useState(false);
   const listRef = useRef<HTMLUListElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
 
   // Reflect external changes (undo, selection) when not typing.
   useEffect(() => {
@@ -89,7 +90,16 @@ export function RulePicker({
   const shownLabel = options.find((o) => o.key === value);
 
   return (
-    <div className="picker">
+    <div
+      className="picker"
+      // Focus moving INSIDE the picker (e.g. Tab to "Enable derived rules") keeps the popover and the typed text.
+      onBlur={(e) => {
+        if (e.relatedTarget instanceof Node && e.currentTarget.contains(e.relatedTarget)) return;
+        setFocused(false);
+        setOpen(false);
+        setText(value);
+      }}
+    >
       <label htmlFor={id} className="visually-hidden">{label}</label>
       <input
         id={id}
@@ -121,11 +131,7 @@ export function RulePicker({
           setFocused(true);
           e.target.select();
         }}
-        onBlur={() => {
-          setFocused(false);
-          setOpen(false);
-          setText(value);
-        }}
+        ref={inputRef}
         onClick={() => setOpen((o) => !o)}
         onKeyDown={handleKey}
       />
@@ -150,7 +156,22 @@ export function RulePicker({
                   type="button"
                   className="btn btn--sm"
                   onMouseDown={(e) => e.preventDefault()}
-                  onClick={() => update({ derivedRules: true })}
+                  onClick={() => {
+                    update({ derivedRules: true });
+                    // Use the rule that was typed, and go back to the field.
+                    onChange(off.key);
+                    setText(off.abbr);
+                    setOpen(false);
+                    inputRef.current?.focus();
+                  }}
+                  onKeyDown={(e) => {
+                    if (e.key !== 'Escape') return;
+                    e.preventDefault();
+                    e.stopPropagation();
+                    setOpen(false);
+                    setText(value);
+                    inputRef.current?.focus();
+                  }}
                 >
                   Enable derived rules
                 </button>

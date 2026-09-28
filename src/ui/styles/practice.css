@@ -156,8 +156,9 @@
 .stat-row--cards .stat { padding: var(--sp-4); }
 .stat__value { font-size: var(--fs-2xl); font-weight: 750; letter-spacing: -0.02em; font-variant-numeric: tabular-nums; }
 .stat__label { font-size: var(--fs-sm); color: var(--c-text-2); }
-.review-list { list-style: none; display: flex; flex-direction: column; gap: var(--sp-2); }
-.review-list li { display: flex; gap: var(--sp-2); align-items: flex-start; overflow-wrap: anywhere; }
+.review-list { list-style: none; display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 20rem), 1fr)); gap: var(--sp-2) var(--sp-4); }
+.review-list li { display: flex; gap: var(--sp-2); align-items: flex-start; overflow-wrap: anywhere; padding: var(--sp-2) var(--sp-3); border: 1px solid var(--c-border); border-radius: var(--radius); background: var(--c-surface); min-width: 0; }
+.review-list__head { display: flex; flex-wrap: wrap; align-items: baseline; gap: var(--sp-1) var(--sp-2); }
 .review-list svg { flex: none; margin-top: 4px; color: var(--c-text-3); }
 
 /* Bars (single series, value always printed) */
