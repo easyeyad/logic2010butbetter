@@ -1,4 +1,4 @@
-import { useEffect, useId, useMemo, useRef, useState, type KeyboardEvent } from 'react';
+import { useEffect, useId, useLayoutEffect, useMemo, useRef, useState, type KeyboardEvent } from 'react';
 import { useSettings } from '../../app/settings';
 import { exactMatch, filterOptions, type JustOption } from './justification';
 
@@ -29,12 +29,41 @@ export function RulePicker({
   const { update } = useSettings();
   const id = useId();
   const listId = `${id}-list`;
+  const popId = `${id}-pop`;
   const [text, setText] = useState(value);
   const [open, setOpen] = useState(false);
   const [active, setActive] = useState(0);
   const [focused, setFocused] = useState(false);
   const listRef = useRef<HTMLUListElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  const popRef = useRef<HTMLDivElement>(null);
+  // Keep the popover clear of fixed bottom bars (phone tab bar, proof tools bar): cap its height, or open upward.
+  const [place, setPlace] = useState<{ up: boolean; maxHeight?: number }>({ up: false });
+  useLayoutEffect(() => {
+    if (!open) return;
+    const measure = () => {
+      const r = inputRef.current?.getBoundingClientRect();
+      if (!r) return;
+      let floor = window.innerHeight;
+      document.querySelectorAll<HTMLElement>('.actionbar, .tabbar').forEach((el) => {
+        const b = el.getBoundingClientRect();
+        if (b.height > 0 && getComputedStyle(el).position === 'fixed') floor = Math.min(floor, b.top);
+      });
+      const gap = 8 + 12; // offset + the popover's own padding and border
+      const below = floor - r.bottom - gap;
+      const above = r.top - gap - 56; // leave room for a sticky header
+      const want = 280;
+      if (below >= Math.min(want, 160) || below >= above) setPlace({ up: false, maxHeight: Math.max(96, Math.min(want, below)) });
+      else setPlace({ up: true, maxHeight: Math.max(96, Math.min(want, above)) });
+    };
+    measure();
+    window.addEventListener('resize', measure);
+    window.visualViewport?.addEventListener('resize', measure);
+    return () => {
+      window.removeEventListener('resize', measure);
+      window.visualViewport?.removeEventListener('resize', measure);
+    };
+  }, [open]);
 
   // Reflect external changes (undo, selection) when not typing.
   useEffect(() => {
@@ -106,7 +135,8 @@ export function RulePicker({
         className={`picker__input ${invalid ? 'is-invalid' : ''} ${value ? 'has-value' : ''}`}
         role="combobox"
         aria-expanded={open}
-        aria-controls={listId}
+        // The listbox when there is one; otherwise the popover that explains why there are no options.
+        aria-controls={open && filtered.length === 0 ? popId : listId}
         aria-autocomplete="list"
         aria-activedescendant={open && filtered[active] ? `${id}-opt-${active}` : undefined}
         aria-invalid={invalid || undefined}
@@ -136,20 +166,45 @@ export function RulePicker({
         onKeyDown={handleKey}
       />
       {open && (
-        <ul
-          id={listId}
-          ref={listRef}
-          role="listbox"
-          className="picker__list"
-          aria-label={`${label} options`}
-          // Chrome makes scrollable elements keyboard-focusable; keep Tab moving on to the cited-lines field.
-          tabIndex={-1}
-        >
-          {filtered.length === 0 && (() => {
+        // Popover: the listbox holds ONLY options (and presentational group headings); messages and the
+        // "Enable derived rules" button sit beside it, still inside the picker so focus stays contained.
+        <div ref={popRef} id={popId} className={`picker__pop ${place.up ? 'picker__pop--up' : ''}`}>
+          {filtered.length > 0 ? (
+            <ul
+              id={listId}
+              ref={listRef}
+              role="listbox"
+              className="picker__list"
+              style={place.maxHeight ? { maxHeight: place.maxHeight } : undefined}
+              aria-label={`${label} options`}
+              // Chrome makes scrollable elements keyboard-focusable; keep Tab moving on to the cited-lines field.
+              tabIndex={-1}
+            >
+              {filtered.map((o, i) => [
+                !text.trim() && (i === 0 || filtered[i - 1].group !== o.group) ? (
+                  <li key={`g-${o.group}`} role="presentation" className="picker__group">{o.group}</li>
+                ) : null,
+                <li
+                  key={o.key}
+                  id={`${id}-opt-${i}`}
+                  role="option"
+                  aria-selected={i === active}
+                  className={`picker__opt ${o.key === value ? 'is-current' : ''}`}
+                  onMouseDown={(e) => e.preventDefault()}
+                  onClick={() => choose(o)}
+                  // Only real pointer movement changes the highlight — a resting pointer must not override typing.
+                  onPointerMove={() => i !== active && setActive(i)}
+                >
+                  <span className="picker__abbr">{o.abbr}</span>
+                  <span className="picker__name">{o.name}</span>
+                </li>,
+              ])}
+            </ul>
+          ) : (() => {
             const off = filterOptions(unavailable, text)[0];
             return off && text.trim() ? (
-              <li className="picker__empty picker__empty--derived" role="presentation">
-                <span>
+              <div className="picker__empty picker__empty--derived" role="group" aria-label="Derived rule unavailable" data-testid="picker-derived">
+                <span role="status">
                   <strong>{off.abbr}</strong> ({off.name}) is a derived rule, and derived rules are off.
                 </span>
                 <button
@@ -176,31 +231,12 @@ export function RulePicker({
                   Enable derived rules
                 </button>
                 <span className="subtle">You can change this any time in Settings.</span>
-              </li>
+              </div>
             ) : (
-              <li className="picker__empty" role="presentation">No rule matches “{text}”</li>
+              <div className="picker__empty" role="status">No rule matches “{text}”</div>
             );
           })()}
-          {filtered.map((o, i) => [
-            !text.trim() && (i === 0 || filtered[i - 1].group !== o.group) ? (
-              <li key={`g-${o.group}`} role="presentation" className="picker__group">{o.group}</li>
-            ) : null,
-            <li
-              key={o.key}
-              id={`${id}-opt-${i}`}
-              role="option"
-              aria-selected={i === active}
-              className={`picker__opt ${o.key === value ? 'is-current' : ''}`}
-              onMouseDown={(e) => e.preventDefault()}
-              onClick={() => choose(o)}
-              // Only real pointer movement changes the highlight — a resting pointer must not override typing.
-              onPointerMove={() => i !== active && setActive(i)}
-            >
-              <span className="picker__abbr">{o.abbr}</span>
-              <span className="picker__name">{o.name}</span>
-            </li>,
-          ])}
-        </ul>
+        </div>
       )}
     </div>
   );

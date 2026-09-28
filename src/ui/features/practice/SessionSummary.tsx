@@ -66,8 +66,10 @@ export function SessionSummary({
                 <Icon name="refresh" size={16} />
                 <span className="review-list__text">
                   <span className="review-list__head">
-                    <span className="badge">{REASON[e.reason] ?? e.reason}</span> <strong>{e.title}</strong>{' '}
-                    <span className="subtle">· {TOPIC_INFO[e.topic].title}</span>
+                    <span className="badge">{REASON[e.reason] ?? e.reason}</span>
+                    <strong>{e.title}</strong>
+                    {/* The flex gap separates the items; a "·" would dangle when the topic wraps. */}
+                    <span className="review-list__topic"><span className="visually-hidden">Topic: </span>{TOPIC_INFO[e.topic].title}</span>
                   </span>
                   <span className="review-list__label math">{e.label}</span>
                 </span>

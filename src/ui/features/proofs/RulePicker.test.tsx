@@ -73,3 +73,31 @@ test('Shift+Tab from the Enable button goes back to the rule field with the text
   await userEvent.tab({ shift: true });
   expect(document.activeElement).toBe(rule());
 });
+
+/** Every child of a listbox is an option (or a presentational group heading) — never a button or text. */
+function expectCleanListboxes() {
+  for (const lb of Array.from(document.querySelectorAll('[role="listbox"]'))) {
+    for (const child of Array.from(lb.children)) expect(['option', 'presentation']).toContain(child.getAttribute('role'));
+    expect(lb.querySelectorAll('[role="option"]').length).toBeGreaterThan(0);
+    expect(lb.querySelector('button, a, input')).toBeNull();
+  }
+}
+
+test('a11y: the derived-rule message and its button are outside the listbox, and the listbox holds only options', async () => {
+  renderWithProviders(<Row />);
+  await userEvent.click(rule());
+  expectCleanListboxes(); // full list with group headings
+  await userEvent.type(rule(), 'm');
+  expectCleanListboxes(); // filtered list
+  await userEvent.clear(rule());
+  await userEvent.type(rule(), 'dm');
+  const enable = screen.getByRole('button', { name: 'Enable derived rules' });
+  expect(enable.closest('[role="listbox"]')).toBeNull();
+  expect(screen.queryByRole('listbox')).toBeNull();
+  expect(document.getElementById(rule().getAttribute("aria-controls")!)).toContainElement(enable);
+  expectCleanListboxes();
+  await userEvent.clear(rule());
+  await userEvent.type(rule(), 'xyz');
+  expect(screen.getByText(/No rule matches/)).toHaveAttribute('role', 'status');
+  expect(screen.queryByRole('listbox')).toBeNull();
+});

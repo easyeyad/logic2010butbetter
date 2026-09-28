@@ -151,7 +151,7 @@
 .rec__text { min-width: 0; flex: 1 1 280px; }
 .rec__title { font-size: var(--fs-lg); margin: 2px 0; }
 .summary { display: flex; flex-direction: column; gap: var(--sp-4); }
-.stat-row { display: grid; gap: var(--sp-3); grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); }
+.stat-row { display: grid; gap: var(--sp-3); grid-template-columns: repeat(auto-fit, minmax(min(100%, 130px), 1fr)); }
 .stat { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
 .stat-row--cards .stat { padding: var(--sp-4); }
 .stat__value { font-size: var(--fs-2xl); font-weight: 750; letter-spacing: -0.02em; font-variant-numeric: tabular-nums; }
@@ -159,6 +159,7 @@
 .review-list { list-style: none; display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 20rem), 1fr)); gap: var(--sp-2) var(--sp-4); }
 .review-list li { display: flex; gap: var(--sp-2); align-items: flex-start; overflow-wrap: anywhere; padding: var(--sp-2) var(--sp-3); border: 1px solid var(--c-border); border-radius: var(--radius); background: var(--c-surface); min-width: 0; }
 .review-list__head { display: flex; flex-wrap: wrap; align-items: baseline; gap: var(--sp-1) var(--sp-2); }
+.review-list__topic { color: var(--c-text-3); font-size: var(--fs-sm); }
 .review-list svg { flex: none; margin-top: 4px; color: var(--c-text-3); }
 
 /* Bars (single series, value always printed) */
