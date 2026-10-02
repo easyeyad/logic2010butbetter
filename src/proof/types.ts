@@ -25,9 +25,18 @@ export type RuleId =
   // Primitive sentential rules (Logic 2010)
   | 'MP' | 'MT' | 'DN' | 'R' | 'S' | 'ADJ' | 'ADD' | 'MTP' | 'BC' | 'CB'
   // Derived sentential rules (Logic 2010 "derived rules"), enabled by settings
-  | 'DM' | 'NC' | 'NB' | 'CDJ' | 'SC';
+  | 'DM' | 'NC' | 'NB' | 'CDJ' | 'SC'
+  // Quantifier rules (primitive): universal instantiation, existential
+  // generalization, existential instantiation (new variable).
+  | 'UI' | 'EG' | 'EI'
+  // Derived quantifier rules: quantifier negation, alphabetic variance.
+  | 'QN' | 'AV'
+  // Identity rules (primitive in Logic 2010's identity chapter): identity
+  // (t = t, no lines cited), Leibniz's law (substitution), symmetry.
+  | 'Id' | 'LL' | 'SM';
 
-export type CloseMethod = 'DD' | 'CD' | 'ID';
+/** DD/CD/ID, plus UD (universal derivation) for "Show ∀xφ" boxes. */
+export type CloseMethod = 'DD' | 'CD' | 'ID' | 'UD';
 
 export type LineKind =
   | 'premise'     // "PR": only at depth 0 before any other line kind
@@ -56,8 +65,13 @@ export interface DerivationDraft {
   /** Goal the student must show (text). Optional in free-form mode. */
   goal?: string;
   lines: DraftLine[];
-  /** Allow derived rules (DM, NC, NB, CDJ, SC). Default false. */
+  /** Allow derived rules (DM, NC, NB, CDJ, SC, QN, AV). Default false. */
   allowDerivedRules?: boolean;
+  /**
+   * Optional: the exercise's given premises (text). When present, every PR
+   * line must be one of them ('premise-not-given' otherwise).
+   */
+  premises?: string[];
 }
 
 export type Severity = 'error' | 'warning' | 'info';
@@ -78,6 +92,8 @@ export interface LineIssue {
   badRefs?: number[];
   /** What would make it valid — must not give away the whole proof. */
   suggestion?: string;
+  /** For 'parse-error': the offending character range of the line's text. */
+  span?: { start: number; end: number };
 }
 
 export interface LineCheck {
