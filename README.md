@@ -42,6 +42,10 @@ npm run build      # static site in dist/ (relative base, hash routing)
 npm run e2e        # Playwright: 7 viewports, axe accessibility, keyboard, reduced motion
 ```
 
+## Deployment
+
+`.github/workflows/deploy-pages.yml` runs the unit tests, builds, and deploys `dist/` to GitHub Pages on every push to `main` (it can also be run by hand from the Actions tab). One-time setup: in the repository's Settings → Pages, set **Source** to **GitHub Actions**. The site is then served at `https://<owner>.github.io/<repo>/`.
+
 ## Scope
 
 Function symbols and definite descriptions are not supported yet. The shared `Formula` AST in `src/logic/ast.ts` is the place to extend it. Predicates with three or more places parse and check, but the practice model builder only handles one- and two-place predicates.
